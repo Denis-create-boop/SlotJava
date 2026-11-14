@@ -180,12 +180,24 @@ db.transaction(()=>{
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
 const starterImages=[
-  ['A','/static/images/symbols/a.svg'],['Q','/static/images/symbols/q.svg'],
-  ['J','/static/images/symbols/j.svg'],['K','/static/images/symbols/k.svg'],
-  ['10','/static/images/symbols/10.svg'],['9','/static/images/symbols/9.svg'],
+  ['A','/static/images/symbols/premium-letters.svg#a'],['Q','/static/images/symbols/premium-letters.svg#q'],
+  ['J','/static/images/symbols/premium-letters.svg#j'],['K','/static/images/symbols/premium-letters.svg#k'],
+  ['10','/static/images/symbols/premium-letters.svg#ten'],['9','/static/images/symbols/premium-letters.svg#nine'],
   ['Череп','/static/images/symbols/skull.svg'],['Меч','/static/images/symbols/sword.svg'],
   ['Змея над чашей','/static/images/symbols/snake-cup.svg'],['Дьявол','/static/images/symbols/devil.svg']
 ];
+// Keep library image IDs (and symbol assignments) when upgrading the artwork.
+if(firstGame){
+  const upgradeArt=db.prepare('UPDATE game_image_library SET builtin_path=? WHERE game_id=? AND builtin_path=?');
+  db.transaction(()=>{
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#a',firstGame.id,'/static/images/symbols/a.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#q',firstGame.id,'/static/images/symbols/q.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#j',firstGame.id,'/static/images/symbols/j.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#k',firstGame.id,'/static/images/symbols/k.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#ten',firstGame.id,'/static/images/symbols/10.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#nine',firstGame.id,'/static/images/symbols/9.svg');
+  })();
+}
 if(firstGame){
   const addImage=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
   db.transaction(()=>{for(const row of starterImages)addImage.run(firstGame.id,...row);})();
