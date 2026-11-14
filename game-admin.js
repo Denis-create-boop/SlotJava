@@ -16,6 +16,7 @@ const assetTypes={
   spin_sound:{label:'Звук вращения барабанов',kind:'audio'},
   win_sound:{label:'Звук выигрыша',kind:'audio'},
 };
+for(let i=1;i<=5;i++)assetTypes['reel_'+i]={label:'Фон барабана №'+i+' (столбец '+i+')',kind:'image'};
 for(let i=1;i<=20;i++)assetTypes['cell_'+i]={label:'Фон ячейки №'+i+' (строка '+(Math.floor((i-1)/5)+1)+', столбец '+((i-1)%5+1)+')',kind:'image'};
 
 const upload=multer({
@@ -117,7 +118,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="asset-settings-grid">'+rows+'</div></section>'+
       '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
       '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
-      '<section class="panel"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Выплата рассчитывается по общему количеству одинаковых символов на поле.</p>'+
+      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Выплата рассчитывается по общему количеству одинаковых символов на поле.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
