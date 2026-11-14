@@ -126,8 +126,15 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const src=libraryUrl(id,image);
       const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length+
         Array.from(assignedBackgrounds.values()).filter(item=>item.library_image_id===image.id).length;
+      const quickAssign=([key,label])=>'<form method="post" action="/admin/games/'+id+'/backgrounds/'+key+'">'+csrf+
+        '<input type="hidden" name="image_id" value="'+image.id+'">'+
+        '<button type="submit"'+(assignedBackgrounds.get(key)?.library_image_id===image.id?' disabled':'')+'>'+label+
+        (assignedBackgrounds.get(key)?.library_image_id===image.id?' ✓':'')+'</button></form>';
       return '<div class="library-image-card"><img src="'+h(src)+'" alt="'+h(image.name)+'" loading="lazy">'+
         '<strong>'+h(image.name)+'</strong>'+
+        '<div class="library-quick-actions">'+
+        quickAssign(['background','Фон игры'])+quickAssign(['field_background','Фон поля'])+
+        '</div>'+
         (image.file_name?'<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
           '<button type="submit"'+(linkedCount?' disabled title="Сначала уберите назначение картинки из символов и фонов"':'')+'>Удалить</button></form>':
           '<small>Стандартная иллюстрация</small>')+'</div>';
