@@ -235,3 +235,49 @@ header,main,footer {position:relative;z-index:1}
  .spin-round-icon{font-size:2.1rem}
 }
 @media(prefers-reduced-motion:reduce){.reel-track{transition:none!important}}
+
+/* Settings control, clickable stake and dialog */
+.slot-bottom-bar{grid-template-columns:auto minmax(0,1fr) auto;gap:clamp(7px,1.8vw,18px)}
+.slot-settings-trigger{
+  display:grid;place-items:center;flex-shrink:0;
+  width:clamp(42px,5vw,56px);height:clamp(42px,5vw,56px);
+  min-height:0;padding:0;border-radius:50%;
+  border:1px solid rgba(229,197,137,.48);
+  background:linear-gradient(145deg,#51515b,#292a33);
+  color:#f8e1b6;font-size:clamp(1.35rem,2.6vw,1.85rem);
+  box-shadow:0 5px 16px #0006
+}
+.slot-settings-trigger:hover{filter:brightness(1.15)}
+.slot-settings-trigger:disabled,.slot-bet-button:disabled{opacity:.6;cursor:wait}
+.slot-bet-button{min-width:0;width:100%;font:inherit;cursor:pointer}
+.slot-bet-button:hover:not(:disabled){filter:brightness(1.16);border-color:rgba(235,191,113,.55)}
+.slot-settings-dialog{
+  max-width:min(420px,calc(100vw - 26px));width:100%;
+  padding:clamp(20px,4vw,28px);
+  color:#f5f4f7;
+  border:1px solid rgba(234,197,129,.38);
+  border-radius:19px;
+  background:linear-gradient(155deg,#3c3d46,#22232c 72%);
+  box-shadow:0 24px 75px #000b,0 0 32px rgba(204,157,80,.09)
+}
+.slot-settings-dialog::backdrop{background:rgba(6,7,11,.67);backdrop-filter:blur(5px)}
+.slot-settings-dialog h2{margin:0 35px 23px 0;font-size:1.45rem}
+.slot-settings-dialog .settings-close{
+  position:absolute;right:13px;top:11px;
+  min-height:34px;width:34px;padding:0;
+  border-radius:50%;font-size:1.4rem
+}
+.slot-settings-dialog .sound-toggle{display:flex;gap:11px;align-items:center;cursor:pointer;padding:10px 0 18px;font-weight:600}
+.slot-settings-dialog .sound-toggle input{width:20px;height:20px;accent-color:#b88aef;cursor:pointer}
+#slot-bet-form{display:grid;gap:12px}
+#slot-bet-form select{width:100%;padding:12px 14px;background:#282a35;border:1px solid #777987;border-radius:10px;color:#fff;font:inherit}
+#slot-bet-form button{margin-top:4px}
+.slot-settings-dialog .hint{margin-bottom:0}
+@media(max-width:650px){
+ .slot-bottom-bar{gap:6px}
+ .slot-settings-trigger{width:38px;height:38px;font-size:1.25rem}
+}
+@media(max-width:390px){
+ .slot-settings-trigger{width:32px;height:32px;font-size:1.1rem}
+ .slot-bottom-bar{gap:4px}
+}
