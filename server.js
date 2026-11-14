@@ -149,27 +149,19 @@ app.get('/',(req,res)=>{
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
 function scoreBoard(cells,symbols,payouts){
-  // A symbol wins when it is visible in consecutive reels starting at reel 1.
-  // Multiple instances within a reel count only once; rows/paylines do not matter.
-  const prizes=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=5)
+  // At least one instance of a symbol must be on EACH of reels 1, 2 and 3.
+  // All visible instances across all five reels contribute to the quantity payout.
+  const payoutMap=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=20)
     .map(p=>[p.symbol_id+':'+p.matches,p.prize]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
-    let reels=0;
-    for(let col=0;col<5;col++){
-      let found=false;
-      for(let row=0;row<4;row++){
-        if(cells[row*5+col]===symbol.id){found=true;break;}
-      }
-      if(!found)break;
-      reels++;
-    }
-    if(reels<3)continue;
-    const prize=prizes.get(symbol.id+':'+reels)||0;
+    if(![0,1,2].every(col=>[0,1,2,3].some(row=>cells[row*5+col]===symbol.id)))continue;
+    const count=cells.filter(id=>id===symbol.id).length;
+    const prize=payoutMap.get(symbol.id+':'+count)||0;
     if(prize>0){
       total+=prize;
-      wins.push({symbolId:symbol.id,name:symbol.name,reels,prize});
+      wins.push({symbolId:symbol.id,name:symbol.name,count,prize});
     }
   }
   return {total,wins};
@@ -180,22 +172,24 @@ function generateSpin(gameId,winFrequency){
   const randomBoard=()=>Array.from({length:20},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
   let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts);
-  // Try to meet the target win frequency, without faking a payout.
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
-    cells=randomBoard();
-    evaluation=scoreBoard(cells,symbols,payouts);
+    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
-    const candidates=payouts.filter(p=>p.prize>0&&p.matches>=3&&p.matches<=5);
-    // Inject a paying symbol into one random row of each required reel.
-    for(let trial=0;trial<Math.min(candidates.length*8,200)&&evaluation.total===0;trial++){
-      const candidateRule=candidates[crypto.randomInt(candidates.length)];
-      const others=symbols.filter(item=>item.id!==candidateRule.symbol_id);
-      const arranged=Array.from({length:20},()=>others[crypto.randomInt(others.length)].id);
-      for(let col=0;col<candidateRule.matches;col++){
-        const row=crypto.randomInt(4);
-        arranged[row*5+col]=candidateRule.symbol_id;
+    const candidates=payouts.filter(p=>p.prize>0&&p.matches>=3&&p.matches<=20);
+    for(let trial=0;trial<Math.min(candidates.length*8,250)&&evaluation.total===0;trial++){
+      const rule=candidates[crypto.randomInt(candidates.length)];
+      const others=symbols.filter(item=>item.id!==rule.symbol_id);
+      const positions=[0,1,2].map(col=>crypto.randomInt(4)*5+col);
+      const available=Array.from({length:20},(_,i)=>i).filter(i=>!positions.includes(i));
+      for(let j=available.length-1;j>0;j--){
+        const k=crypto.randomInt(j+1);
+        [available[j],available[k]]=[available[k],available[j]];
       }
+      positions.push(...available.slice(0,rule.matches-3));
+      const winningCells=new Set(positions);
+      const arranged=Array.from({length:20},(_,i)=>winningCells.has(i)?
+        rule.symbol_id:others[crypto.randomInt(others.length)].id);
       const scored=scoreBoard(arranged,symbols,payouts);
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
