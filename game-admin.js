@@ -54,7 +54,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     return !!db.prepare('SELECT id FROM game_symbols WHERE id=? AND game_id=?').get(symbolId,gameId);
   }
   function isBackgroundAsset(key) {
-    return !!assetTypes[key] && assetTypes[key].kind==='image' && key!=='logo';
+    return !!assetTypes[key] && assetTypes[key].kind==='image';
   }
   function imageBox(id,key,label,assets,csrf) {
     const value=assets.get(key),src='/game-assets/'+id+'/'+key;
@@ -105,7 +105,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<form method="post" class="library-background-picker" action="/admin/games/'+id+'/backgrounds/'+key+'">'+csrf+
         '<label>Выбрать из папки изображений<select name="image_id" required><option value="">Выберите картинку</option>'+
         libraryImages.map(image=>'<option value="'+image.id+'"'+(assigned?.library_image_id===image.id?' selected':'')+'>'+h(image.name)+'</option>').join('')+
-        '</select></label><button class="primary" type="submit">Применить фон</button></form>':'';
+        '</select></label><button class="primary" type="submit">'+(key==='logo'?'Применить логотип':'Применить фон')+'</button></form>':'';
       return '<div class="asset-setting"><div class="asset-detail"><strong>'+h(meta.label)+'</strong>'+preview+
         (assigned?'<small>Применено из папки изображений: '+h(assigned.name)+'</small>':
          value?'<small>Применён загруженный файл</small>':'<small>Фон пока не задан</small>')+
