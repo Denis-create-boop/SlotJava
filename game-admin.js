@@ -16,7 +16,7 @@ const assetTypes={
   spin_sound:{label:'Звук вращения барабанов',kind:'audio'},
   win_sound:{label:'Звук выигрыша',kind:'audio'},
 };
-for(let i=1;i<=12;i++)assetTypes['symbol_'+i]={label:'Символ барабана №'+i,kind:'image'};
+for(let i=1;i<=12;i++)assetTypes['symbol_'+i]={label:'Символ №'+i+' (для всех барабанов)',kind:'image'};
 
 const upload=multer({
   storage:multer.memoryStorage(),
@@ -63,12 +63,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
       '<section class="panel"><h2>Частота выигрыша</h2>'+
-      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Применим параметр при разработке механики игры; пока он только сохраняется.</p>'+
+      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр уже управляет вероятностью совпадения трёх символов на средней линии. Денежные ставки пока не используются.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings">'+csrf+
       '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
       '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
       '<button class="primary" type="submit">Сохранить</button></div></form></section>'+
       '<section class="panel"><h2>Оформление, символы и звук</h2>'+
+      '<p class="hint"><strong>Барабан №1</strong> — слева, <strong>№2</strong> — по центру, <strong>№3</strong> — справа. Поля «Символ №1» … «Символ №12» задают 12 видов картинок, которые появляются на любом из трёх барабанов. Номера символов видны и в самой игре.</p>'+
       '<p class="hint">Изображения: PNG, JPG, WEBP, GIF (до 5 МБ). Звук: MP3, OGG, WAV (до 12 МБ). Каждый файл закрепляется за этой игрой.</p>'+
       '<div class="asset-settings-grid">'+rows+'</div></section></div>',req,error?400:200);
   }
