@@ -46,13 +46,14 @@ CREATE TABLE IF NOT EXISTS game_assets (
 `);
 
 const initialGames=[
-  ['slot-classic','Слот Классик','/static/images/game-slot.svg',1],
+  ['slot-classic','Первая игра','/static/images/game-slot.svg',1],
   ['golden-seven','Золотая Семёрка','/static/images/game-seven.svg',2],
   ['lucky-stars','Счастливые Звёзды','/static/images/game-stars.svg',3]
 ];
 const seedGame=db.prepare('INSERT OR IGNORE INTO games(slug,title,image_path,position) VALUES(?,?,?,?)');
 db.transaction(()=>{ for(const game of initialGames) seedGame.run(...game); })();
 
+db.prepare("UPDATE games SET title='Первая игра' WHERE slug='slot-classic' AND title='Слот Классик'").run();
 const seedSettings=db.prepare('INSERT OR IGNORE INTO game_settings(game_id) VALUES(?)');
 db.transaction(()=>{ for(const game of db.prepare('SELECT id FROM games').all()) seedSettings.run(game.id); })();
 function getGameSettings(id) {
