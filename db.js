@@ -83,6 +83,25 @@ CREATE TABLE IF NOT EXISTS game_assets (
 );
 `);
 
+// When the admin labels were swapped, images stored as field_background
+// were shown in the "Фон барабанов" section but could be hidden under reels_background.
+// Migrate them to the shared 20-cell background once, without copying/deleting files.
+// Never overwrite a background already configured in the new setting.
+db.transaction(()=>{
+  const from='field_background',to='cells_background';
+  const gamesWithLegacy=db.prepare(`
+    SELECT game_id FROM game_assets WHERE asset_key=?
+    UNION SELECT game_id FROM game_background_images WHERE asset_key=?`).all(from,from);
+  const hasFile=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
+  const hasLink=db.prepare('SELECT 1 FROM game_background_images WHERE game_id=? AND asset_key=?');
+  const moveFile=db.prepare('UPDATE game_assets SET asset_key=? WHERE game_id=? AND asset_key=?');
+  const moveLink=db.prepare('UPDATE game_background_images SET asset_key=? WHERE game_id=? AND asset_key=?');
+  for(const {game_id} of gamesWithLegacy){
+    if(hasFile.get(game_id,to)||hasLink.get(game_id,to))continue;
+    moveFile.run(to,game_id,from);
+    moveLink.run(to,game_id,from);
+  }
+})();
 // Existing wallets retain their balance; add a persisted choice of test stake.
 if(!db.pragma('table_info(game_wallets)').some(column=>column.name==='bet')){
   db.exec('ALTER TABLE game_wallets ADD COLUMN bet INTEGER NOT NULL DEFAULT 10 CHECK(bet IN (10,20,50,100))');
