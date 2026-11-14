@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -148,55 +148,93 @@ app.get('/',(req,res)=>{
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
-const spinSymbols=Array.from({length:12},(_,i)=>i+1);
-function randomSymbol(){return crypto.randomInt(1,13);}
-function generateSpin(winFrequency) {
-  const columns=Array.from({length:3},()=>Array.from({length:3},randomSymbol));
-  const win=crypto.randomInt(0,100)<winFrequency;
-  if(win) {
-    const symbol=randomSymbol();
-    for(let i=0;i<3;i++)columns[i][1]=symbol;
-  } else {
-    // Ensure the middle line is not a three-of-a-kind.
-    if(columns[0][1]===columns[1][1] && columns[1][1]===columns[2][1])
-      columns[2][1]=(columns[2][1]%12)+1;
+function scoreBoard(cells,symbols,payouts){
+  const counts=new Map();
+  for(const id of cells)counts.set(id,(counts.get(id)||0)+1);
+  const payoutMap=new Map(payouts.map(p=>[p.symbol_id+':'+p.matches,p.prize]));
+  const wins=[];
+  let total=0;
+  for(const symbol of symbols){
+    const count=counts.get(symbol.id)||0;
+    const prize=payoutMap.get(symbol.id+':'+count)||0;
+    if(prize>0){total+=prize;wins.push({symbolId:symbol.id,name:symbol.name,count,prize});}
   }
-  return {columns,win};
+  return {total,wins};
 }
-function firstGamePage(game,req) {
-  const assets=Object.fromEntries(getGameAssets(game.id).map(a=>[a.asset_key,'/game-assets/'+game.id+'/'+a.asset_key]));
-  const bodyStyle=assets.background?' style="--slot-wall:url(\''+h(assets.background)+'\')"':'';
-  const reelStyle=assets.reels_background?' style="--reels-wall:url(\''+h(assets.reels_background)+'\')"':'';
-  const betStyle=assets.bet_panel?' style="--bet-wall:url(\''+h(assets.bet_panel)+'\')"':'';
-  const winStyle=assets.win_panel?' style="--win-wall:url(\''+h(assets.win_panel)+'\')"':'';
-  const columns=Array.from({length:3},(_,col)=>'<div class="slot-reel"><div class="slot-reel-label">Барабан №'+(col+1)+'</div>'+
-    Array.from({length:3},(_,row)=>'<div class="slot-symbol" data-row="'+row+'" data-reel="'+col+'"><span class="symbol-placeholder">'+(col*3+row+1)+'</span><small>Символ №'+(col*3+row+1)+'</small></div>').join('')+'</div>').join('');
-  const logo=assets.logo?'<img class="slot-logo" src="'+h(assets.logo)+'" alt="'+h(game.title)+'">':'';
-  const symbols=spinSymbols.map(n=>'<div class="slot-legend-item"><span class="legend-visual">'+(assets['symbol_'+n]?'<img src="'+h(assets['symbol_'+n])+'" alt="Символ '+n+'">':n)+'</span><span>Символ №'+n+'</span></div>').join('');
-  const audio=['music','spin_sound','win_sound'].map(key=>assets[key]?'<audio preload="none" data-sound="'+key+'" src="'+h(assets[key])+'"></audio>':'').join('');
-  return '<div class="slot-game" data-slug="'+h(game.slug)+'" data-game-id="'+game.id+'"'+bodyStyle+'><a class="back-link" href="/">← К каталогу</a>'+
-    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>Тестовый слот · 3 барабана · 12 символов</p></div>'+
-    '<div class="slot-machine"><div class="slot-reels"'+reelStyle+'>'+columns+'</div>'+
-    '<div class="slot-controls"><div class="slot-stats"'+betStyle+'><strong>Ставка</strong><span>Тестовый режим · без денег</span></div>'+
-    '<div class="slot-stats"'+winStyle+'><strong>Результат</strong><span id="slot-result" role="status" aria-live="polite">Нажмите «Вращать»</span></div>'+
+function generateSpin(gameId,winFrequency) {
+  const symbols=getSymbols(gameId),payouts=getPayouts(gameId);
+  if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
+  const randomBoard=()=>Array.from({length:20},()=>symbols[crypto.randomInt(symbols.length)].id);
+  const wantWin=crypto.randomInt(100)<winFrequency;
+  // Bounded candidate selection. Payouts always follow the actual 20 symbols.
+  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts);
+  for(let trial=0;trial<500&&Boolean(evaluation.total)!==wantWin;trial++){
+    cells=randomBoard();
+    evaluation=scoreBoard(cells,symbols,payouts);
+  }
+  // If the payout schedule defines rare wins, deliberately construct a candidate
+  // with an exact count. Never claim an award that the visible board does not earn.
+  if(wantWin&&evaluation.total===0){
+    const winningRules=payouts.filter(p=>p.prize>0&&p.matches>=2&&p.matches<=20&&
+      (p.matches===20||symbols.length>=2));
+    for(let attempt=0;attempt<winningRules.length*3&&evaluation.total===0;attempt++){
+      const rule=winningRules[crypto.randomInt(winningRules.length)];
+      const others=symbols.filter(x=>x.id!==rule.symbol_id);
+      if(rule.matches<20&&!others.length)continue;
+      const candidate=Array.from({length:20},(_,i)=>i<rule.matches?rule.symbol_id:others[crypto.randomInt(others.length)].id);
+      // Fisher-Yates shuffle so winning cells have no fixed positions.
+      for(let i=candidate.length-1;i>0;i--){const j=crypto.randomInt(i+1);[candidate[i],candidate[j]]=[candidate[j],candidate[i]];}
+      const scored=scoreBoard(candidate,symbols,payouts);
+      if(scored.total>0){cells=candidate;evaluation=scored;}
+    }
+  }
+  return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0};
+}
+function assetUrl(assets,key,gameId){
+  return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
+}
+function firstGamePage(game,req){
+  const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
+  const url=key=>assetUrl(assets,key,game.id);
+  const cssUrl=(key,varName)=>url(key)?' style="'+varName+':url(\''+h(url(key))+'\')"':'';
+  const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
+  const reelTitles=Array.from({length:5},(_,i)=>'<div class="reel-header">Барабан №'+(i+1)+'</div>').join('');
+  const cells=Array.from({length:20},(_,i)=>{
+    const col=(i%5)+1,row=Math.floor(i/5)+1;
+    const style=' style="--cell-wall:'+(url('cell_'+(i+1))?'url(\''+h(url('cell_'+(i+1)))+'\')':'none')+
+      ';--reel-wall:'+(url('reel_'+col)?'url(\''+h(url('reel_'+col))+'\')':url('reels_background')?'url(\''+h(url('reels_background'))+'\')':'none')+'"';
+    return '<div class="slot-symbol" data-index="'+i+'"'+style+'><span class="slot-cell-number">'+(i+1)+'</span>'+
+      '<span class="symbol-placeholder">?</span><small>Строка '+row+' · Столбец '+col+'</small></div>';
+  }).join('');
+  const symbols=getSymbols(game.id).map(symbol=>{
+    const src=url('symbol_'+symbol.id);
+    return '<div class="slot-legend-item" data-symbol-id="'+symbol.id+'"><span class="legend-visual">'+
+      (src?'<img src="'+h(src)+'" alt="'+h(symbol.name)+'">':symbol.id)+'</span>'+
+      '<span>'+h(symbol.name)+'</span></div>';
+  }).join('');
+  const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
+  return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
+    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>4 линии × 5 ячеек · тестовый режим</p></div>'+
+    '<div class="slot-machine"><div class="slot-reels slot-reels-five">'+reelTitles+cells+'</div>'+
+    '<div class="slot-controls"><div class="slot-stats"'+cssUrl('bet_panel','--bet-wall')+'><strong>Ставка</strong><span>Без реальных денег</span></div>'+
+    '<div class="slot-stats"'+cssUrl('win_panel','--win-wall')+'><strong>Выигрыш</strong><span id="slot-result" role="status" aria-live="polite">Нажмите «Вращать»</span></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="primary" type="submit">Вращать барабаны</button></form></div></div>'+
-    '<section class="slot-legend"><h2>Номера символов в админке</h2><p class="hint">Номер обозначает вид картинки, а не номер барабана. Любой из 12 символов может появиться на каждом барабане. В админке загружайте изображение в поле с тем же номером.</p>'+
+    '<section class="slot-legend"><h2>Символы игры</h2><p class="hint">Картинки выбираются по алгоритму и не закреплены за ячейками. Номера ячеек 1–20 видны на поле, а фоны этих позиций можно загрузить отдельно в админке. Выплаты считаются по точному общему количеству символов.</p>'+
     '<div class="slot-legend-grid">'+symbols+'</div></section>'+audio+'</div>';
 }
 app.get('/games/:slug',guarded,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/">Все игры</a></section>',req,404);
-  if(game.slug==='slot-classic') return sendPage(res,game.title,firstGamePage(game,req),req);
+  if(game.slug==='slot-classic')return sendPage(res,game.title,firstGamePage(game,req),req);
   sendPage(res,game.title,'<section class="panel game-placeholder"><img src="'+h(game.image_path)+'" alt="" width="720" height="450"><h1>'+h(game.title)+'</h1><p>Игра находится в разработке.</p><a class="secondary" href="/">Назад к играм</a></section>',req);
 });
 app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
-  const settings=getGameSettings(game.id);
-  const frequency=settings?.win_frequency ?? 25;
-  const result=generateSpin(frequency);
+  const result=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
   res.set('Cache-Control','no-store');
+  if(result.error)return res.status(400).json({error:result.error});
   res.json(result);
 });
 app.get('/register',redirectHomeIfLogged,(req,res)=>authForm('Регистрация','/register',req,res));
@@ -247,7 +285,7 @@ app.get('/admin',adminOnly,(req,res)=>{
     '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
     '</tbody></table></div></section></div>',req);
 });
-installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
+installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
   const user=Number.isSafeInteger(id)?db.prepare('SELECT id,role,active FROM users WHERE id=?').get(id):null;
