@@ -56,9 +56,9 @@ app.use((req,res,next) => {
   req.sessionToken=c.slot_session;
   req.session=null; req.user=null;
   if(req.sessionToken && /^[a-f0-9]{64}$/.test(req.sessionToken)){
-    const row=db.prepare(\`SELECT s.csrf_token,s.expires_at,u.id,u.username,u.role,u.active
+    const row=db.prepare(`SELECT s.csrf_token,s.expires_at,u.id,u.username,u.role,u.active
       FROM sessions s JOIN users u ON u.id=s.user_id
-      WHERE s.token_hash=? AND s.expires_at > ?\`).get(sha(req.sessionToken),Date.now());
+      WHERE s.token_hash=? AND s.expires_at > ?`).get(sha(req.sessionToken),Date.now());
     if(row && row.active) {req.session=row;req.user=row;}
   }
   next();
