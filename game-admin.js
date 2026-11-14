@@ -88,8 +88,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.prize);}
     const symbolItems=symbols.map(symbol=>{
       const costs=payoutBySymbol.get(symbol.id)||new Map();
-      const cells=Array.from({length:19},(_,i)=>{
-        const count=i+2;
+      const cells=Array.from({length:20},(_,i)=>{
+        const count=i+1;
         return '<label class="payout-input">'+count+' шт.<input type="number" min="0" max="1000000000" step="1" name="p_'+count+'" value="'+(costs.get(count)||0)+'" required></label>';
       }).join('');
       return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
@@ -147,7 +147,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     const prices=[];
-    for(let n=2;n<=20;n++){
+    for(let n=1;n<=20;n++){
       const raw=req.body['p_'+n];
       if(typeof raw!=='string'||!/^\d{1,10}$/.test(raw)||Number(raw)>1000000000)
         return show(req,res,'Цены должны быть целыми числами от 0 до 1 000 000 000.',true);
