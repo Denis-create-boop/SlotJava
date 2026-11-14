@@ -73,17 +73,17 @@ function verifyCsrf(req) {
 function guarded(req,res,next) { if(!req.user)return res.redirect('/login'); next(); }
 function adminOnly(req,res,next) { if(!req.user)return res.redirect('/login');if(req.user.role!=='admin')return res.status(403).send('Доступ запрещён');next(); }
 function postGuard(req,res,next) { if(!verifyCsrf(req))return res.status(403).send('Недействительный токен формы. Обновите страницу.');next(); }
-function layout(title,body,user) {
+function layout(title,body,user,csrf) {
   const menu=user
     ? '<a href="/">Главная</a>'+(user.role==='admin'?'<a href="/admin">Админ-панель</a>':'')+
-      '<form method="post" action="/logout" class="inline"><button type="submit" data-logout>Выход</button></form>'
+      '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
     '<footer>SlotJava · браузерная версия в разработке</footer><script src="/static/app.js" defer></script></body></html>';
 }
-function sendPage(res,title,body,req,status=200) { res.status(status).send(layout(title,body,req.user)); }
+function sendPage(res,title,body,req,status=200) { res.status(status).send(layout(title,body,req.user,req.session?.csrf_token)); }
 function redirectHomeIfLogged(req,res,next){if(req.user)return res.redirect('/');next();}
 function authForm(title,action,req,res,error='') {
   const csrf=csrfFor(req,res);
