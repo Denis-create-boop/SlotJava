@@ -218,20 +218,20 @@ function firstGamePage(game,req){
     item.asset_key,item.builtin_path||'/game-library/'+game.id+'/'+item.library_image_id
   ]));
   const url=key=>libraryBackgrounds.get(key)||assetUrl(assets,key,game.id);
-  const cssUrl=(key,varName)=>url(key)?' style="'+varName+':url(\''+h(url(key))+'\')"':'';
+  const backgroundImage=(key,cls)=>url(key)?'<img class="'+cls+'" src="'+h(url(key))+'" alt="" aria-hidden="true">':'';
   const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
 
   const reels=Array.from({length:5},(_,col)=>{
     const reelNumber=col+1;
     const reelBackground=url('reel_'+reelNumber)||url('reels_background');
-    const backgroundStyle=reelBackground?'--reel-wall:url(\''+h(reelBackground)+'\');':'';
+    const reelBg=reelBackground?'<img class="reel-background-image" src="'+h(reelBackground)+'" alt="" aria-hidden="true">':'';
     const backgrounds=Array.from({length:4},(_,row)=>{
       const n=row*5+reelNumber;
       const image=url('cell_'+n);
-      return '<div class="reel-cell-bg"'+(image?' style="--cell-wall:url(\''+h(image)+'\')"':'')+'></div>';
+      return '<div class="reel-cell-bg">'+(image?'<img class="reel-cell-background-image" src="'+h(image)+'" alt="" aria-hidden="true">':'')+'</div>';
     }).join('');
-    return '<div class="reel-column" data-reel="'+col+'" style="'+backgroundStyle+'">'+
-      '<div class="reel-window"><div class="reel-backdrops">'+backgrounds+'</div>'+
+    return '<div class="reel-column" data-reel="'+col+'">'+
+      '<div class="reel-window">'+reelBg+'<div class="reel-backdrops">'+backgrounds+'</div>'+
       '<div class="reel-track" aria-label="Барабан '+reelNumber+'"></div></div></div>';
   }).join('');
   const chosenImages=new Map(getSymbolImageLinks(game.id).map(item=>[
@@ -243,15 +243,18 @@ function firstGamePage(game,req){
   }).join('');
   const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
-  return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
+  return '<div class="slot-game" data-game-id="'+game.id+'">'+
+    backgroundImage(url('background')?'background':'field_background','slot-full-background')+
+    '<a class="back-link" href="/">← К каталогу</a>'+
     '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1></div>'+
-    '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon"'+cssUrl('field_background','--field-wall')+'>'+
+    '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
+    (url('background')&&url('field_background')?backgroundImage('field_background','slot-field-background'):'')+
     '<div class="reel-columns">'+reels+'</div></div>'+
 
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
-    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
-    '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger"'+cssUrl('bet_panel','--bet-wall')+'><span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
-    '<div class="slot-meter"'+cssUrl('win_panel','--win-wall')+'><span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
+    '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
+    '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
+    '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span>ВРАЩАТЬ</span></button></form></div>'+
     '<p class="slot-message" id="slot-result" role="status" aria-live="polite">Нажмите на круглую кнопку для вращения.</p></div>'+
