@@ -46,10 +46,18 @@ function issueGuestCsrf(req,res) {
 }
 function isValidOrigin(req) {
   const origin=req.get('origin');
-  if (!origin) return true; // SameSite cookies plus form CSRF token provide fallback for older clients
+  if (!origin) return true; // The CSRF form token is still mandatory.
   try {
     const url=new URL(origin);
-    return url.host === req.get('host') && url.protocol === (req.secure?'https:':'http:');
+    if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) return false;
+    // Codespaces forwards HTTPS through a proxy; the internal host/protocol can differ.
+    // Validate against the request host and the proxy's forwarded public host.
+    const hosts=[req.get('host'),req.get('x-forwarded-host')]
+      .filter(Boolean).flatMap(v=>v.split(',').map(h=>h.trim().toLowerCase()));
+    const schemes=[req.protocol + ':'];
+    if(req.get('x-forwarded-proto')) schemes.push(...req.get('x-forwarded-proto').split(',').map(p=>p.trim().toLowerCase()+':'));
+    if(!IS_PRODUCTION) schemes.push('https:'); // Codespaces HTTPS proxy with internal HTTP.
+    return hosts.includes(url.host.toLowerCase()) && schemes.includes(url.protocol);
   } catch { return false; }
 }
 app.use((req,res,next) => {
