@@ -347,3 +347,14 @@ header,main,footer {position:relative;z-index:1}
  .game-admin-menu-button small{font-size:.68rem}
 }
 @media(max-width:365px){.game-admin-menu{grid-template-columns:1fr}.game-admin-menu-button{min-height:62px}}
+
+/* Individual symbol settings open on demand */
+.symbol-admin-card{display:block}
+.symbol-admin-card>*:not(summary){margin-top:15px}
+.symbol-admin-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-size:1.08rem;font-weight:700;list-style:none;min-height:38px}
+.symbol-admin-summary::-webkit-details-marker{display:none}
+.symbol-admin-summary small{color:#bdb8bd;font-size:.76rem;font-weight:500;margin-left:8px}
+.symbol-expand-hint{display:flex;gap:8px;align-items:center;flex-shrink:0;font-size:.79rem;font-weight:600;color:#f0cf91}
+.symbol-expand-hint span{display:inline-block;transition:transform .2s}
+.symbol-admin-card[open] .symbol-expand-hint span{transform:rotate(180deg)}
+.symbol-admin-summary:focus-visible{outline:2px solid #f1c879;outline-offset:6px;border-radius:5px}
