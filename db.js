@@ -129,6 +129,24 @@ if(firstGame){
     db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
   })();
 }
+// Percent-based payouts, separate from legacy fixed-credit table for reversible migration.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS symbol_payout_percentages (
+    symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+    matches INTEGER NOT NULL CHECK(matches BETWEEN 3 AND 20),
+    percent INTEGER NOT NULL DEFAULT 0 CHECK(percent BETWEEN 0 AND 10000000000),
+    PRIMARY KEY(symbol_id,matches)
+  );
+`);
+db.transaction(()=>{
+  const flag='symbol_payout_percentages_migrated_v1';
+  if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
+  // Previously one "prize" was the number of credits at the 10-credit base bet.
+  // Preserve its monetary equivalent: legacy prize 15 => 150% => 15 at stake 10.
+  db.prepare(`INSERT OR IGNORE INTO symbol_payout_percentages(symbol_id,matches,percent)
+    SELECT symbol_id,matches,prize*10 FROM symbol_payouts WHERE matches BETWEEN 3 AND 20`).run();
+  db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+})();
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
   return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
@@ -137,7 +155,7 @@ function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
 }
 function getPayouts(gameId){
-  return db.prepare('SELECT p.symbol_id,p.matches,p.prize FROM symbol_payouts p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
+  return db.prepare('SELECT p.symbol_id,p.matches,p.percent FROM symbol_payout_percentages p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
 }
 function getGameSettings(id) {
   return db.prepare('SELECT win_frequency FROM game_settings WHERE game_id=?').get(id);
