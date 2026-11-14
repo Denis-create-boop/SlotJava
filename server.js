@@ -242,7 +242,7 @@ function firstGamePage(game,req){
   const wallet=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
     '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1></div>'+
-    '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
+    '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon"'+cssUrl('field_background','--field-wall')+'>'+
     '<div class="reel-columns">'+reels+'</div></div>'+
 
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
