@@ -147,11 +147,57 @@ app.get('/',(req,res)=>{
   sendPage(res,'Игры','<section class="games-section"><div class="section-title"><p class="eyebrow">Каталог игр</p><h1>Выберите игру</h1></div>'+
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
+const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
+const spinSymbols=Array.from({length:12},(_,i)=>i+1);
+function randomSymbol(){return crypto.randomInt(1,13);}
+function generateSpin(winFrequency) {
+  const columns=Array.from({length:3},()=>Array.from({length:3},randomSymbol));
+  const win=crypto.randomInt(0,100)<winFrequency;
+  if(win) {
+    const symbol=randomSymbol();
+    for(let i=0;i<3;i++)columns[i][1]=symbol;
+  } else {
+    // Ensure the middle line is not a three-of-a-kind.
+    if(columns[0][1]===columns[1][1] && columns[1][1]===columns[2][1])
+      columns[2][1]=(columns[2][1]%12)+1;
+  }
+  return {columns,win};
+}
+function firstGamePage(game,req) {
+  const assets=Object.fromEntries(getGameAssets(game.id).map(a=>[a.asset_key,'/game-assets/'+game.id+'/'+a.asset_key]));
+  const bodyStyle=assets.background?' style="--slot-wall:url(\''+h(assets.background)+'\')"':'';
+  const reelStyle=assets.reels_background?' style="--reels-wall:url(\''+h(assets.reels_background)+'\')"':'';
+  const betStyle=assets.bet_panel?' style="--bet-wall:url(\''+h(assets.bet_panel)+'\')"':'';
+  const winStyle=assets.win_panel?' style="--win-wall:url(\''+h(assets.win_panel)+'\')"':'';
+  const columns=Array.from({length:3},(_,col)=>'<div class="slot-reel"><div class="slot-reel-label">Барабан №'+(col+1)+'</div>'+
+    Array.from({length:3},(_,row)=>'<div class="slot-symbol" data-row="'+row+'" data-reel="'+col+'"><span class="symbol-placeholder">'+(col*3+row+1)+'</span><small>Символ №'+(col*3+row+1)+'</small></div>').join('')+'</div>').join('');
+  const logo=assets.logo?'<img class="slot-logo" src="'+h(assets.logo)+'" alt="'+h(game.title)+'">':'';
+  const symbols=spinSymbols.map(n=>'<div class="slot-legend-item"><span class="legend-visual">'+(assets['symbol_'+n]?'<img src="'+h(assets['symbol_'+n])+'" alt="Символ '+n+'">':n)+'</span><span>Символ №'+n+'</span></div>').join('');
+  const audio=['music','spin_sound','win_sound'].map(key=>assets[key]?'<audio preload="none" data-sound="'+key+'" src="'+h(assets[key])+'"></audio>':'').join('');
+  return '<div class="slot-game" data-slug="'+h(game.slug)+'" data-game-id="'+game.id+'"'+bodyStyle+'><a class="back-link" href="/">← К каталогу</a>'+
+    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>Тестовый слот · 3 барабана · 12 символов</p></div>'+
+    '<div class="slot-machine"><div class="slot-reels"'+reelStyle+'>'+columns+'</div>'+
+    '<div class="slot-controls"><div class="slot-stats"'+betStyle+'><strong>Ставка</strong><span>Тестовый режим · без денег</span></div>'+
+    '<div class="slot-stats"'+winStyle+'><strong>Результат</strong><span id="slot-result" role="status" aria-live="polite">Нажмите «Вращать»</span></div>'+
+    '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
+    '<button id="slot-spin-button" class="primary" type="submit">Вращать барабаны</button></form></div></div>'+
+    '<section class="slot-legend"><h2>Номера символов в админке</h2><p class="hint">Номер обозначает вид картинки, а не номер барабана. Любой из 12 символов может появиться на каждом барабане. В админке загружайте изображение в поле с тем же номером.</p>'+
+    '<div class="slot-legend-grid">'+symbols+'</div></section>'+audio+'</div>';
+}
 app.get('/games/:slug',guarded,(req,res)=>{
-  const slug=req.params.slug;
-  const game=listGames(true).find(item=>item.slug===slug);
-  if(!game) return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/">Все игры</a></section>',req,404);
+  const game=listGames(true).find(item=>item.slug===req.params.slug);
+  if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/">Все игры</a></section>',req,404);
+  if(game.slug==='slot-classic') return sendPage(res,game.title,firstGamePage(game,req),req);
   sendPage(res,game.title,'<section class="panel game-placeholder"><img src="'+h(game.image_path)+'" alt="" width="720" height="450"><h1>'+h(game.title)+'</h1><p>Игра находится в разработке.</p><a class="secondary" href="/">Назад к играм</a></section>',req);
+});
+app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
+  const game=listGames(true).find(item=>item.slug===req.params.slug);
+  if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
+  const settings=getGameSettings(game.id);
+  const frequency=settings?.win_frequency ?? 25;
+  const result=generateSpin(frequency);
+  res.set('Cache-Control','no-store');
+  res.json(result);
 });
 app.get('/register',redirectHomeIfLogged,(req,res)=>authForm('Регистрация','/register',req,res));
 app.post('/register',postGuard,(req,res)=>{
