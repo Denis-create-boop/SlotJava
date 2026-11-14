@@ -213,6 +213,19 @@ if(firstGame){
     db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
   })();
 }
+// Clean up only untouched demo placeholders without art or payout rules.
+if(firstGame){
+  const placeholders=db.prepare('SELECT id,name,position FROM game_symbols WHERE game_id=? AND position IN (11,12)').all(firstGame.id);
+  for(const symbol of placeholders){
+    if(symbol.name!=='Символ №'+symbol.position)continue;
+    if(db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?').get(firstGame.id,'symbol_'+symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payout_multipliers WHERE symbol_id=? AND coefficient_milli>0').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payout_percentages WHERE symbol_id=? AND percent>0').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payouts WHERE symbol_id=? AND prize>0').get(symbol.id))continue;
+    db.prepare('DELETE FROM game_symbols WHERE id=? AND game_id=?').run(symbol.id,firstGame.id);
+  }
+}
 function getLibraryImages(gameId){
   return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
 }
