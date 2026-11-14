@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const crypto = require('node:crypto');
 const path = require('node:path');
+const fs = require('node:fs');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins } = require('./db');
 
 const app = express();
@@ -28,7 +29,15 @@ app.use('/admin', rateLimit({ windowMs: 15*60*1000, limit: 120, standardHeaders:
 const h = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 const token = () => crypto.randomBytes(32).toString('hex');
-const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(x => x.trim().split('=').map(decodeURIComponent)).filter(a=>a.length===2));
+const cookies = req => {
+  const result = {};
+  for (const entry of (req.headers.cookie || '').split(';')) {
+    const index = entry.indexOf('=');
+    if (index < 1) continue;
+    try { result[entry.slice(0,index).trim()] = decodeURIComponent(entry.slice(index+1).trim()); } catch {}
+  }
+  return result;
+};
 const cookieOpt = secure => '; Path=/; HttpOnly; SameSite=Lax' + (secure?'; Secure':'');
 function setCookie(res,name,value,seconds,secure) {
   res.append('Set-Cookie', name+'='+encodeURIComponent(value)+'; Max-Age='+seconds+cookieOpt(secure));
@@ -39,26 +48,37 @@ function safeEqual(a,b) {
   const x=Buffer.from(a); const y=Buffer.from(b);
   return x.length === y.length && crypto.timingSafeEqual(x,y);
 }
-function issueGuestCsrf(req,res) {
-  const t=token();
-  setCookie(res,'slot_guest_csrf',t,3600,req.secure);
-  return t;
+// Persisted secret survives app restarts, but is ignored by Git.
+const secretFile=path.join(__dirname,'data','.csrf-secret');
+let csrfSecret;
+try {
+  csrfSecret=fs.readFileSync(secretFile);
+} catch(e) {
+  if(e.code!=='ENOENT') throw e;
+  try {fs.writeFileSync(secretFile,crypto.randomBytes(32),{mode:0o600,flag:'wx'});} catch(writeError) {
+    if(writeError.code!=='EEXIST') throw writeError;
+  }
+  csrfSecret=fs.readFileSync(secretFile);
 }
-function isValidOrigin(req) {
-  const origin=req.get('origin');
-  if (!origin) return true; // The CSRF form token is still mandatory.
-  try {
-    const url=new URL(origin);
-    if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) return false;
-    // Codespaces forwards HTTPS through a proxy; the internal host/protocol can differ.
-    // Validate against the request host and the proxy's forwarded public host.
-    const hosts=[req.get('host'),req.get('x-forwarded-host')]
-      .filter(Boolean).flatMap(v=>v.split(',').map(h=>h.trim().toLowerCase()));
-    const schemes=[req.protocol + ':'];
-    if(req.get('x-forwarded-proto')) schemes.push(...req.get('x-forwarded-proto').split(',').map(p=>p.trim().toLowerCase()+':'));
-    if(!IS_PRODUCTION) schemes.push('https:'); // Codespaces HTTPS proxy with internal HTTP.
-    return hosts.includes(url.host.toLowerCase()) && schemes.includes(url.protocol);
-  } catch { return false; }
+if(csrfSecret.length!==32) throw new Error('Invalid CSRF secret; restore or regenerate securely');
+function issueGuestCsrf() {
+  const payload=Date.now().toString(36)+'.'+crypto.randomBytes(16).toString('hex');
+  const signature=crypto.createHmac('sha256',csrfSecret).update(payload).digest('hex');
+  return payload+'.'+signature;
+}
+function verifyGuestCsrf(value) {
+  if(typeof value!=='string' || !/^[a-z0-9]+\.[a-f0-9]{32}\.[a-f0-9]{64}$/.test(value)) return false;
+  const pieces=value.split('.');
+  const age=Date.now()-parseInt(pieces[0],36);
+  if(!Number.isFinite(age) || age<0 || age>60*60*1000) return false;
+  const payload=pieces[0]+'.'+pieces[1];
+  const signature=crypto.createHmac('sha256',csrfSecret).update(payload).digest('hex');
+  return safeEqual(signature,pieces[2]);
+}
+function safeRequestSource(req) {
+  // This check is independent of proxy host/protocol translations.
+  const site=req.get('sec-fetch-site');
+  return !site || site==='same-origin' || site==='none';
 }
 app.use((req,res,next) => {
   res.set('Cache-Control', 'no-store');
@@ -74,15 +94,21 @@ app.use((req,res,next) => {
   next();
 });
 function csrfInput(value) { return '<input type="hidden" name="_csrf" value="'+h(value)+'">'; }
-function csrfFor(req,res) { return req.session?.csrf_token || issueGuestCsrf(req,res); }
+function csrfFor(req) { return req.session?.csrf_token || issueGuestCsrf(); }
 function verifyCsrf(req) {
-  if(!isValidOrigin(req)) return false;
-  const expected=req.session?.csrf_token || cookies(req).slot_guest_csrf;
-  return !!expected && safeEqual(req.body?._csrf,expected);
+  if(!safeRequestSource(req)) return false;
+  const provided=req.body?._csrf;
+  return req.session ? safeEqual(provided,req.session.csrf_token) : verifyGuestCsrf(provided);
 }
 function guarded(req,res,next) { if(!req.user)return res.redirect('/login'); next(); }
 function adminOnly(req,res,next) { if(!req.user)return res.redirect('/login');if(req.user.role!=='admin')return res.status(403).send('Доступ запрещён');next(); }
-function postGuard(req,res,next) { if(!verifyCsrf(req))return res.status(403).send('Недействительный токен формы. Обновите страницу.');next(); }
+function postGuard(req,res,next) {
+  if(!verifyCsrf(req)) {
+    console.warn('CSRF rejected:', {path:req.path, authenticated:!!req.user, fetchSite:req.get('sec-fetch-site')||'unknown'});
+    return res.status(403).send('Проверка безопасности формы не пройдена. Обновите страницу и повторите действие.');
+  }
+  next();
+}
 function layout(title,body,user,csrf) {
   const menu=user
     ? '<a href="/">Главная</a>'+(user.role==='admin'?'<a href="/admin">Админ-панель</a>':'')+
@@ -96,7 +122,7 @@ function layout(title,body,user,csrf) {
 function sendPage(res,title,body,req,status=200) { res.status(status).send(layout(title,body,req.user,req.session?.csrf_token)); }
 function redirectHomeIfLogged(req,res,next){if(req.user)return res.redirect('/');next();}
 function authForm(title,action,req,res,error='') {
-  const csrf=csrfFor(req,res);
+  const csrf=csrfFor(req);
   const isRegister=action==='/register';
   sendPage(res,title,'<section class="panel auth"><h1>'+h(title)+'</h1>'+
     (error?'<p class="error" role="alert">'+h(error)+'</p>':'')+
