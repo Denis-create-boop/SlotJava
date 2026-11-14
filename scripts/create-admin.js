@@ -8,7 +8,7 @@ const ask = question => new Promise(resolve => rl.question(question,resolve));
     const username=(await ask('Имя администратора [admin]: ')).trim() || 'admin';
     if(!validUsername(username))throw new Error('Логин: 3–30 латинских букв, цифр и _');
     const password=await ask('Пароль администратора (будет виден в терминале): ');
-    if(!validPassword(password))throw new Error('Пароль должен содержать хотя бы 5 символов и не более 256 байт');
+    if(!validPassword(password))throw new Error('Пароль должен содержать хотя бы 12 символов и не более 256 байт');
     if(getUserByName(username))throw new Error('Аккаунт уже существует. Новый пароль через этот скрипт не устанавливается.');
     db.prepare("INSERT INTO users(username,password_hash,role) VALUES(?,?,'admin')").run(username,hashPassword(password));
     console.log('Администратор создан. Смените тестовый пароль перед публичным запуском.');
