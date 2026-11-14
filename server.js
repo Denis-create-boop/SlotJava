@@ -141,9 +141,17 @@ app.get('/',(req,res)=>{
       '<div class="actions"><a class="primary" href="/register">Зарегистрироваться</a><a class="secondary" href="/login">Войти</a></div></section>',req);
   }
   const games=listGames(true);
-  const cards=games.map(game=>'<article class="game-card"><a class="game-card-link" href="/games/'+encodeURIComponent(game.slug)+'">'+
-    '<img loading="lazy" src="'+h(game.image_path)+'" alt="Обложка игры '+h(game.title)+'" width="720" height="450">'+
-    '<h2>'+h(game.title)+'</h2></a></article>').join('');
+  const cards=games.map(game=>{
+    const logoAssignment=getGameBackgroundImages(game.id).find(image=>image.asset_key==='logo');
+    const logoAsset=getGameAssets(game.id).some(asset=>asset.asset_key==='logo');
+    const logo=logoAssignment
+      ?(logoAssignment.builtin_path||'/game-library/'+game.id+'/'+logoAssignment.library_image_id)
+      :logoAsset?'/game-assets/'+game.id+'/logo':null;
+    const cardImage=logo||game.image_path;
+    return '<article class="game-card'+(logo?' game-card-has-logo':'')+'"><a class="game-card-link" href="/games/'+encodeURIComponent(game.slug)+'">'+
+      '<img loading="lazy" src="'+h(cardImage)+'" alt="'+(logo?'Логотип':'Обложка')+' игры '+h(game.title)+'" width="720" height="450">'+
+      '<h2>'+h(game.title)+'</h2></a></article>';
+  }).join('');
   sendPage(res,'Игры','<section class="games-section"><div class="section-title"><p class="eyebrow">Каталог игр</p><h1>Выберите игру</h1></div>'+
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
