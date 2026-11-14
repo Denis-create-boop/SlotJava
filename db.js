@@ -64,6 +64,10 @@ CREATE TABLE IF NOT EXISTS game_assets (
 );
 `);
 
+// Existing wallets retain their balance; add a persisted choice of test stake.
+if(!db.pragma('table_info(game_wallets)').some(column=>column.name==='bet')){
+  db.exec('ALTER TABLE game_wallets ADD COLUMN bet INTEGER NOT NULL DEFAULT 10 CHECK(bet IN (10,20,50,100))');
+}
 // Migration for earlier test databases whose payout range started at 2.
 const payoutSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='symbol_payouts'").get()?.sql||'';
 if(/BETWEEN\s+2\s+AND\s+20/i.test(payoutSchema)){
@@ -103,7 +107,7 @@ if(firstGame){
 }
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
-  return db.prepare('SELECT balance FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId).balance;
+  return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
 }
 function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
