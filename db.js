@@ -55,6 +55,19 @@ CREATE TABLE IF NOT EXISTS game_wallets (
   balance INTEGER NOT NULL DEFAULT 1000 CHECK(balance >= 0),
   PRIMARY KEY(user_id,game_id)
 );
+CREATE TABLE IF NOT EXISTS game_image_library (
+  id INTEGER PRIMARY KEY,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  builtin_path TEXT,
+  file_name TEXT,
+  UNIQUE(game_id,builtin_path),
+  CHECK((builtin_path IS NULL) != (file_name IS NULL))
+);
+CREATE TABLE IF NOT EXISTS game_symbol_images (
+  symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
+  library_image_id INTEGER NOT NULL REFERENCES game_image_library(id) ON DELETE RESTRICT
+);
 CREATE TABLE IF NOT EXISTS game_assets (
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   asset_key TEXT NOT NULL,
@@ -166,6 +179,26 @@ db.transaction(()=>{
     WHERE matches BETWEEN 3 AND 20 AND percent BETWEEN 0 AND 100000`).run();
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
+const starterImages=[
+  ['A','/static/images/symbols/a.svg'],['Q','/static/images/symbols/q.svg'],
+  ['J','/static/images/symbols/j.svg'],['K','/static/images/symbols/k.svg'],
+  ['10','/static/images/symbols/10.svg'],['9','/static/images/symbols/9.svg'],
+  ['Череп','/static/images/symbols/skull.svg'],['Меч','/static/images/symbols/sword.svg'],
+  ['Змея над чашей','/static/images/symbols/snake-cup.svg'],['Дьявол','/static/images/symbols/devil.svg']
+];
+if(firstGame){
+  const addImage=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  db.transaction(()=>{for(const row of starterImages)addImage.run(firstGame.id,...row);})();
+}
+function getLibraryImages(gameId){
+  return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
+}
+function getSymbolImageLinks(gameId){
+  return db.prepare(`SELECT s.id AS symbol_id,l.id AS image_id,l.name,l.builtin_path,l.file_name
+    FROM game_symbol_images x JOIN game_symbols s ON s.id=x.symbol_id
+    JOIN game_image_library l ON l.id=x.library_image_id AND l.game_id=s.game_id
+    WHERE s.game_id=?`).all(gameId);
+}
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
   return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
@@ -214,4 +247,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
