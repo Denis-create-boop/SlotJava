@@ -465,3 +465,10 @@ header,main,footer {position:relative;z-index:1}
 }
 .slot-game>.game-catalog-link span{font-size:1.45rem;line-height:.7}
 .slot-game>.game-catalog-link + .slot-machine{margin-top:3px}
+
+/* Use each game's configured logo as an uncropped catalog card image. */
+.game-card.game-card-has-logo img{
+  object-fit:contain;
+  padding:clamp(10px,2vw,22px);
+  background:radial-gradient(ellipse at 50% 45%,rgba(88,70,47,.25),rgba(22,23,33,.92) 80%);
+}
