@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS game_symbols (
 CREATE INDEX IF NOT EXISTS game_symbols_order_idx ON game_symbols(game_id,position,id);
 CREATE TABLE IF NOT EXISTS symbol_payouts (
   symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
-  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 20),
+  matches INTEGER NOT NULL CHECK(matches BETWEEN 1 AND 20),
   prize INTEGER NOT NULL DEFAULT 0 CHECK(prize BETWEEN 0 AND 1000000000),
   PRIMARY KEY(symbol_id,matches)
 );
@@ -58,6 +58,24 @@ CREATE TABLE IF NOT EXISTS game_assets (
 );
 `);
 
+// Migration for earlier test databases whose payout range started at 2.
+const payoutSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='symbol_payouts'").get()?.sql||'';
+if(/BETWEEN\s+2\s+AND\s+20/i.test(payoutSchema)){
+  db.transaction(()=>{
+    db.exec(`
+      CREATE TABLE symbol_payouts_new(
+        symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+        matches INTEGER NOT NULL CHECK(matches BETWEEN 1 AND 20),
+        prize INTEGER NOT NULL DEFAULT 0 CHECK(prize BETWEEN 0 AND 1000000000),
+        PRIMARY KEY(symbol_id,matches)
+      );
+      INSERT INTO symbol_payouts_new(symbol_id,matches,prize)
+      SELECT symbol_id,matches,prize FROM symbol_payouts;
+      DROP TABLE symbol_payouts;
+      ALTER TABLE symbol_payouts_new RENAME TO symbol_payouts;
+    `);
+  })();
+}
 const initialGames=[
   ['slot-classic','Первая игра','/static/images/game-slot.svg',1],
   ['golden-seven','Золотая Семёрка','/static/images/game-seven.svg',2],
