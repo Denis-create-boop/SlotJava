@@ -85,17 +85,17 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const symbols=getSymbols(id);
     const payouts=getPayouts(id);
     const payoutBySymbol=new Map();
-    for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.percent);}
+    for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.coefficient_milli);}
     const symbolItems=symbols.map(symbol=>{
       const costs=payoutBySymbol.get(symbol.id)||new Map();
       const cells=Array.from({length:18},(_,i)=>{
         const count=i+3;
-        return '<label class="payout-input">'+count+' символов, %<input type="number" min="0" max="100000" step="1" name="p_'+count+'" value="'+(costs.get(count)||0)+'" required></label>';
+        return '<label class="payout-input">'+count+' символов, ×<input type="number" min="0" max="1000" step="0.001" name="p_'+count+'" value="'+((costs.get(count)||0)/1000).toFixed(3)+'" required></label>';
       }).join('');
       return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
         imageBox(id,'symbol_'+symbol.id,'Картинка: '+symbol.name,assets,csrf)+
         '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
-        '<p class="hint">Символ учитывается на непрерывной цепочке барабанов слева направо, начиная с первого. Минимум 3 барабана. Повторы суммируются только до первого пропуска. Для каждого количества укажите выплату в процентах от текущей ставки: например, 150% при ставке 20 = 30 очков. Ноль — выплаты нет.</p>'+
+        '<p class="hint">Символ учитывается на непрерывной цепочке барабанов слева направо, начиная с первого. Минимум 3 барабана. Повторы суммируются только до первого пропуска. Для каждого количества укажите коэффициент, на который умножается текущая ставка: например, ×1.5 при ставке 20 = 30 очков. Ноль — выплаты нет.</p>'+
         '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form></div>';
@@ -107,7 +107,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
       '<section class="panel"><h2>Частота выигрыша</h2>'+
-      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой в процентах от ставки по количеству символов в непрерывной цепочке барабанов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
+      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой по коэффициенту от ставки для числа символов в непрерывной цепочке барабанов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings">'+csrf+
       '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
       '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
@@ -118,7 +118,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="asset-settings-grid">'+rows+'</div></section>'+
       '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
       '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
-      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Для выигрыша символ должен встретиться на первых трёх барабанах. Цепочка продолжается только пока символ есть на следующем барабане; после первого пропуска дальнейшие символы не считаются. Повторы внутри цепочки суммируются. Для каждого количества от 3 до 20 задаётся процент от ставки.</p>'+
+      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Для выигрыша символ должен встретиться на первых трёх барабанах. Цепочка продолжается только пока символ есть на следующем барабане; после первого пропуска дальнейшие символы не считаются. Повторы внутри цепочки суммируются. Для каждого количества от 3 до 20 задаётся коэффициент умножения текущей ставки.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
@@ -149,11 +149,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const prices=[];
     for(let n=3;n<=20;n++){
       const raw=req.body['p_'+n];
-      if(typeof raw!=='string'||!/^\d{1,10}$/.test(raw)||Number(raw)>100000)
-        return show(req,res,'Выплаты должны быть целыми процентами от 0 до 100 000.',true);
-      prices.push([n,Number(raw)]);
+      if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
+        return show(req,res,'Коэффициент должен быть от 0 до 1000, с точностью до трёх знаков после запятой.',true);
+      prices.push([n,Math.round(Number(raw)*1000)]);
     }
-    const put=db.prepare('INSERT INTO symbol_payout_percentages(symbol_id,matches,percent) VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET percent=excluded.percent');
+    const put=db.prepare('INSERT INTO symbol_payout_multipliers(symbol_id,matches,coefficient_milli) VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET coefficient_milli=excluded.coefficient_milli');
     db.transaction(()=>{for(const [count,price] of prices)put.run(symbolId,count,price);})();
     res.redirect('/admin/games/'+id+'#symbols');
   });
