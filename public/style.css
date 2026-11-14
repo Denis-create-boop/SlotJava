@@ -28,8 +28,8 @@ button:hover,.secondary:hover{filter:brightness(1.2);text-decoration:none}.prima
 body {
   position:relative;
   background:
-    linear-gradient(to right,rgba(209,155,63,.10),transparent 8%,transparent 92%,rgba(209,155,63,.10)),
-    linear-gradient(to bottom,rgba(224,175,85,.10),transparent 12%,transparent 88%,rgba(224,175,85,.08)),
+    linear-gradient(to right,rgba(209,155,63,.045),transparent 4%,transparent 96%,rgba(209,155,63,.045)),
+    linear-gradient(to bottom,rgba(224,175,85,.045),transparent 6%,transparent 94%,rgba(224,175,85,.035)),
     radial-gradient(ellipse 65% 40% at 18% 6%,rgba(156,162,189,.12),transparent 72%),
     linear-gradient(145deg,#292a30 0%,#191a1f 43%,#24252b 70%,#15161b 100%);
   background-attachment:fixed;
@@ -40,16 +40,16 @@ body::before {
   position:fixed;
   z-index:0;
   inset:0;
-  box-shadow:inset 0 0 40px rgba(210,157,66,.09),inset 0 0 125px rgba(213,163,80,.06);
+  box-shadow:inset 0 0 20px rgba(210,157,66,.04),inset 0 0 60px rgba(213,163,80,.025);
 }
 header,main,footer {position:relative;z-index:1}
 .hero,.panel {
   overflow:visible;
-  border-color:rgba(218,176,97,.29);
-  box-shadow:0 0 0 1px rgba(238,194,105,.07),0 0 24px rgba(208,158,74,.15),0 0 76px rgba(204,148,51,.075),0 28px 65px rgba(0,0,0,.51),inset 0 1px 0 rgba(255,228,170,.19);
+  border-color:rgba(218,176,97,.17);
+  box-shadow:0 0 0 1px rgba(238,194,105,.035),0 0 12px rgba(208,158,74,.075),0 0 38px rgba(204,148,51,.035),0 28px 65px rgba(0,0,0,.51),inset 0 1px 0 rgba(255,228,170,.10);
 }
 .hero::before,.panel::before{border-radius:inherit}
 @media(max-width:600px){
-  body::before {box-shadow:inset 0 0 24px rgba(210,157,66,.09)}
-  .hero,.panel {box-shadow:0 0 18px rgba(208,158,74,.13),0 15px 44px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,228,170,.15)}
+  body::before {box-shadow:inset 0 0 12px rgba(210,157,66,.04)}
+  .hero,.panel {box-shadow:0 0 9px rgba(208,158,74,.06),0 15px 44px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,228,170,.08)}
 }
