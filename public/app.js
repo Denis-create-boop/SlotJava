@@ -1,74 +1,146 @@
-// Visual animation only; the server selects symbols and computes payouts.
+// Five continuous reel strips. The server is authoritative for spins, awards and balance.
 (() => {
   'use strict';
   const root=document.querySelector('.slot-game');
   if(!root)return;
+
   const form=document.getElementById('slot-spin-form');
   const button=document.getElementById('slot-spin-button');
-  const status=document.getElementById('slot-result');
-  const cells=Array.from(root.querySelectorAll('.slot-symbol'));
-  const symbolList=Array.from(root.querySelectorAll('.slot-legend-item')).map(item=>{
-    const id=Number(item.dataset.symbolId);
-    const img=item.querySelector('img');
-    return {id,name:item.querySelector('span:last-child')?.textContent||('Символ '+id),image:img?.getAttribute('src')||null};
-  });
-  const symbols=new Map(symbolList.map(item=>[item.id,item]));
+  const message=document.getElementById('slot-result');
+  const balance=document.getElementById('slot-balance');
+  const winDisplay=document.getElementById('slot-win');
+  const columns=Array.from(root.querySelectorAll('.reel-column'));
+  const definitions=Array.from(root.querySelectorAll('[data-symbol-def]')).map(node=>({
+    id:Number(node.dataset.symbolId),
+    name:node.dataset.name||'Символ',
+    image:node.dataset.image||''
+  })).filter(item=>Number.isSafeInteger(item.id));
+  const symbols=new Map(definitions.map(item=>[item.id,item]));
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
+
   function play(name){
     const audio=sound(name);
     if(!audio)return;
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
   }
-  const background=sound('music');
-  if(background){background.loop=true;background.volume=.2;}
-  function renderCell(cell,id){
-    const symbol=symbols.get(id);
-    const previous=cell.querySelector('.slot-cell-content');
-    if(previous)previous.remove();
-    const visual=document.createElement('div');visual.className='slot-cell-content';
-    if(symbol?.image){
-      const img=document.createElement('img');img.src=symbol.image;img.alt=symbol.name;visual.append(img);
-    }else{
-      const span=document.createElement('span');span.className='symbol-placeholder';
-      span.textContent=symbol?.name||String(id);visual.append(span);
-    }
-    const caption=document.createElement('small');caption.textContent=symbol?.name||('Символ '+id);
-    visual.append(caption);
-    cell.querySelector('.symbol-placeholder')?.remove();
-    cell.querySelector('small')?.remove();
-    cell.append(visual);
+  const music=sound('music');
+  if(music){music.loop=true;music.volume=.18;}
+
+  function sample(){
+    return definitions[Math.floor(Math.random()*definitions.length)].id;
   }
-  let busy=false;
+  function makeTile(id){
+    const symbol=symbols.get(id);
+    const tile=document.createElement('div');
+    tile.className='ribbon-tile';
+    tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
+    if(symbol?.image){
+      const img=document.createElement('img');
+      img.src=symbol.image;
+      img.alt='';
+      img.draggable=false;
+      tile.append(img);
+    }else{
+      const text=document.createElement('span');
+      text.className='ribbon-symbol-fallback';
+      text.textContent=symbol?.name||String(id);
+      tile.append(text);
+    }
+    return tile;
+  }
+  function buildStrip(ids){
+    const fragment=document.createDocumentFragment();
+    ids.forEach(id=>fragment.append(makeTile(id)));
+    return fragment;
+  }
+  function showStatic(col,ids){
+    const track=col.querySelector('.reel-track');
+    track.style.transition='none';
+    track.style.transform='translate3d(0,0,0)';
+    track.replaceChildren(buildStrip(ids));
+  }
+
+  if(definitions.length){
+    columns.forEach(col=>showStatic(col,Array.from({length:4},sample)));
+  }else{
+    message.textContent='В игре пока нет символов. Добавьте их через админку.';
+    button.disabled=true;
+  }
+
+  const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function animateColumn(col,index,finalIds){
+    if(reducedMotion){
+      showStatic(col,finalIds);
+      return Promise.resolve();
+    }
+    const track=col.querySelector('.reel-track');
+    const view=col.querySelector('.reel-window');
+    const rowHeight=view.getBoundingClientRect().height/4;
+    const extra=16+index*3;
+    // The four target items are at the top of the strip; the remainder are
+    // filler. Sliding the whole strip DOWN reveals the four target items.
+    const strip=finalIds.concat(Array.from({length:extra},sample));
+    track.style.transition='none';
+    track.replaceChildren(buildStrip(strip));
+    track.style.transform='translate3d(0,'+(-extra*rowHeight)+'px,0)';
+    void track.offsetHeight;
+    return new Promise(resolve=>{
+      const delay=index*160;
+      const duration=1400+index*170;
+      window.setTimeout(()=>{
+        track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
+        track.style.transform='translate3d(0,0,0)';
+        window.setTimeout(()=>{
+          showStatic(col,finalIds);
+          resolve();
+        },duration+50);
+      },delay);
+    });
+  }
+
+  let spinning=false;
   form.addEventListener('submit',async event=>{
     event.preventDefault();
-    if(busy)return;
-    if(!symbolList.length){status.textContent='Добавьте символы в админке.';return;}
-    busy=true;button.disabled=true;status.textContent='Барабаны вращаются…';
-    root.classList.add('slot-spinning');
+    if(spinning||!definitions.length)return;
+    spinning=true;
+    button.disabled=true;
+    message.textContent='Барабаны вращаются…';
+    winDisplay.textContent='0';
     play('spin_sound');
-    const animation=window.setInterval(()=>{
-      cells.forEach(cell=>renderCell(cell,symbolList[Math.floor(Math.random()*symbolList.length)].id));
-    },85);
+
     try{
       const response=await fetch(form.action,{
-        method:'POST',credentials:'same-origin',
-        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        method:'POST',
+        credentials:'same-origin',
+        headers:{
+          'Content-Type':'application/x-www-form-urlencoded',
+          'Accept':'application/json'
+        },
         body:new URLSearchParams(new FormData(form))
       });
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||'Ошибка вращения ('+response.status+').');
-      if(!Array.isArray(result.cells)||result.cells.length!==20||!result.cells.every(id=>symbols.has(id)))
-        throw new Error('Некорректный ответ сервера');
-      await new Promise(resolve=>setTimeout(resolve,850));
-      window.clearInterval(animation);
-      cells.forEach((cell,index)=>renderCell(cell,result.cells[Number(cell.dataset.index)??index]));
-      const description=(result.wins||[]).map(win=>win.name+': '+win.count+' шт. = '+win.prize).join('; ');
-      status.textContent=result.total>0?'Выигрыш: '+result.total+' очков! '+description:'Без выигрыша. Попробуйте ещё.';
+      if(!Array.isArray(result.cells)||result.cells.length!==20||
+          !result.cells.every(id=>symbols.has(id))||
+          !Number.isSafeInteger(result.total)||result.total<0||
+          !Number.isSafeInteger(result.balance)||result.balance<0){
+        throw new Error('Некорректный ответ игрового сервера.');
+      }
+      const animations=columns.map((col,index)=>{
+        const target=Array.from({length:4},(_,row)=>result.cells[row*5+index]);
+        return animateColumn(col,index,target);
+      });
+      await Promise.all(animations);
+      balance.textContent=String(result.balance);
+      winDisplay.textContent=String(result.total);
+      message.textContent=result.total>0?'Выигрыш: '+result.total+' тестовых очков!':'Без выигрыша. Попробуйте ещё.';
       if(result.total>0)play('win_sound');
-      if(background?.paused)play('music');
+      if(music?.paused)play('music');
     }catch(error){
-      window.clearInterval(animation);
-      status.textContent=error.message+' Попробуйте ещё или обновите страницу.';
-    }finally{root.classList.remove('slot-spinning');button.disabled=false;busy=false;}
+      message.textContent=error.message+' При необходимости обновите страницу для сверки баланса.';
+    }finally{
+      spinning=false;
+      button.disabled=false;
+    }
   });
 })();
