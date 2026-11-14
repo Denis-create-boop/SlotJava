@@ -147,6 +147,25 @@ db.transaction(()=>{
     SELECT symbol_id,matches,prize*10 FROM symbol_payouts WHERE matches BETWEEN 3 AND 20`).run();
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
+// Convert each former percentage to a multiplier with three decimal places.
+// Stored as thousandths to avoid floating-point persistence errors.
+// Example: 150% -> 1.500x -> coefficient_milli 1500.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS symbol_payout_multipliers (
+    symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+    matches INTEGER NOT NULL CHECK(matches BETWEEN 3 AND 20),
+    coefficient_milli INTEGER NOT NULL DEFAULT 0 CHECK(coefficient_milli BETWEEN 0 AND 1000000),
+    PRIMARY KEY(symbol_id,matches)
+  );
+`);
+db.transaction(()=>{
+  const flag='symbol_payout_multipliers_migrated_v1';
+  if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
+  db.prepare(`INSERT OR IGNORE INTO symbol_payout_multipliers(symbol_id,matches,coefficient_milli)
+    SELECT symbol_id,matches,percent*10 FROM symbol_payout_percentages
+    WHERE matches BETWEEN 3 AND 20 AND percent BETWEEN 0 AND 100000`).run();
+  db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+})();
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
   return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
@@ -155,7 +174,7 @@ function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
 }
 function getPayouts(gameId){
-  return db.prepare('SELECT p.symbol_id,p.matches,p.percent FROM symbol_payout_percentages p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
+  return db.prepare('SELECT p.symbol_id,p.matches,p.coefficient_milli FROM symbol_payout_multipliers p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
 }
 function getGameSettings(id) {
   return db.prepare('SELECT win_frequency FROM game_settings WHERE game_id=?').get(id);
