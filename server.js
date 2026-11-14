@@ -223,11 +223,9 @@ function firstGamePage(game,req){
 
   const reels=Array.from({length:5},(_,col)=>{
     const reelNumber=col+1;
-    const backgrounds=Array.from({length:4},(_,row)=>{
-      const n=row*5+reelNumber;
-      const image=url('cell_'+n);
-      return '<div class="reel-cell-bg">'+(image?'<img class="reel-cell-background-image" src="'+h(image)+'" alt="" aria-hidden="true">':'')+'</div>';
-    }).join('');
+    const backgrounds=Array.from({length:4},()=>
+      '<div class="reel-cell-bg">'+backgroundImage('cells_background','reel-cell-background-image')+'</div>'
+    ).join('');
     return '<div class="reel-column" data-reel="'+col+'">'+
       '<div class="reel-window"><div class="reel-backdrops">'+backgrounds+'</div>'+
       '<div class="reel-track" aria-label="Барабан '+reelNumber+'"></div></div></div>';
