@@ -348,8 +348,16 @@ app.get('/admin',adminOnly,(req,res)=>{
     return '<tr><td>'+user.id+'</td><td>'+h(user.username)+'</td><td>'+h(user.role)+'</td><td>'+
       (user.active?'Активен':'Заблокирован')+'</td><td>'+h(user.created_at)+'</td><td>'+controls+'</td></tr>';
   }).join('');
-  const gameButtons=listGames().map(game=>'<a class="admin-game-link" href="/admin/games/'+game.id+'">'+
-    '<img src="'+h(game.image_path)+'" alt="" width="720" height="450"><span>'+h(game.title)+'</span><small>Настройки игры</small></a>').join('');
+  const gameButtons=listGames().map(game=>{
+    const assigned=getGameBackgroundImages(game.id).find(image=>image.asset_key==='logo');
+    const uploaded=getGameAssets(game.id).some(asset=>asset.asset_key==='logo');
+    const logo=assigned
+      ?(assigned.builtin_path||'/game-library/'+game.id+'/'+assigned.library_image_id)
+      :uploaded?'/game-assets/'+game.id+'/logo':null;
+    return '<a class="admin-game-link'+(logo?' admin-game-has-logo':'')+'" href="/admin/games/'+game.id+'">'+
+      '<img src="'+h(logo||game.image_path)+'" alt="'+(logo?'Логотип':'Обложка')+' игры '+h(game.title)+'" width="720" height="450">'+
+      '<span>'+h(game.title)+'</span><small>Настройки игры</small></a>';
+  }).join('');
   sendPage(res,'Админ-панель','<div class="admin-content"><section class="panel"><h1>Управление играми</h1>'+
     '<p class="hint">Выберите игру, чтобы перейти к её настройкам.</p><div class="admin-games-grid">'+gameButtons+'</div></section>'+
     '<section class="panel"><h2>Управление пользователями</h2><p>Пользователи: '+users.length+
