@@ -124,11 +124,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
     const libraryCards=libraryImages.map(image=>{
       const src=libraryUrl(id,image);
-      const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length;
+      const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length+
+        Array.from(assignedBackgrounds.values()).filter(item=>item.library_image_id===image.id).length;
       return '<div class="library-image-card"><img src="'+h(src)+'" alt="'+h(image.name)+'" loading="lazy">'+
         '<strong>'+h(image.name)+'</strong>'+
         (image.file_name?'<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
-          '<button type="submit"'+(linkedCount?' disabled title="Сначала отвяжите изображение от символов"':'')+'>Удалить</button></form>':
+          '<button type="submit"'+(linkedCount?' disabled title="Сначала уберите назначение картинки из символов и фонов"':'')+'>Удалить</button></form>':
           '<small>Стандартная иллюстрация</small>')+'</div>';
     }).join('');
     const symbolItems=symbols.map(symbol=>{
@@ -260,6 +261,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!row||!row.file_name)return res.sendStatus(404);
     const inUse=db.prepare('SELECT 1 FROM game_symbol_images WHERE library_image_id=?').get(imageId);
     if(inUse)return show(req,res,'Изображение используется символом. Сначала выберите для него другую картинку.',true,'library');
+    const inBackground=db.prepare('SELECT 1 FROM game_background_images WHERE game_id=? AND library_image_id=?').get(id,imageId);
+    if(inBackground)return show(req,res,'Изображение применяется как фон. Сначала выберите для фона другую картинку или уберите его.',true,'library');
     db.prepare('DELETE FROM game_image_library WHERE game_id=? AND id=?').run(id,imageId);
     try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Library image cleanup:',e.code);}
     res.redirect(sectionUrl(id,'library'));
@@ -308,6 +311,17 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(image)try{fs.unlinkSync(path.join(uploadsDir,image.file_name));}catch{}
     res.redirect(sectionUrl(id,'symbols'));
   });
+  app.post('/admin/games/:id/backgrounds/:key',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),key=req.params.key;
+    if(!id||!gameById(id)||!isBackgroundAsset(key))return res.sendStatus(404);
+    const imageId=Number(req.body?.image_id);
+    if(!Number.isSafeInteger(imageId)||imageId<=0||!ownedLibraryImage(id,imageId))
+      return show(req,res,'Выберите изображение из папки этой игры.',true,assetTab(key));
+    db.prepare(`INSERT INTO game_background_images(game_id,asset_key,library_image_id)
+      VALUES(?,?,?) ON CONFLICT(game_id,asset_key) DO UPDATE SET library_image_id=excluded.library_image_id`)
+      .run(id,key,imageId);
+    res.redirect(sectionUrl(id,assetTab(key))+'&applied=1');
+  });
   app.post('/admin/games/:id/assets/:key',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
     const id=gameId(req),key=req.params.key,meta=id?dynamicAsset(id,key):null;
     if(!id||!gameById(id)||!meta)return res.sendStatus(404);
@@ -321,6 +335,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     try {
       const previous=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,key);
       db.prepare('INSERT INTO game_assets(game_id,asset_key,file_name,media_type) VALUES(?,?,?,?) ON CONFLICT(game_id,asset_key) DO UPDATE SET file_name=excluded.file_name,media_type=excluded.media_type').run(id,key,name,type.type);
+      if(isBackgroundAsset(key))db.prepare('DELETE FROM game_background_images WHERE game_id=? AND asset_key=?').run(id,key);
       if(previous)try{fs.unlinkSync(path.join(uploadsDir,previous.file_name));}catch(e){console.warn('Old game asset cleanup:',e.code);}
     }catch(e){try{fs.unlinkSync(fullPath);}catch{}throw e;}
     res.redirect(sectionUrl(id,assetTab(key))+'&uploaded=1');
@@ -329,6 +344,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),key=req.params.key;
     if(!id||!gameById(id)||!dynamicAsset(id,key))return res.sendStatus(404);
     const previous=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,key);
+    if(isBackgroundAsset(key))db.prepare('DELETE FROM game_background_images WHERE game_id=? AND asset_key=?').run(id,key);
     db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,key);
     if(previous)try{fs.unlinkSync(path.join(uploadsDir,previous.file_name));}catch(e){console.warn('Asset removal:',e.code);}
     res.redirect(sectionUrl(id,assetTab(key))+'&deleted=1');
