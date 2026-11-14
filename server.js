@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -231,8 +231,11 @@ function firstGamePage(game,req){
       '<div class="reel-window"><div class="reel-backdrops">'+backgrounds+'</div>'+
       '<div class="reel-track" aria-label="Барабан '+reelNumber+'"></div></div></div>';
   }).join('');
+  const chosenImages=new Map(getSymbolImageLinks(game.id).map(item=>[
+    item.symbol_id,item.builtin_path||'/game-library/'+game.id+'/'+item.image_id
+  ]));
   const symbols=getSymbols(game.id).map(symbol=>{
-    const image=url('symbol_'+symbol.id)||'';
+    const image=chosenImages.get(symbol.id)||url('symbol_'+symbol.id)||'';
     return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
   const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
@@ -345,7 +348,7 @@ app.get('/admin',adminOnly,(req,res)=>{
     '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
     '</tbody></table></div></section></div>',req);
 });
-installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
+installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
   const user=Number.isSafeInteger(id)?db.prepare('SELECT id,role,active FROM users WHERE id=?').get(id):null;
