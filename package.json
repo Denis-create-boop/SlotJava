@@ -1,0 +1,19 @@
+{
+  "name": "slotjava",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser slot prototype with registration and admin panel",
+  "scripts": {
+    "start": "node server.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "express-rate-limit": "^7.5.0"
+  }
+}
