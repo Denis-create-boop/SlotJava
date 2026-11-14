@@ -150,9 +150,8 @@
   function highlightWinningSymbols(wins){
     clearWinningGlow();
     for(const win of wins){
-      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels))continue;
-      const matchingReels=Math.min(5,Math.max(0,win.reels));
-      for(let col=0;col<matchingReels;col++){
+      if(!symbols.has(win.symbolId)||!Number.isInteger(win.count))continue;
+      for(let col=0;col<columns.length;col++){
         columns[col].querySelectorAll('.ribbon-tile').forEach(tile=>{
           if(Number(tile.dataset.symbolId)===win.symbolId)tile.classList.add('is-winning');
         });
