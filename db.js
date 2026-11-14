@@ -105,6 +105,30 @@ if(firstGame){
     db.transaction(()=>{ for(let i=1;i<=12;i++)insert.run(firstGame.id,'Символ №'+i,i); })();
   }
 }
+// One-time demo prize setup for the first game. Never reinsert after a user edits prices.
+db.exec(`CREATE TABLE IF NOT EXISTS demo_setup_flags (
+  name TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`);
+if(firstGame){
+  db.transaction(()=>{
+    const flag='first_game_sample_payouts_v1';
+    const done=db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag);
+    if(done)return;
+    const hasPositive=db.prepare(`SELECT 1 FROM symbol_payouts p
+      JOIN game_symbols s ON s.id=p.symbol_id
+      WHERE s.game_id=? AND p.matches BETWEEN 3 AND 5 AND p.prize>0 LIMIT 1`).get(firstGame.id);
+    if(!hasPositive){
+      const demoSymbols=db.prepare('SELECT id FROM game_symbols WHERE game_id=? ORDER BY position,id LIMIT 3').all(firstGame.id);
+      const samplePrices=[[20,50,120],[15,40,100],[10,30,80]];
+      const insert=db.prepare('INSERT OR IGNORE INTO symbol_payouts(symbol_id,matches,prize) VALUES(?,?,?)');
+      demoSymbols.forEach((symbol,index)=>{
+        for(let reels=3;reels<=5;reels++)insert.run(symbol.id,reels,samplePrices[index][reels-3]);
+      });
+    }
+    db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+  })();
+}
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
   return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
