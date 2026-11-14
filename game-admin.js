@@ -38,7 +38,7 @@ function gameId(req) {
   const id=Number(req.params.id);
   return Number.isSafeInteger(id) && id>0 ? id : null;
 }
-function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
   function dynamicAsset(id,key) {
     if(assetTypes[key])return assetTypes[key];
     const match=/^symbol_(\d+)$/.exec(key);
@@ -61,6 +61,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Загрузить</button></form>'+
       (value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Удалить фон</button></form>':'')+
       '</div></div>';
+  }
+  function libraryUrl(gameId,image){
+    return image.builtin_path||'/game-library/'+gameId+'/'+image.id;
+  }
+  function ownedLibraryImage(gameId,imageId){
+    return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? AND id=?')
+      .get(gameId,imageId);
   }
   function show(req,res,message='',error=false) {
     const id=gameId(req);
@@ -86,14 +93,34 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const payouts=getPayouts(id);
     const payoutBySymbol=new Map();
     for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.coefficient_milli);}
+    const libraryImages=getLibraryImages(id);
+    const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
+    const libraryCards=libraryImages.map(image=>{
+      const src=libraryUrl(id,image);
+      const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length;
+      return '<div class="library-image-card"><img src="'+h(src)+'" alt="'+h(image.name)+'" loading="lazy">'+
+        '<strong>'+h(image.name)+'</strong>'+
+        (image.file_name?'<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
+          '<button type="submit"'+(linkedCount?' disabled title="Сначала отвяжите изображение от символов"':'')+'>Удалить</button></form>':
+          '<small>Стандартная иллюстрация</small>')+'</div>';
+    }).join('');
+    const libraryOptions=libraryImages.map(image=>'<option value="'+image.id+'">'+h(image.name)+'</option>').join('');
     const symbolItems=symbols.map(symbol=>{
       const costs=payoutBySymbol.get(symbol.id)||new Map();
       const cells=Array.from({length:18},(_,i)=>{
         const count=i+3;
         return '<label class="payout-input">'+count+' символов, ×<input type="number" min="0" max="1000" step="0.001" name="p_'+count+'" value="'+((costs.get(count)||0)/1000).toFixed(3)+'" required></label>';
       }).join('');
+      const selected=linked.get(symbol.id)||0;
+      const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
+      const chosen=libraryImages.find(image=>image.id===selected);
+      const preview=chosen?'<img class="asset-preview" src="'+h(libraryUrl(id,chosen))+'" alt="'+h(chosen.name)+'">':'';
       return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
-        imageBox(id,'symbol_'+symbol.id,'Картинка: '+symbol.name,assets,csrf)+
+        '<div class="symbol-library-picker">'+preview+
+        '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/image">'+csrf+
+        '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
+        '<button class="primary" type="submit">Применить картинку</button></form></div>'+
+        (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
         '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">Символ учитывается на непрерывной цепочке барабанов слева направо, начиная с первого. Минимум 3 барабана. Повторы суммируются только до первого пропуска. Для каждого количества укажите коэффициент, на который умножается текущая ставка: например, ×1.5 при ставке 20 = 30 очков. Ноль — выплаты нет.</p>'+
         '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
@@ -118,6 +145,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="asset-settings-grid">'+rows+'</div></section>'+
       '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
       '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
+      '<section class="panel" id="library"><h2>Папка изображений игры</h2>'+
+      '<p class="hint">Изображения хранятся отдельно для каждой игры. Сначала загрузите картинку сюда, затем выберите её для нужного символа ниже. Форматы PNG, JPG, WEBP и GIF, до 5 МБ.</p>'+
+      '<form class="library-upload" method="post" action="/admin/games/'+id+'/library" enctype="multipart/form-data">'+csrf+
+      '<label>Название картинки<input name="name" maxlength="80" required placeholder="Например: Череп"></label>'+
+      '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
+      '<button class="primary" type="submit">Добавить в папку</button></form>'+
+      '<div class="library-images">'+libraryCards+'</div></section>'+
       '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Для выигрыша символ должен встретиться на первых трёх барабанах. Цепочка продолжается только пока символ есть на следующем барабане; после первого пропуска дальнейшие символы не считаются. Повторы внутри цепочки суммируются. Для каждого количества от 3 до 20 задаётся коэффициент умножения текущей ставки.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
@@ -142,6 +176,52 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(id).n;
     db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
     res.redirect('/admin/games/'+id+'#symbols');
+  });
+  app.post('/admin/games/:id/library',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
+    const id=gameId(req),name=typeof req.body.name==='string'?req.body.name.trim():'';
+    if(!id||!gameById(id))return res.sendStatus(404);
+    if(!name||name.length>80)return show(req,res,'Укажите название изображения до 80 символов.',true);
+    if(!req.file?.buffer?.length)return show(req,res,'Выберите изображение.',true);
+    const type=fileType(req.file.buffer);
+    if(!type||type.kind!=='image'||req.file.size>5*1024*1024)
+      return show(req,res,'Допустимы только PNG, JPG, WEBP и GIF до 5 МБ.',true);
+    const fileName=crypto.randomBytes(24).toString('hex')+'.'+type.ext;
+    const fullPath=path.join(uploadsDir,fileName);
+    fs.writeFileSync(fullPath,req.file.buffer,{flag:'wx',mode:0o600});
+    try{
+      db.prepare('INSERT INTO game_image_library(game_id,name,file_name) VALUES(?,?,?)').run(id,name,fileName);
+    }catch(e){fs.unlinkSync(fullPath);throw e;}
+    res.redirect('/admin/games/'+id+'#library');
+  });
+  app.post('/admin/games/:id/library/:imageId/delete',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),imageId=Number(req.params.imageId);
+    if(!id||!gameById(id)||!Number.isSafeInteger(imageId))return res.sendStatus(404);
+    const row=ownedLibraryImage(id,imageId);
+    if(!row||!row.file_name)return res.sendStatus(404);
+    const inUse=db.prepare('SELECT 1 FROM game_symbol_images WHERE library_image_id=?').get(imageId);
+    if(inUse)return show(req,res,'Изображение используется символом. Сначала выберите для него другую картинку.',true);
+    db.prepare('DELETE FROM game_image_library WHERE game_id=? AND id=?').run(id,imageId);
+    try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Library image cleanup:',e.code);}
+    res.redirect('/admin/games/'+id+'#library');
+  });
+  app.post('/admin/games/:id/symbols/:symbolId/image',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId),imageId=Number(req.body.image_id);
+    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId)||!Number.isSafeInteger(imageId)||!ownedLibraryImage(id,imageId))
+      return res.sendStatus(404);
+    db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?) ON CONFLICT(symbol_id) DO UPDATE SET library_image_id=excluded.library_image_id').run(symbolId,imageId);
+    res.redirect('/admin/games/'+id+'#symbols');
+  });
+  app.get('/game-library/:id/:imageId',guarded,(req,res)=>{
+    const id=gameId(req),imageId=Number(req.params.imageId);
+    if(!id||!Number.isSafeInteger(imageId)||!gameById(id))return res.sendStatus(404);
+    const image=ownedLibraryImage(id,imageId);
+    if(!image)return res.sendStatus(404);
+    if(image.builtin_path)return res.redirect(image.builtin_path);
+    if(!/^[a-f0-9]{48}\.(png|jpg|webp|gif)$/.test(image.file_name||''))return res.sendStatus(404);
+    const type={png:'image/png',jpg:'image/jpeg',webp:'image/webp',gif:'image/gif'}[path.extname(image.file_name).slice(1)];
+    res.set('Content-Type',type);
+    res.set('X-Content-Type-Options','nosniff');
+    res.sendFile(path.join(uploadsDir,image.file_name),err=>{if(err&&!res.headersSent)res.sendStatus(404);});
   });
   app.post('/admin/games/:id/symbols/:symbolId/payouts',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId);
