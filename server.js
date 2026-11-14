@@ -149,19 +149,28 @@ app.get('/',(req,res)=>{
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
 function scoreBoard(cells,symbols,payouts){
-  // At least one instance of a symbol must be on EACH of reels 1, 2 and 3.
-  // All visible instances across all five reels contribute to the quantity payout.
+  // A complete chain starts at the first reel and ends at the first missing reel.
+  // Count all occurrences within that chain only, including repeated symbols in a reel.
   const payoutMap=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=20)
     .map(p=>[p.symbol_id+':'+p.matches,p.prize]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
-    if(![0,1,2].every(col=>[0,1,2,3].some(row=>cells[row*5+col]===symbol.id)))continue;
-    const count=cells.filter(id=>id===symbol.id).length;
+    let reels=0,count=0;
+    for(let col=0;col<5;col++){
+      let inReel=0;
+      for(let row=0;row<4;row++){
+        if(cells[row*5+col]===symbol.id)inReel++;
+      }
+      if(inReel===0)break;
+      count+=inReel;
+      reels++;
+    }
+    if(reels<3)continue;
     const prize=payoutMap.get(symbol.id+':'+count)||0;
     if(prize>0){
       total+=prize;
-      wins.push({symbolId:symbol.id,name:symbol.name,count,prize});
+      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,prize});
     }
   }
   return {total,wins};
@@ -180,13 +189,16 @@ function generateSpin(gameId,winFrequency){
     for(let trial=0;trial<Math.min(candidates.length*8,250)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
-      const positions=[0,1,2].map(col=>crypto.randomInt(4)*5+col);
-      const available=Array.from({length:20},(_,i)=>i).filter(i=>!positions.includes(i));
+      // Enough reels to hold the exact number, with one guaranteed symbol in each.
+      const reelCount=Math.max(3,Math.ceil(rule.matches/4));
+      const positions=Array.from({length:reelCount},(_,col)=>crypto.randomInt(4)*5+col);
+      const available=Array.from({length:reelCount*4},(_,i)=>Math.floor(i/4)+(i%4)*5)
+        .filter(i=>!positions.includes(i));
       for(let j=available.length-1;j>0;j--){
         const k=crypto.randomInt(j+1);
         [available[j],available[k]]=[available[k],available[j]];
       }
-      positions.push(...available.slice(0,rule.matches-3));
+      positions.push(...available.slice(0,rule.matches-reelCount));
       const winningCells=new Set(positions);
       const arranged=Array.from({length:20},(_,i)=>winningCells.has(i)?
         rule.symbol_id:others[crypto.randomInt(others.length)].id);
