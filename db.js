@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS symbol_payouts (
   prize INTEGER NOT NULL DEFAULT 0 CHECK(prize BETWEEN 0 AND 1000000000),
   PRIMARY KEY(symbol_id,matches)
 );
+CREATE TABLE IF NOT EXISTS game_wallets (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  balance INTEGER NOT NULL DEFAULT 1000 CHECK(balance >= 0),
+  PRIMARY KEY(user_id,game_id)
+);
 CREATE TABLE IF NOT EXISTS game_assets (
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   asset_key TEXT NOT NULL,
@@ -95,6 +101,10 @@ if(firstGame){
     db.transaction(()=>{ for(let i=1;i<=12;i++)insert.run(firstGame.id,'Символ №'+i,i); })();
   }
 }
+function getWallet(userId,gameId) {
+  db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
+  return db.prepare('SELECT balance FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId).balance;
+}
 function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
 }
@@ -139,4 +149,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
