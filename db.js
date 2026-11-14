@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS game_symbol_images (
   symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
   library_image_id INTEGER NOT NULL REFERENCES game_image_library(id) ON DELETE RESTRICT
 );
+CREATE TABLE IF NOT EXISTS game_background_images (
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  asset_key TEXT NOT NULL,
+  library_image_id INTEGER NOT NULL REFERENCES game_image_library(id) ON DELETE RESTRICT,
+  PRIMARY KEY(game_id,asset_key)
+);
 CREATE TABLE IF NOT EXISTS game_assets (
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   asset_key TEXT NOT NULL,
@@ -241,6 +247,12 @@ if(firstGame){
 function getLibraryImages(gameId){
   return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
 }
+function getGameBackgroundImages(gameId){
+  return db.prepare(`SELECT b.asset_key,b.library_image_id,l.name,l.builtin_path,l.file_name
+    FROM game_background_images b
+    JOIN game_image_library l ON l.id=b.library_image_id AND l.game_id=b.game_id
+    WHERE b.game_id=?`).all(gameId);
+}
 function getSymbolImageLinks(gameId){
   return db.prepare(`SELECT s.id AS symbol_id,l.id AS image_id,l.name,l.builtin_path,l.file_name
     FROM game_symbol_images x JOIN game_symbols s ON s.id=x.symbol_id
@@ -295,4 +307,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getGameBackgroundImages,getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
