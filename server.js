@@ -23,6 +23,7 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use('/static', express.static(path.join(__dirname,'public'), { maxAge: IS_PRODUCTION ? '1h' : 0 }));
 const limiter = rateLimit({ windowMs: 15*60*1000, limit: 25, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use(['/login','/register'], limiter);
+app.use('/admin', rateLimit({ windowMs: 15*60*1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false }));
 
 const h = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -52,6 +53,7 @@ function isValidOrigin(req) {
   } catch { return false; }
 }
 app.use((req,res,next) => {
+  res.set('Cache-Control', 'no-store');
   const c=cookies(req);
   req.sessionToken=c.slot_session;
   req.session=null; req.user=null;
@@ -93,13 +95,13 @@ function authForm(title,action,req,res,error='') {
     '<form method="post" action="'+action+'">'+csrfInput(csrf)+
     '<label>Логин<input name="username" autocomplete="username" minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]+" required></label>'+
     '<label>Пароль<input type="password" name="password" autocomplete="'+(isRegister?'new-password':'current-password')+'" required></label>'+
-    (isRegister?'<p class="hint">Логин: 3–30 латинских букв, цифр и _. Пароль: минимум 5 символов.</p>':'')+
+    (isRegister?'<p class="hint">Логин: 3–30 латинских букв, цифр и _. Пароль: минимум 12 символов.</p>':'')+
     '<button class="primary" type="submit">'+h(title)+'</button></form>'+
     '<p class="hint">'+(isRegister?'<a href="/login">Уже есть аккаунт?</a>':'<a href="/register">Создать аккаунт</a>')+'</p></section>',req,error?400:200);
 }
 app.get('/',(req,res)=>{
   const title=req.user?'Привет, '+h(req.user.username)+'!':'Добро пожаловать';
-  // Logout uses JS to add the CSRF token to the form; without JS, logout fails closed.
+  // Logout form includes a server-generated CSRF token.
   sendPage(res,'Главная','<section class="hero"><p class="eyebrow">Новый проект</p><h1>'+title+'</h1>'+
     '<p>Мы создаём новую браузерную версию Slot. Пока готова система пользователей; сама игра появится позже.</p>'+
     (!req.user?'<div class="actions"><a class="primary" href="/register">Зарегистрироваться</a><a class="secondary" href="/login">Войти</a></div>':
