@@ -133,7 +133,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       return '<div class="library-image-card"><img src="'+h(src)+'" alt="'+h(image.name)+'" loading="lazy">'+
         '<strong>'+h(image.name)+'</strong>'+
         '<div class="library-quick-actions">'+
-        quickAssign(['background','Фон игры'])+quickAssign(['field_background','Фон поля'])+
+        quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
         '</div>'+
         (image.file_name?'<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
           '<button type="submit"'+(linkedCount?' disabled title="Сначала уберите назначение картинки из символов и фонов"':'')+'>Удалить</button></form>':
@@ -163,8 +163,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     }).join('');
     const tabs=[
       ['background','Изменение фона','Фон игрового окна и логотип','image'],
-      ['reels','Фон игрового поля','Один фон на все пять барабанов','columns'],
-      ['cells','Фон барабанов','Общий фон ячеек с символами','grid'],
+      ['reels','Фон игрового поля','Общий фон за пятью столбцами','columns'],
+      ['cells','Фон барабанов','Фон каждой ячейки под символом','grid'],
       ['panels','Панели ставок и выигрыша','Оформление нижних панелей','wallet'],
       ['audio','Музыка и звуки','Музыка, вращение и выигрыш','music'],
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
@@ -185,11 +185,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Изменяйте фон игрового окна и логотип игры.</p><div class="asset-settings-grid">'+
       rowsFor(['background','logo'])+'</div></section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
-      '<p class="hint">Одно изображение используется как общий фон всей области пяти барабанов. Отдельных фонов у барабанов больше нет.</p>'+
+      '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
     if(activeTab==='cells')panel=panelStart('Фон барабанов')+
-      '<p class="hint">Общий фон поля располагается за всеми барабанами. Фон ячеек повторяется одинаково в каждой из 20 клеток — под символами. Выберите картинку из папки игры или загрузите новую.</p>'+
-      '<div class="asset-settings-grid">'+rowsFor(['field_background','cells_background'])+'</div></section>';
+      '<p class="hint">Одна картинка повторяется внутри каждой из 20 ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['cells_background'])+'</div></section>';
     if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
       rowsFor(['bet_panel','win_panel'])+'</div></section>';
