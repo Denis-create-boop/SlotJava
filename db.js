@@ -36,6 +36,19 @@ CREATE TABLE IF NOT EXISTS game_settings (
   game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
   win_frequency INTEGER NOT NULL DEFAULT 25 CHECK(win_frequency BETWEEN 0 AND 100)
 );
+CREATE TABLE IF NOT EXISTS game_symbols (
+  id INTEGER PRIMARY KEY,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS game_symbols_order_idx ON game_symbols(game_id,position,id);
+CREATE TABLE IF NOT EXISTS symbol_payouts (
+  symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 20),
+  prize INTEGER NOT NULL DEFAULT 0 CHECK(prize BETWEEN 0 AND 1000000000),
+  PRIMARY KEY(symbol_id,matches)
+);
 CREATE TABLE IF NOT EXISTS game_assets (
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   asset_key TEXT NOT NULL,
@@ -56,6 +69,20 @@ db.transaction(()=>{ for(const game of initialGames) seedGame.run(...game); })()
 db.prepare("UPDATE games SET title='Первая игра' WHERE slug='slot-classic' AND title='Слот Классик'").run();
 const seedSettings=db.prepare('INSERT OR IGNORE INTO game_settings(game_id) VALUES(?)');
 db.transaction(()=>{ for(const game of db.prepare('SELECT id FROM games').all()) seedSettings.run(game.id); })();
+const firstGame=db.prepare("SELECT id FROM games WHERE slug='slot-classic'").get();
+if(firstGame){
+  const hasSymbols=db.prepare('SELECT COUNT(*) AS total FROM game_symbols WHERE game_id=?').get(firstGame.id).total;
+  if(!hasSymbols){
+    const insert=db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)');
+    db.transaction(()=>{ for(let i=1;i<=12;i++)insert.run(firstGame.id,'Символ №'+i,i); })();
+  }
+}
+function getSymbols(gameId){
+  return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
+}
+function getPayouts(gameId){
+  return db.prepare('SELECT p.symbol_id,p.matches,p.prize FROM symbol_payouts p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
+}
 function getGameSettings(id) {
   return db.prepare('SELECT win_frequency FROM game_settings WHERE game_id=?').get(id);
 }
@@ -94,4 +121,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
