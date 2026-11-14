@@ -154,7 +154,7 @@
       const chainLength=Math.min(columns.length,Math.max(0,win.reels));
       for(let col=0;col<chainLength;col++){
         columns[col].querySelectorAll('.ribbon-tile').forEach(tile=>{
-          if(Number(tile.dataset.symbolId)===win.symbolId)tile.classList.add('is-winning');
+          if(Number(tile.dataset.symbolId)===win.symbolId){tile.style.setProperty('--win-delay', (col*0.18)+'s');tile.classList.add('is-winning');}
         });
       }
     }
