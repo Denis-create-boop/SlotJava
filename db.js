@@ -32,7 +32,17 @@ CREATE TABLE IF NOT EXISTS games (
   position INTEGER NOT NULL DEFAULT 0,
   enabled INTEGER NOT NULL DEFAULT 1
 );
-
+CREATE TABLE IF NOT EXISTS game_settings (
+  game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+  win_frequency INTEGER NOT NULL DEFAULT 25 CHECK(win_frequency BETWEEN 0 AND 100)
+);
+CREATE TABLE IF NOT EXISTS game_assets (
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  asset_key TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  PRIMARY KEY(game_id, asset_key)
+);
 `);
 
 const initialGames=[
@@ -43,6 +53,14 @@ const initialGames=[
 const seedGame=db.prepare('INSERT OR IGNORE INTO games(slug,title,image_path,position) VALUES(?,?,?,?)');
 db.transaction(()=>{ for(const game of initialGames) seedGame.run(...game); })();
 
+const seedSettings=db.prepare('INSERT OR IGNORE INTO game_settings(game_id) VALUES(?)');
+db.transaction(()=>{ for(const game of db.prepare('SELECT id FROM games').all()) seedSettings.run(game.id); })();
+function getGameSettings(id) {
+  return db.prepare('SELECT win_frequency FROM game_settings WHERE game_id=?').get(id);
+}
+function getGameAssets(id) {
+  return db.prepare('SELECT asset_key,file_name,media_type FROM game_assets WHERE game_id=?').all(id);
+}
 function hashPassword(password) {
   const salt = crypto.randomBytes(16);
   const key = crypto.scryptSync(password, salt, 64);
@@ -75,4 +93,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
