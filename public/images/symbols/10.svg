@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Символ 10">
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2=".25" y2="1"><stop stop-color="#fff7c8"/><stop offset=".20" stop-color="#f7d575"/><stop offset=".43" stop-color="#bb7622"/><stop offset=".65" stop-color="#ffe58b"/><stop offset="1" stop-color="#945315"/></linearGradient>
+  <linearGradient id="jewel" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="#fff3f1"/><stop offset=".13" stop-color="#58db48"/><stop offset=".52" stop-color="#58db48"/><stop offset=".75" stop-color="#147b41"/><stop offset="1" stop-color="#147b41"/></linearGradient>
+  <filter id="shadow" x="-35%" y="-35%" width="170%" height="170%"><feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#120b05" flood-opacity=".8"/></filter>
+</defs>
+<g text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="900" font-size="151" letter-spacing="-10" transform="translate(0 0)" filter="url(#shadow)">
+<text x="128" y="193" fill="#5b3514" stroke="#5b3514" stroke-width="21" stroke-linejoin="round">10</text>
+<text x="128" y="191" fill="url(#gold)" stroke="url(#gold)" stroke-width="16" stroke-linejoin="round">10</text>
+<text x="128" y="190" fill="url(#jewel)" stroke="#5d2f15" stroke-width="4" stroke-linejoin="round">10</text>
+</g>
+<g fill="#fff9e2" opacity=".9">
+<path d="M47 51 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5Z"/>
+<path d="M208 154 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3Z"/>
+</g>
+</svg>
