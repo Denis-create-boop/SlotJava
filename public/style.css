@@ -384,3 +384,13 @@ header,main,footer {position:relative;z-index:1}
     var(--cell-wall,none);
 }
 .game-field-subtitle {font-size:1.05rem;margin:28px 0 12px}
+
+/* Keep applying an uploaded image easy from the per-game image library. */
+.library-background-picker{width:100%;display:grid!important;grid-template-columns:1fr;gap:9px}
+.library-background-picker label{display:grid;gap:6px;min-width:0;font-size:.85rem}
+.library-background-picker select{min-width:0;width:100%;padding:10px;border-radius:9px;color:#f4f3f7;background:#252630;border:1px solid #77717d;font:inherit}
+.library-background-picker button{width:100%}
+.library-quick-actions{display:grid;grid-template-columns:1fr;gap:6px;width:100%;margin-top:auto}
+.library-quick-actions form{width:100%;margin:0}
+.library-quick-actions button{width:100%;min-height:34px;white-space:normal;border-color:rgba(232,189,111,.40);color:#f6dcb1}
+.library-quick-actions button:disabled{opacity:.68;cursor:default}
