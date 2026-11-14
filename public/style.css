@@ -394,3 +394,29 @@ header,main,footer {position:relative;z-index:1}
 .library-quick-actions form{width:100%;margin:0}
 .library-quick-actions button{width:100%;min-height:34px;white-space:normal;border-color:rgba(232,189,111,.40);color:#f6dcb1}
 .library-quick-actions button:disabled{opacity:.68;cursor:default}
+
+/* Background images rendered as real DOM images: works under strict CSP (no inline styles).
+   The selected game background covers both the heading and the entire reel area. */
+.slot-game{position:relative;isolation:isolate;overflow:hidden;background-color:#1c1d25;background-image:none}
+.slot-full-background{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;pointer-events:none}
+.slot-game:has(> .slot-full-background){background-color:#1c1d25}
+.slot-game:has(> .slot-full-background)::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(145deg,rgba(17,17,24,.22),rgba(14,14,21,.34))
+}
+.slot-game>.back-link,.slot-game>.slot-heading,.slot-game>.slot-machine,.slot-game>.slot-message{
+  position:relative;z-index:1
+}
+.slot-reels.slot-reels-ribbon{position:relative;isolation:isolate;background-image:none;background-color:rgba(15,16,23,.26)}
+.slot-field-background{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;pointer-events:none}
+.slot-reels.slot-reels-ribbon:has(> .slot-field-background){background-color:rgba(15,16,23,.1)}
+.reel-column{background-image:none;background-color:rgba(23,24,32,.26)}
+.reel-window{position:relative;isolation:isolate}
+.reel-background-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none}
+.reel-backdrops{z-index:1}
+.reel-track{z-index:2}
+.reel-cell-bg{position:relative;overflow:hidden;background:rgba(27,28,38,.13)}
+.reel-cell-background-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.slot-meter{position:relative;isolation:isolate;overflow:hidden;background-image:none;background-color:rgba(30,31,40,.66)}
+.slot-meter-background{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;pointer-events:none}
+.slot-meter:has(> .slot-meter-background){background-color:rgba(30,31,40,.12)}
