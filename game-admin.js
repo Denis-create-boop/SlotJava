@@ -162,6 +162,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button type="submit" class="danger-action">Удалить символ</button></form></details>';
     }).join('');
     const tabs=[
+      ['name','Название игры','Название в каталоге и админке','image'],
       ['background','Изменение фона','Фон игрового окна и логотип','image'],
       ['reels','Фон игрового поля','Общий фон за пятью столбцами','columns'],
       ['cells','Фон барабанов','Фон каждой ячейки под символом','grid'],
@@ -181,6 +182,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '</span><span><strong>'+title+'</strong><small>'+description+'</small></span></a>').join('');
     const panelStart=(title)=>'<section class="panel game-admin-selected" id="'+activeTab+'"><h2>'+title+'</h2>';
     let panel='';
+    if(activeTab==='name')panel=panelStart('Название игры')+
+      '<p class="hint">Название отображается в каталоге игр и на карточке админки. Ссылка на игру и настройки при переименовании сохраняются.</p>'+
+      '<form method="post" class="game-title-form" action="/admin/games/'+id+'/title">'+csrf+
+      '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
+      '<button class="primary" type="submit">Сохранить название</button></form></section>';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
       '<p class="hint">Изменяйте фон игрового окна и логотип игры.</p><div class="asset-settings-grid">'+
       rowsFor(['background','logo'])+'</div></section>';
@@ -225,6 +231,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '</div>',req,error?400:200);
   }
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
+  app.post('/admin/games/:id/title',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req);
+    if(!id||!gameById(id))return res.sendStatus(404);
+    const raw=req.body?.title;
+    const title=typeof raw==='string'?raw.trim():'';
+    if(!title||title.length>80||/[\\x00-\\x1f\\x7f]/.test(title))
+      return show(req,res,'Название должно содержать от 1 до 80 символов без управляющих знаков.',true,'name');
+    db.prepare('UPDATE games SET title=? WHERE id=?').run(title,id);
+    res.redirect(sectionUrl(id,'name')+'&saved=1');
+  });
   app.post('/admin/games/:id/settings',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req);
     if(!id||!gameById(id))return res.sendStatus(404);
