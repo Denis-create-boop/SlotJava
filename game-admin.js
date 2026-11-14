@@ -8,6 +8,7 @@ fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
 
 const assetTypes={
   background:{label:'Фон игрового окна',kind:'image'},
+  field_background:{label:'Общий фон поля с барабанами (все 20 ячеек)',kind:'image'},
   logo:{label:'Логотип игры',kind:'image'},
   reels_background:{label:'Фон барабанов',kind:'image'},
   bet_panel:{label:'Фон панели ставок',kind:'image'},
@@ -72,7 +73,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   function assetTab(key){
     if(key==='background'||key==='logo')return 'background';
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
-    if(/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
+    if(key==='field_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
     if(key==='music'||key==='spin_sound'||key==='win_sound')return 'audio';
     if(/^symbol_\d+$/.test(key))return 'symbols';
@@ -168,8 +169,9 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Выберите общий фон барабанов или отдельный фон каждого из пяти столбцов.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background','reel_1','reel_2','reel_3','reel_4','reel_5'])+'</div></section>';
     if(activeTab==='cells')panel=panelStart('Фон игрового поля')+
-      '<p class="hint">Двадцать ячеек: нумерация слева направо, сверху вниз. Символы вращаются поверх фона.</p>'+
-      '<div class="asset-settings-grid">'+cellSettings+'</div></section>';
+      '<p class="hint">Здесь можно установить один фон на всё игровое поле или отдельные фоны на 20 ячеек. Номера ячеек идут слева направо, сверху вниз. Символы вращаются поверх фона.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['field_background'])+'</div>'+ 
+      '<h3 class="game-field-subtitle">Фон отдельных ячеек</h3><div class="asset-settings-grid">'+cellSettings+'</div></section>';
     if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
       rowsFor(['bet_panel','win_panel'])+'</div></section>';
