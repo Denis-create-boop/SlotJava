@@ -39,7 +39,7 @@ function gameId(req) {
   const id=Number(req.params.id);
   return Number.isSafeInteger(id) && id>0 ? id : null;
 }
-function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
   function dynamicAsset(id,key) {
     if(assetTypes[key])return assetTypes[key];
     const match=/^symbol_(\d+)$/.exec(key);
@@ -52,6 +52,9 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   function assertOwnSymbol(gameId,symbolId) {
     if(!Number.isSafeInteger(symbolId)||symbolId<1)return false;
     return !!db.prepare('SELECT id FROM game_symbols WHERE id=? AND game_id=?').get(symbolId,gameId);
+  }
+  function isBackgroundAsset(key) {
+    return !!assetTypes[key] && assetTypes[key].kind==='image' && key!=='logo';
   }
   function imageBox(id,key,label,assets,csrf) {
     const value=assets.get(key),src='/game-assets/'+id+'/'+key;
@@ -88,18 +91,29 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">Вернуться</a></section>',req,404);
     const settings=getGameSettings(id)||{win_frequency:25};
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
+    const assignedBackgrounds=new Map(getGameBackgroundImages(id).map(item=>[item.asset_key,item]));
+    const libraryImages=getLibraryImages(id);
     const csrf=csrfInput(req.session.csrf_token);
     const renderAssetRow=([key,meta])=>{
       const value=assets.get(key);
-      const src='/game-assets/'+id+'/'+key;
-      const preview=value ? (meta.kind==='image'
-        ? '<img class="asset-preview" src="'+src+'" alt="'+h(meta.label)+'">'
-        : '<audio controls preload="none" src="'+src+'"></audio>') : '<span class="asset-empty">Файл не загружен</span>';
-      return '<div class="asset-setting"><div class="asset-detail"><strong>'+h(meta.label)+'</strong>'+preview+'</div>'+
-        '<div class="asset-actions"><form method="post" action="/admin/games/'+id+'/assets/'+key+'" enctype="multipart/form-data">'+csrf+
-        '<label class="asset-upload-label">Выбрать файл <input type="file" name="asset" accept="'+(meta.kind==='image'?'image/png,image/jpeg,image/webp,image/gif':'audio/mpeg,audio/ogg,audio/wav')+'" required></label>'+
-        '<button class="primary" type="submit">Загрузить</button></form>'+
-        (value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Удалить</button></form>':'')+
+      const assigned=assignedBackgrounds.get(key);
+      const src=assigned ? (assigned.builtin_path||'/game-library/'+id+'/'+assigned.library_image_id) : '/game-assets/'+id+'/'+key;
+      const preview=(assigned||value) ? (meta.kind==='image'
+        ? '<img class="asset-preview" src="'+h(src)+'" alt="'+h(meta.label)+'">'
+        : '<audio controls preload="none" src="'+src+'"></audio>') : '<span class="asset-empty">Файл не выбран</span>';
+      const selector=isBackgroundAsset(key)?
+        '<form method="post" class="library-background-picker" action="/admin/games/'+id+'/backgrounds/'+key+'">'+csrf+
+        '<label>Выбрать из папки изображений<select name="image_id" required><option value="">Выберите картинку</option>'+
+        libraryImages.map(image=>'<option value="'+image.id+'"'+(assigned?.library_image_id===image.id?' selected':'')+'>'+h(image.name)+'</option>').join('')+
+        '</select></label><button class="primary" type="submit">Применить фон</button></form>':'';
+      return '<div class="asset-setting"><div class="asset-detail"><strong>'+h(meta.label)+'</strong>'+preview+
+        (assigned?'<small>Применено из папки изображений: '+h(assigned.name)+'</small>':
+         value?'<small>Применён загруженный файл</small>':'<small>Фон пока не задан</small>')+
+        '</div><div class="asset-actions">'+selector+
+        '<form method="post" action="/admin/games/'+id+'/assets/'+key+'" enctype="multipart/form-data">'+csrf+
+        '<label class="asset-upload-label">Или загрузить новый файл<input type="file" name="asset" accept="'+(meta.kind==='image'?'image/png,image/jpeg,image/webp,image/gif':'audio/mpeg,audio/ogg,audio/wav')+'" required></label>'+
+        '<button class="primary" type="submit">Загрузить и применить</button></form>'+
+        (assigned||value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Убрать</button></form>':'')+
         '</div></div>';
     };
     const rowsFor=keys=>keys.map(key=>renderAssetRow([key,assetTypes[key]])).join('');
@@ -107,7 +121,6 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const payouts=getPayouts(id);
     const payoutBySymbol=new Map();
     for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.coefficient_milli);}
-    const libraryImages=getLibraryImages(id);
     const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
     const libraryCards=libraryImages.map(image=>{
       const src=libraryUrl(id,image);
@@ -140,8 +153,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form></details>';
     }).join('');
-    const cellSettings=Array.from({length:20},(_,index)=>imageBox(id,'cell_'+(index+1),
-      'Ячейка №'+(index+1)+' — строка '+(Math.floor(index/5)+1)+', столбец '+((index%5)+1),assets,csrf)).join('');
+    const cellSettings=Array.from({length:20},(_,index)=>renderAssetRow(['cell_'+(index+1),{label:'Ячейка №'+(index+1)+' — строка '+(Math.floor(index/5)+1)+', столбец '+((index%5)+1),kind:'image'}])).join('');
     const tabs=[
       ['background','Изменение фона','Фон игрового окна и логотип','image'],
       ['reels','Фон барабанов','Общий фон и 5 барабанов','columns'],
