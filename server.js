@@ -149,43 +149,55 @@ app.get('/',(req,res)=>{
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
 function scoreBoard(cells,symbols,payouts){
-  const counts=new Map();
-  for(const id of cells)counts.set(id,(counts.get(id)||0)+1);
-  const payoutMap=new Map(payouts.map(p=>[p.symbol_id+':'+p.matches,p.prize]));
+  // A symbol wins when it is visible in consecutive reels starting at reel 1.
+  // Multiple instances within a reel count only once; rows/paylines do not matter.
+  const prizes=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=5)
+    .map(p=>[p.symbol_id+':'+p.matches,p.prize]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
-    const count=counts.get(symbol.id)||0;
-    const prize=payoutMap.get(symbol.id+':'+count)||0;
-    if(prize>0){total+=prize;wins.push({symbolId:symbol.id,name:symbol.name,count,prize});}
+    let reels=0;
+    for(let col=0;col<5;col++){
+      let found=false;
+      for(let row=0;row<4;row++){
+        if(cells[row*5+col]===symbol.id){found=true;break;}
+      }
+      if(!found)break;
+      reels++;
+    }
+    if(reels<3)continue;
+    const prize=prizes.get(symbol.id+':'+reels)||0;
+    if(prize>0){
+      total+=prize;
+      wins.push({symbolId:symbol.id,name:symbol.name,reels,prize});
+    }
   }
   return {total,wins};
 }
-function generateSpin(gameId,winFrequency) {
+function generateSpin(gameId,winFrequency){
   const symbols=getSymbols(gameId),payouts=getPayouts(gameId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const randomBoard=()=>Array.from({length:20},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
-  // Bounded candidate selection. Payouts always follow the actual 20 symbols.
   let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts);
-  for(let trial=0;trial<500&&Boolean(evaluation.total)!==wantWin;trial++){
+  // Try to meet the target win frequency, without faking a payout.
+  for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
     cells=randomBoard();
     evaluation=scoreBoard(cells,symbols,payouts);
   }
-  // If the payout schedule defines rare wins, deliberately construct a candidate
-  // with an exact count. Never claim an award that the visible board does not earn.
-  if(wantWin&&evaluation.total===0){
-    const winningRules=payouts.filter(p=>p.prize>0&&p.matches>=1&&p.matches<=20&&
-      (p.matches===20||symbols.length>=2));
-    for(let attempt=0;attempt<winningRules.length*3&&evaluation.total===0;attempt++){
-      const rule=winningRules[crypto.randomInt(winningRules.length)];
-      const others=symbols.filter(x=>x.id!==rule.symbol_id);
-      if(rule.matches<20&&!others.length)continue;
-      const candidate=Array.from({length:20},(_,i)=>i<rule.matches?rule.symbol_id:others[crypto.randomInt(others.length)].id);
-      // Fisher-Yates shuffle so winning cells have no fixed positions.
-      for(let i=candidate.length-1;i>0;i--){const j=crypto.randomInt(i+1);[candidate[i],candidate[j]]=[candidate[j],candidate[i]];}
-      const scored=scoreBoard(candidate,symbols,payouts);
-      if(scored.total>0){cells=candidate;evaluation=scored;}
+  if(wantWin&&evaluation.total===0&&symbols.length>=2){
+    const candidates=payouts.filter(p=>p.prize>0&&p.matches>=3&&p.matches<=5);
+    // Inject a paying symbol into one random row of each required reel.
+    for(let trial=0;trial<Math.min(candidates.length*8,200)&&evaluation.total===0;trial++){
+      const candidateRule=candidates[crypto.randomInt(candidates.length)];
+      const others=symbols.filter(item=>item.id!==candidateRule.symbol_id);
+      const arranged=Array.from({length:20},()=>others[crypto.randomInt(others.length)].id);
+      for(let col=0;col<candidateRule.matches;col++){
+        const row=crypto.randomInt(4);
+        arranged[row*5+col]=candidateRule.symbol_id;
+      }
+      const scored=scoreBoard(arranged,symbols,payouts);
+      if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
   return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0};
@@ -193,7 +205,8 @@ function generateSpin(gameId,winFrequency) {
 function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
 }
-const DEMO_BET=10;
+const DEMO_BETS=[10,20,50,100];
+const BET_UNIT=10;
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
   const url=key=>assetUrl(assets,key,game.id);
@@ -218,18 +231,27 @@ function firstGamePage(game,req){
     return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
   const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
-  const balance=getWallet(req.user.id,game.id);
+  const wallet=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
     '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>4 ряда × 5 барабанов · демонстрационная игра</p></div>'+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
     '<div class="reel-labels">'+reelLabels+'</div><div class="reel-columns">'+reels+'</div></div>'+
-    '<div class="slot-bottom-bar"><div class="slot-meters">'+
-    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Баланс</span><strong id="slot-balance">'+balance+'</strong></div>'+
-    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Ставка</span><strong id="slot-bet">'+DEMO_BET+'</strong></div>'+
+    '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
+    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
+    '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger"'+cssUrl('bet_panel','--bet-wall')+'><span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
     '<div class="slot-meter"'+cssUrl('win_panel','--win-wall')+'><span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span>ВРАЩАТЬ</span></button></form></div>'+
     '<p class="slot-message" id="slot-result" role="status" aria-live="polite">Нажмите на круглую кнопку для вращения.</p></div>'+
+    '<dialog class="slot-settings-dialog" id="slot-settings-dialog" aria-labelledby="slot-settings-heading">'+
+    '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть настройки">×</button></form>'+
+    '<h2 id="slot-settings-heading">Настройки игры</h2>'+
+    '<label class="sound-toggle"><input type="checkbox" id="slot-sound-toggle" checked> Включить звук</label>'+
+    '<form method="post" id="slot-bet-form" action="/games/'+h(game.slug)+'/bet">'+csrfInput(req.session.csrf_token)+
+    '<label for="slot-bet-select">Ставка за вращение</label><select id="slot-bet-select" name="bet">'+
+    DEMO_BETS.map(bet=>'<option value="'+bet+'"'+(wallet.bet===bet?' selected':'')+'>'+bet+' очков</option>').join('')+
+    '</select><button class="primary" type="submit">Применить ставку</button></form>'+
+    '<p class="hint">Очки тестовые, без реальных денег. Изменение ставки сохраняется в вашем профиле этой игры.</p></dialog>'+
     '<div class="slot-symbol-data" hidden>'+symbols+'</div>'+audio+'</div>';
 }
 app.get('/games/:slug',guarded,(req,res)=>{
@@ -238,18 +260,32 @@ app.get('/games/:slug',guarded,(req,res)=>{
   if(game.slug==='slot-classic')return sendPage(res,game.title,firstGamePage(game,req),req);
   sendPage(res,game.title,'<section class="panel game-placeholder"><img src="'+h(game.image_path)+'" alt="" width="720" height="450"><h1>'+h(game.title)+'</h1><p>Игра находится в разработке.</p><a class="secondary" href="/">Назад к играм</a></section>',req);
 });
+app.post('/games/:slug/bet',guarded,spinLimiter,postGuard,(req,res)=>{
+  const game=listGames(true).find(item=>item.slug===req.params.slug);
+  if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
+  const bet=Number(req.body?.bet);
+  if(!DEMO_BETS.includes(bet)||String(bet)!==req.body?.bet)return res.status(400).json({error:'Недопустимая ставка'});
+  getWallet(req.user.id,game.id);
+  db.prepare('UPDATE game_wallets SET bet=? WHERE user_id=? AND game_id=?').run(bet,req.user.id,game.id);
+  res.set('Cache-Control','no-store');
+  res.json({bet});
+});
 app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
   const result=db.transaction(()=>{
-    const balance=getWallet(req.user.id,game.id);
-    if(balance<DEMO_BET)return {error:'Недостаточно тестовых очков для ставки.'};
+    const wallet=getWallet(req.user.id,game.id);
+    if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const spin=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
     if(spin.error)return spin;
-    const updatedBalance=balance-DEMO_BET+spin.total;
+    // Admin-configured prizes are expressed for the base 10-point stake.
+    const payout=spin.total*(wallet.bet/BET_UNIT);
+    const updatedBalance=wallet.balance-wallet.bet+payout;
+    if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
     db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
       .run(updatedBalance,req.user.id,game.id);
-    return {...spin,balance:updatedBalance,bet:DEMO_BET};
+    const wins=spin.wins.map(w=>({...w,prize:w.prize*(wallet.bet/BET_UNIT)}));
+    return {...spin,total:payout,wins,balance:updatedBalance,bet:wallet.bet};
   })();
   res.set('Cache-Control','no-store');
   if(result.error)return res.status(400).json({error:result.error});
