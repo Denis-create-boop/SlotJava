@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -193,35 +193,44 @@ function generateSpin(gameId,winFrequency) {
 function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
 }
+const DEMO_BET=10;
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
   const url=key=>assetUrl(assets,key,game.id);
   const cssUrl=(key,varName)=>url(key)?' style="'+varName+':url(\''+h(url(key))+'\')"':'';
   const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
-  const reelTitles=Array.from({length:5},(_,i)=>'<div class="reel-header">Барабан №'+(i+1)+'</div>').join('');
-  const cells=Array.from({length:20},(_,i)=>{
-    const col=(i%5)+1,row=Math.floor(i/5)+1;
-    const style=' style="--cell-wall:'+(url('cell_'+(i+1))?'url(\''+h(url('cell_'+(i+1)))+'\')':'none')+
-      ';--reel-wall:'+(url('reel_'+col)?'url(\''+h(url('reel_'+col))+'\')':url('reels_background')?'url(\''+h(url('reels_background'))+'\')':'none')+'"';
-    return '<div class="slot-symbol" data-index="'+i+'"'+style+'><span class="slot-cell-number">'+(i+1)+'</span>'+
-      '<span class="symbol-placeholder">?</span><small>Строка '+row+' · Столбец '+col+'</small></div>';
+  const reelLabels=Array.from({length:5},(_,col)=>'<div class="reel-header">Барабан №'+(col+1)+'</div>').join('');
+  const reels=Array.from({length:5},(_,col)=>{
+    const reelNumber=col+1;
+    const reelBackground=url('reel_'+reelNumber)||url('reels_background');
+    const backgroundStyle=reelBackground?'--reel-wall:url(\''+h(reelBackground)+'\');':'';
+    const backgrounds=Array.from({length:4},(_,row)=>{
+      const n=row*5+reelNumber;
+      const image=url('cell_'+n);
+      return '<div class="reel-cell-bg"'+(image?' style="--cell-wall:url(\''+h(image)+'\')"':'')+'></div>';
+    }).join('');
+    return '<div class="reel-column" data-reel="'+col+'" style="'+backgroundStyle+'">'+
+      '<div class="reel-window"><div class="reel-backdrops">'+backgrounds+'</div>'+
+      '<div class="reel-track" aria-label="Барабан '+reelNumber+'"></div></div></div>';
   }).join('');
   const symbols=getSymbols(game.id).map(symbol=>{
-    const src=url('symbol_'+symbol.id);
-    return '<div class="slot-legend-item" data-symbol-id="'+symbol.id+'"><span class="legend-visual">'+
-      (src?'<img src="'+h(src)+'" alt="'+h(symbol.name)+'">':symbol.id)+'</span>'+
-      '<span>'+h(symbol.name)+'</span></div>';
+    const image=url('symbol_'+symbol.id)||'';
+    return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
   const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
+  const balance=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
-    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>4 линии × 5 ячеек · тестовый режим</p></div>'+
-    '<div class="slot-machine"><div class="slot-reels slot-reels-five">'+reelTitles+cells+'</div>'+
-    '<div class="slot-controls"><div class="slot-stats"'+cssUrl('bet_panel','--bet-wall')+'><strong>Ставка</strong><span>Без реальных денег</span></div>'+
-    '<div class="slot-stats"'+cssUrl('win_panel','--win-wall')+'><strong>Выигрыш</strong><span id="slot-result" role="status" aria-live="polite">Нажмите «Вращать»</span></div>'+
+    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>4 ряда × 5 барабанов · демонстрационная игра</p></div>'+
+    '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
+    '<div class="reel-labels">'+reelLabels+'</div><div class="reel-columns">'+reels+'</div></div>'+
+    '<div class="slot-bottom-bar"><div class="slot-meters">'+
+    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Баланс</span><strong id="slot-balance">'+balance+'</strong></div>'+
+    '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Ставка</span><strong id="slot-bet">'+DEMO_BET+'</strong></div>'+
+    '<div class="slot-meter"'+cssUrl('win_panel','--win-wall')+'><span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
-    '<button id="slot-spin-button" class="primary" type="submit">Вращать барабаны</button></form></div></div>'+
-    '<section class="slot-legend"><h2>Символы игры</h2><p class="hint">Картинки выбираются по алгоритму и не закреплены за ячейками. Номера ячеек 1–20 видны на поле, а фоны этих позиций можно загрузить отдельно в админке. Выплаты считаются по точному общему количеству символов.</p>'+
-    '<div class="slot-legend-grid">'+symbols+'</div></section>'+audio+'</div>';
+    '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span>ВРАЩАТЬ</span></button></form></div>'+
+    '<p class="slot-message" id="slot-result" role="status" aria-live="polite">Нажмите на круглую кнопку для вращения.</p></div>'+
+    '<div class="slot-symbol-data" hidden>'+symbols+'</div>'+audio+'</div>';
 }
 app.get('/games/:slug',guarded,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
@@ -232,7 +241,16 @@ app.get('/games/:slug',guarded,(req,res)=>{
 app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
-  const result=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
+  const result=db.transaction(()=>{
+    const balance=getWallet(req.user.id,game.id);
+    if(balance<DEMO_BET)return {error:'Недостаточно тестовых очков для ставки.'};
+    const spin=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
+    if(spin.error)return spin;
+    const updatedBalance=balance-DEMO_BET+spin.total;
+    db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
+      .run(updatedBalance,req.user.id,game.id);
+    return {...spin,balance:updatedBalance,bet:DEMO_BET};
+  })();
   res.set('Cache-Control','no-store');
   if(result.error)return res.status(400).json({error:result.error});
   res.json(result);
