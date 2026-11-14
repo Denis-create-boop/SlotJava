@@ -76,7 +76,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const settings=getGameSettings(id)||{win_frequency:25};
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
     const csrf=csrfInput(req.session.csrf_token);
-    const rows=Object.entries(assetTypes).filter(([key])=>!key.startsWith('cell_')).map(([key,meta])=>{
+    const renderAssetRow=([key,meta])=>{
       const value=assets.get(key);
       const src='/game-assets/'+id+'/'+key;
       const preview=value ? (meta.kind==='image'
@@ -88,7 +88,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button class="primary" type="submit">Загрузить</button></form>'+
         (value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Удалить</button></form>':'')+
         '</div></div>';
-    }).join('');
+    };
+    const rowsFor=keys=>keys.map(key=>renderAssetRow([key,assetTypes[key]])).join('');
     const symbols=getSymbols(id);
     const payouts=getPayouts(id);
     const payoutBySymbol=new Map();
@@ -129,34 +130,69 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     }).join('');
     const cellSettings=Array.from({length:20},(_,index)=>imageBox(id,'cell_'+(index+1),
       'Ячейка №'+(index+1)+' — строка '+(Math.floor(index/5)+1)+', столбец '+((index%5)+1),assets,csrf)).join('');
+    const tabs=[
+      ['background','Изменение фона','Фон игрового окна и логотип','image'],
+      ['reels','Фон барабанов','Общий фон и 5 барабанов','columns'],
+      ['cells','Фон игрового поля','Фон каждой из 20 ячеек','grid'],
+      ['panels','Панели ставок и выигрыша','Оформление нижних панелей','wallet'],
+      ['audio','Музыка и звуки','Музыка, вращение и выигрыш','music'],
+      ['library','Папка изображений','Загрузка и хранение картинок','folder'],
+      ['symbols','Символы и коэффициенты','Символы и таблица выплат','star'],
+      ['frequency','Частота выигрыша','Вероятность выигрышных вращений','percent']
+    ];
+    const validTabs=new Set(tabs.map(tab=>tab[0]));
+    const activeTab=typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview';
+    const tabButtons=tabs.map(([key,title,description,icon])=>
+      '<a class="game-admin-menu-button'+(activeTab===key?' is-active':'')+'" href="/admin/games/'+id+'?tab='+key+'"'+
+      (activeTab===key?' aria-current="page"':'')+'>'+
+      '<span class="game-admin-menu-icon" aria-hidden="true">'+
+      ({image:'▧',columns:'▥',grid:'▦',wallet:'▣',music:'♫',folder:'▤',star:'★',percent:'%'}[icon])+
+      '</span><span><strong>'+title+'</strong><small>'+description+'</small></span></a>').join('');
+    const currentTitle=tabs.find(tab=>tab[0]===activeTab)?.[1]||'Выберите раздел';
+    const panelStart=(title)=>'<section class="panel game-admin-selected" id="'+activeTab+'"><h2>'+title+'</h2>';
+    let panel='';
+    if(activeTab==='background')panel=panelStart('Изменение фона')+
+      '<p class="hint">Изменяйте фон игрового окна и логотип игры.</p><div class="asset-settings-grid">'+
+      rowsFor(['background','logo'])+'</div></section>';
+    if(activeTab==='reels')panel=panelStart('Фон барабанов')+
+      '<p class="hint">Выберите общий фон барабанов или отдельный фон каждого из пяти столбцов.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['reels_background','reel_1','reel_2','reel_3','reel_4','reel_5'])+'</div></section>';
+    if(activeTab==='cells')panel=panelStart('Фон игрового поля')+
+      '<p class="hint">Двадцать ячеек: нумерация слева направо, сверху вниз. Символы вращаются поверх фона.</p>'+
+      '<div class="asset-settings-grid">'+cellSettings+'</div></section>';
+    if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
+      '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
+      rowsFor(['bet_panel','win_panel'])+'</div></section>';
+    if(activeTab==='audio')panel=panelStart('Музыка и звуки')+
+      '<p class="hint">Добавьте фоновую музыку и звуки вращения и выигрыша. Форматы MP3, OGG, WAV до 12 МБ.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound'])+'</div></section>';
+    if(activeTab==='frequency')panel=panelStart('Частота выигрыша')+
+      '<p class="hint">Целевой процент выигрышных вращений от 0 до 100. Это не RTP и не доля возвращаемых ставок. При отсутствии положительных коэффициентов выигрышей не будет.</p>'+
+      '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings?tab=frequency">'+csrf+
+      '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
+      '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
+      '<button class="primary" type="submit">Сохранить</button></div></form></section>';
+    if(activeTab==='library')panel=panelStart('Папка изображений игры')+
+      '<p class="hint">Картинки сохраняются в библиотеке именно этой игры. После загрузки их можно выбирать для символов. PNG, JPG, WEBP, GIF до 5 МБ.</p>'+
+      '<form class="library-upload" method="post" action="/admin/games/'+id+'/library?tab=library" enctype="multipart/form-data">'+csrf+
+      '<label>Название картинки<input name="name" maxlength="80" required placeholder="Например: Череп"></label>'+
+      '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
+      '<button class="primary" type="submit">Добавить в папку</button></form>'+
+      '<div class="library-images">'+libraryCards+'</div></section>';
+    if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
+      '<p class="hint">Для каждого символа выберите картинку из папки игры и задайте коэффициент выплаты за 3–20 появлений. Выигрышная цепочка должна начинаться на первых трёх барабанах и прерывается при первом пропуске.</p>'+
+      '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
+      '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
+      '<button class="primary" type="submit">Добавить символ</button></form>'+
+      '<div class="symbol-admin-list">'+symbolItems+'</div></section>';
     const notice=message?'<p class="'+(error?'error':'success-note')+'" role="status">'+h(message)+'</p>':'';
     sendPage(res,'Настройки: '+game.title,
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
-      '<section class="panel"><h2>Частота выигрыша</h2>'+
-      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой по коэффициенту от ставки для числа символов в непрерывной цепочке барабанов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
-      '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings">'+csrf+
-      '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
-      '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
-      '<button class="primary" type="submit">Сохранить</button></div></form></section>'+
-      '<section class="panel"><h2>Оформление, символы и звук</h2>'+
-      '<p class="hint">Поле 4 строки × 5 столбцов. Символы не закреплены за позициями: при каждом вращении алгоритм выбирает символ для каждой ячейки.</p>'+
-      '<p class="hint">Изображения: PNG, JPG, WEBP, GIF (до 5 МБ). Звук: MP3, OGG, WAV (до 12 МБ). Каждый файл закрепляется за этой игрой.</p>'+
-      '<div class="asset-settings-grid">'+rows+'</div></section>'+
-      '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
-      '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
-      '<section class="panel" id="library"><h2>Папка изображений игры</h2>'+
-      '<p class="hint">Изображения хранятся отдельно для каждой игры. Сначала загрузите картинку сюда, затем выберите её для нужного символа ниже. Форматы PNG, JPG, WEBP и GIF, до 5 МБ.</p>'+
-      '<form class="library-upload" method="post" action="/admin/games/'+id+'/library" enctype="multipart/form-data">'+csrf+
-      '<label>Название картинки<input name="name" maxlength="80" required placeholder="Например: Череп"></label>'+
-      '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
-      '<button class="primary" type="submit">Добавить в папку</button></form>'+
-      '<div class="library-images">'+libraryCards+'</div></section>'+
-      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Для выигрыша символ должен встретиться на первых трёх барабанах. Цепочка продолжается только пока символ есть на следующем барабане; после первого пропуска дальнейшие символы не считаются. Повторы внутри цепочки суммируются. Для каждого количества от 3 до 20 задаётся коэффициент умножения текущей ставки.</p>'+
-      '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
-      '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
-      '<button class="primary" type="submit">Добавить символ</button></form>'+
-      '<div class="symbol-admin-list">'+symbolItems+'</div></section></div>',req,error?400:200);
+      '<nav class="game-admin-menu" aria-label="Разделы настроек игры">'+tabButtons+'</nav>'+
+      (panel || '<section class="panel game-admin-intro"><h2>Управление игрой</h2>'+
+      '<p class="hint">Выберите нужный раздел кнопкой выше. Настройки, файлы и коэффициенты сохраняются отдельно для каждой игры.</p></section>')+
+      '</div>',req,error?400:200);
   }
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
   app.post('/admin/games/:id/settings',adminOnly,postGuard,(req,res)=>{
