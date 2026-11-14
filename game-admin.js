@@ -81,7 +81,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   function sectionUrl(id,tab){
     return '/admin/games/'+id+'?tab='+tab;
   }
-  function show(req,res,message='',error=false) {
+  function show(req,res,message='',error=false,forcedTab=null) {
     const id=gameId(req);
     const game=id?gameById(id):null;
     if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">Вернуться</a></section>',req,404);
@@ -152,7 +152,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ['frequency','Частота выигрыша','Вероятность выигрышных вращений','percent']
     ];
     const validTabs=new Set(tabs.map(tab=>tab[0]));
-    const activeTab=typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview';
+    const activeTab=forcedTab&&validTabs.has(forcedTab)?forcedTab:(typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview');
     const tabButtons=tabs.map(([key,title,description,icon])=>
       '<a class="game-admin-menu-button'+(activeTab===key?' is-active':'')+'" href="/admin/games/'+id+'?tab='+key+'"'+
       (activeTab===key?' aria-current="page"':'')+'>'+
@@ -209,7 +209,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req);
     if(!id||!gameById(id))return res.sendStatus(404);
     const value=req.body.win_frequency;
-    if(typeof value!=='string'||!/^(100|[1-9]?\d)$/.test(value))return show({...req,query:{...req.query,tab:'frequency'}},res,'Введите целое число от 0 до 100.',true);
+    if(typeof value!=='string'||!/^(100|[1-9]?\d)$/.test(value))return show(req,res,'Введите целое число от 0 до 100.',true,'frequency');
     db.prepare('INSERT INTO game_settings(game_id,win_frequency) VALUES(?,?) ON CONFLICT(game_id) DO UPDATE SET win_frequency=excluded.win_frequency').run(id,Number(value));
     res.redirect(sectionUrl(id,'frequency')+'&saved=1');
   });
@@ -217,8 +217,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req);
     if(!id||!gameById(id))return res.sendStatus(404);
     const name=typeof req.body.name==='string'?req.body.name.trim():'';
-    if(name.length<1||name.length>60)return show({...req,query:{...req.query,tab:'symbols'}},res,'Имя символа должно содержать от 1 до 60 символов.',true);
-    if(getSymbols(id).length>=50)return show({...req,query:{...req.query,tab:'symbols'}},res,'Лимит — 50 символов на игру.',true);
+    if(name.length<1||name.length>60)return show(req,res,'Имя символа должно содержать от 1 до 60 символов.',true,'symbols');
+    if(getSymbols(id).length>=50)return show(req,res,'Лимит — 50 символов на игру.',true,'symbols');
     const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(id).n;
     db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
     res.redirect(sectionUrl(id,'symbols'));
@@ -226,11 +226,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.post('/admin/games/:id/library',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
     const id=gameId(req),name=typeof req.body.name==='string'?req.body.name.trim():'';
     if(!id||!gameById(id))return res.sendStatus(404);
-    if(!name||name.length>80)return show({...req,query:{...req.query,tab:'library'}},res,'Укажите название изображения до 80 символов.',true);
-    if(!req.file?.buffer?.length)return show({...req,query:{...req.query,tab:'library'}},res,'Выберите изображение.',true);
+    if(!name||name.length>80)return show(req,res,'Укажите название изображения до 80 символов.',true,'library');
+    if(!req.file?.buffer?.length)return show(req,res,'Выберите изображение.',true,'library');
     const type=fileType(req.file.buffer);
     if(!type||type.kind!=='image'||req.file.size>5*1024*1024)
-      return show({...req,query:{...req.query,tab:'library'}},res,'Допустимы только PNG, JPG, WEBP и GIF до 5 МБ.',true);
+      return show(req,res,'Допустимы только PNG, JPG, WEBP и GIF до 5 МБ.',true,'library');
     const fileName=crypto.randomBytes(24).toString('hex')+'.'+type.ext;
     const fullPath=path.join(uploadsDir,fileName);
     fs.writeFileSync(fullPath,req.file.buffer,{flag:'wx',mode:0o600});
@@ -245,7 +245,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const row=ownedLibraryImage(id,imageId);
     if(!row||!row.file_name)return res.sendStatus(404);
     const inUse=db.prepare('SELECT 1 FROM game_symbol_images WHERE library_image_id=?').get(imageId);
-    if(inUse)return show({...req,query:{...req.query,tab:'library'}},res,'Изображение используется символом. Сначала выберите для него другую картинку.',true);
+    if(inUse)return show(req,res,'Изображение используется символом. Сначала выберите для него другую картинку.',true,'library');
     db.prepare('DELETE FROM game_image_library WHERE game_id=? AND id=?').run(id,imageId);
     try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Library image cleanup:',e.code);}
     res.redirect(sectionUrl(id,'library'));
@@ -276,7 +276,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     for(let n=3;n<=20;n++){
       const raw=req.body['p_'+n];
       if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
-        return show({...req,query:{...req.query,tab:'symbols'}},res,'Коэффициент должен быть от 0 до 1000, с точностью до трёх знаков после запятой.',true);
+        return show(req,res,'Коэффициент должен быть от 0 до 1000, с точностью до трёх знаков после запятой.',true,'symbols');
       prices.push([n,Math.round(Number(raw)*1000)]);
     }
     const put=db.prepare('INSERT INTO symbol_payout_multipliers(symbol_id,matches,coefficient_milli) VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET coefficient_milli=excluded.coefficient_milli');
@@ -297,10 +297,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.post('/admin/games/:id/assets/:key',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
     const id=gameId(req),key=req.params.key,meta=id?dynamicAsset(id,key):null;
     if(!id||!gameById(id)||!meta)return res.sendStatus(404);
-    if(!req.file||!req.file.buffer?.length)return show({...req,query:{...req.query,tab:assetTab(key)}},res,'Выберите файл для загрузки.',true);
+    if(!req.file||!req.file.buffer?.length)return show(req,res,'Выберите файл для загрузки.',true,assetTab(key));
     const type=fileType(req.file.buffer);
-    if(!type||type.kind!==meta.kind)return show({...req,query:{...req.query,tab:assetTab(key)}},res,'Неподдерживаемый формат файла.',true);
-    if(meta.kind==='image'&&req.file.size>5*1024*1024)return show({...req,query:{...req.query,tab:assetTab(key)}},res,'Изображение должно быть не больше 5 МБ.',true);
+    if(!type||type.kind!==meta.kind)return show(req,res,'Неподдерживаемый формат файла.',true,assetTab(key));
+    if(meta.kind==='image'&&req.file.size>5*1024*1024)return show(req,res,'Изображение должно быть не больше 5 МБ.',true,assetTab(key));
     const name=crypto.randomBytes(24).toString('hex')+'.'+type.ext;
     const fullPath=path.join(uploadsDir,name);
     fs.writeFileSync(fullPath,req.file.buffer,{flag:'wx',mode:0o600});
