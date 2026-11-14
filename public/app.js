@@ -10,7 +10,7 @@
   const balance=document.getElementById('slot-balance');
   const winDisplay=document.getElementById('slot-win');
   const columns=Array.from(root.querySelectorAll('.reel-column'));
-  const definitions=Array.from(root.querySelectorAll('[data-symbol-def]')).map(node=>({
+  const definitions=Array.from(document.querySelectorAll('[data-symbol-def]')).map(node=>({
     id:Number(node.dataset.symbolId),
     name:node.dataset.name||'Символ',
     image:node.dataset.image||''
