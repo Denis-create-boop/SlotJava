@@ -163,8 +163,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     }).join('');
     const tabs=[
       ['background','Изменение фона','Фон игрового окна и логотип','image'],
-      ['reels','Фон барабанов','Один фон на все пять барабанов','columns'],
-      ['cells','Фон игрового поля','Фон каждой из 20 ячеек','grid'],
+      ['reels','Фон игрового поля','Один фон на все пять барабанов','columns'],
+      ['cells','Фон барабанов','Общий фон ячеек с символами','grid'],
       ['panels','Панели ставок и выигрыша','Оформление нижних панелей','wallet'],
       ['audio','Музыка и звуки','Музыка, вращение и выигрыш','music'],
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
@@ -184,10 +184,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(activeTab==='background')panel=panelStart('Изменение фона')+
       '<p class="hint">Изменяйте фон игрового окна и логотип игры.</p><div class="asset-settings-grid">'+
       rowsFor(['background','logo'])+'</div></section>';
-    if(activeTab==='reels')panel=panelStart('Фон барабанов')+
+    if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одно изображение используется как общий фон всей области пяти барабанов. Отдельных фонов у барабанов больше нет.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
-    if(activeTab==='cells')panel=panelStart('Фон игрового поля')+
+    if(activeTab==='cells')panel=panelStart('Фон барабанов')+
       '<p class="hint">Общий фон поля располагается за всеми барабанами. Фон ячеек повторяется одинаково в каждой из 20 клеток — под символами. Выберите картинку из папки игры или загрузите новую.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['field_background','cells_background'])+'</div></section>';
     if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
