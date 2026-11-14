@@ -9,6 +9,50 @@
   const message=document.getElementById('slot-result');
   const balance=document.getElementById('slot-balance');
   const winDisplay=document.getElementById('slot-win');
+  const betDisplay=document.getElementById('slot-bet');
+  const settingsButton=document.getElementById('slot-settings-trigger');
+  const betButton=document.getElementById('slot-bet-trigger');
+  const settingsDialog=document.getElementById('slot-settings-dialog');
+  const betForm=document.getElementById('slot-bet-form');
+  const soundToggle=document.getElementById('slot-sound-toggle');
+  let soundEnabled=true;
+  try {soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';} catch {}
+  soundToggle.checked=soundEnabled;
+  soundToggle.addEventListener('change',()=>{
+    soundEnabled=soundToggle.checked;
+    try {window.localStorage.setItem('slotjava-sound',soundEnabled?'on':'off');} catch {}
+    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());}
+  });
+  function openSettings(){
+    if(spinning)return;
+    if(typeof settingsDialog.showModal==='function')settingsDialog.showModal();
+    else settingsDialog.setAttribute('open','');
+  }
+  settingsButton.addEventListener('click',openSettings);
+  betButton.addEventListener('click',openSettings);
+  settingsDialog.addEventListener('click',event=>{
+    if(event.target===settingsDialog)settingsDialog.close();
+  });
+  betForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    if(spinning)return;
+    const submit=betForm.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    try{
+      const response=await fetch(betForm.action,{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        body:new URLSearchParams(new FormData(betForm))
+      });
+      const result=await response.json();
+      if(!response.ok||!Number.isSafeInteger(result.bet))throw new Error(result.error||'Ошибка изменения ставки');
+      betDisplay.textContent=String(result.bet);
+      settingsDialog.close();
+      message.textContent='Ставка изменена: '+result.bet+' тестовых очков.';
+    }catch(error){message.textContent=error.message;}
+    finally{submit.disabled=false;}
+  });
+
   const columns=Array.from(root.querySelectorAll('.reel-column'));
   const definitions=Array.from(document.querySelectorAll('[data-symbol-def]')).map(node=>({
     id:Number(node.dataset.symbolId),
@@ -19,6 +63,7 @@
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
 
   function play(name){
+    if(!soundEnabled)return;
     const audio=sound(name);
     if(!audio)return;
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
@@ -104,6 +149,8 @@
     if(spinning||!definitions.length)return;
     spinning=true;
     button.disabled=true;
+    settingsButton.disabled=true;
+    betButton.disabled=true;
     message.textContent='Барабаны вращаются…';
     winDisplay.textContent='0';
     play('spin_sound');
@@ -132,6 +179,7 @@
       });
       await Promise.all(animations);
       balance.textContent=String(result.balance);
+      betDisplay.textContent=String(result.bet);
       winDisplay.textContent=String(result.total);
       message.textContent=result.total>0?'Выигрыш: '+result.total+' тестовых очков!':'Без выигрыша. Попробуйте ещё.';
       if(result.total>0)play('win_sound');
@@ -141,6 +189,8 @@
     }finally{
       spinning=false;
       button.disabled=false;
+      settingsButton.disabled=false;
+      betButton.disabled=false;
     }
   });
 })();
