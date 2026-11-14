@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -214,7 +214,10 @@ function assetUrl(assets,key,gameId){
 const DEMO_BETS=[10,20,50,100];
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
-  const url=key=>assetUrl(assets,key,game.id);
+  const libraryBackgrounds=new Map(getGameBackgroundImages(game.id).map(item=>[
+    item.asset_key,item.builtin_path||'/game-library/'+game.id+'/'+item.library_image_id
+  ]));
+  const url=key=>libraryBackgrounds.get(key)||assetUrl(assets,key,game.id);
   const cssUrl=(key,varName)=>url(key)?' style="'+varName+':url(\''+h(url(key))+'\')"':'';
   const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
 
@@ -348,7 +351,7 @@ app.get('/admin',adminOnly,(req,res)=>{
     '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
     '</tbody></table></div></section></div>',req);
 });
-installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
+installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
   const user=Number.isSafeInteger(id)?db.prepare('SELECT id,role,active FROM users WHERE id=?').get(id):null;
