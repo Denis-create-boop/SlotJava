@@ -175,7 +175,7 @@ function generateSpin(gameId,winFrequency) {
   // If the payout schedule defines rare wins, deliberately construct a candidate
   // with an exact count. Never claim an award that the visible board does not earn.
   if(wantWin&&evaluation.total===0){
-    const winningRules=payouts.filter(p=>p.prize>0&&p.matches>=2&&p.matches<=20&&
+    const winningRules=payouts.filter(p=>p.prize>0&&p.matches>=1&&p.matches<=20&&
       (p.matches===20||symbols.length>=2));
     for(let attempt=0;attempt<winningRules.length*3&&evaluation.total===0;attempt++){
       const rule=winningRules[crypto.randomInt(winningRules.length)];
