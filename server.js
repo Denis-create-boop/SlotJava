@@ -241,8 +241,8 @@ function firstGamePage(game,req){
   const wallet=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'">'+
     backgroundImage('background','slot-full-background')+
-    '<a class="back-link" href="/">← К каталогу</a>'+
-    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1></div>'+
+    '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
+    (logo?'<div class="slot-heading">'+logo+'</div>':'')+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="reel-columns">'+reels+'</div></div>'+
