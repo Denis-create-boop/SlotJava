@@ -236,7 +236,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!id||!gameById(id))return res.sendStatus(404);
     const raw=req.body?.title;
     const title=typeof raw==='string'?raw.trim():'';
-    if(!title||title.length>80||/[\\x00-\\x1f\\x7f]/.test(title))
+    if(!title||title.length>80||/[\x00-\x1f\x7f]/.test(title))
       return show(req,res,'Название должно содержать от 1 до 80 символов без управляющих знаков.',true,'name');
     db.prepare('UPDATE games SET title=? WHERE id=?').run(title,id);
     res.redirect(sectionUrl(id,'name')+'&saved=1');
