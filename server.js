@@ -217,7 +217,7 @@ function firstGamePage(game,req){
   const url=key=>assetUrl(assets,key,game.id);
   const cssUrl=(key,varName)=>url(key)?' style="'+varName+':url(\''+h(url(key))+'\')"':'';
   const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
-  const reelLabels=Array.from({length:5},(_,col)=>'<div class="reel-header">Барабан №'+(col+1)+'</div>').join('');
+
   const reels=Array.from({length:5},(_,col)=>{
     const reelNumber=col+1;
     const reelBackground=url('reel_'+reelNumber)||url('reels_background');
@@ -238,9 +238,10 @@ function firstGamePage(game,req){
   const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'"'+cssUrl('background','--slot-wall')+'><a class="back-link" href="/">← К каталогу</a>'+
-    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1><p>4 ряда × 5 барабанов · демонстрационная игра</p></div>'+
+    '<div class="slot-heading">'+logo+'<h1>'+h(game.title)+'</h1></div>'+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
-    '<div class="reel-labels">'+reelLabels+'</div><div class="reel-columns">'+reels+'</div></div>'+
+    '<div class="reel-columns">'+reels+'</div></div>'+
+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter"'+cssUrl('bet_panel','--bet-wall')+'><span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger"'+cssUrl('bet_panel','--bet-wall')+'><span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
