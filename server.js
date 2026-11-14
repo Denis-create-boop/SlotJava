@@ -110,9 +110,10 @@ function postGuard(req,res,next) {
   }
   next();
 }
-function layout(title,body,user,csrf) {
+function layout(title,body,user,csrf,balanceLabel) {
   const menu=user
     ? '<a href="/">Главная</a>'+(user.role==='admin'?'<a href="/admin">Админ-панель</a>':'')+
+      (balanceLabel===null?'':'<span class="header-user-balance" aria-label="Баланс Первой игры"><span>Баланс</span><strong>'+h(balanceLabel)+'</strong></span>')+
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
@@ -120,7 +121,16 @@ function layout(title,body,user,csrf) {
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
     '<footer>SlotJava · браузерная версия в разработке</footer><script src="/static/app.js" defer></script></body></html>';
 }
-function sendPage(res,title,body,req,status=200) { res.status(status).send(layout(title,body,req.user,req.session?.csrf_token)); }
+function sendPage(res,title,body,req,status=200) {
+  // The first playable game's demo balance is shown on pages outside gameplay.
+  // Game-specific wallets remain separate; other games can get their own later.
+  let balanceLabel=null;
+  if(req.user&&!req.path.startsWith('/games/')){
+    const mainGame=db.prepare("SELECT id FROM games WHERE slug='slot-classic'").get();
+    if(mainGame)balanceLabel=getWallet(req.user.id,mainGame.id).balance;
+  }
+  res.status(status).send(layout(title,body,req.user,req.session?.csrf_token,balanceLabel));
+}
 function redirectHomeIfLogged(req,res,next){if(req.user)return res.redirect('/');next();}
 function authForm(title,action,req,res,error='') {
   const csrf=csrfFor(req);
