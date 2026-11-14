@@ -152,7 +152,7 @@ function scoreBoard(cells,symbols,payouts){
   // A complete chain starts at the first reel and ends at the first missing reel.
   // Count all occurrences within that chain only, including repeated symbols in a reel.
   const payoutMap=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=20)
-    .map(p=>[p.symbol_id+':'+p.matches,p.prize]));
+    .map(p=>[p.symbol_id+':'+p.matches,p.percent]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
@@ -167,10 +167,10 @@ function scoreBoard(cells,symbols,payouts){
       reels++;
     }
     if(reels<3)continue;
-    const prize=payoutMap.get(symbol.id+':'+count)||0;
-    if(prize>0){
-      total+=prize;
-      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,prize});
+    const percent=payoutMap.get(symbol.id+':'+count)||0;
+    if(percent>0){
+      total+=percent;
+      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,percent});
     }
   }
   return {total,wins};
@@ -185,7 +185,7 @@ function generateSpin(gameId,winFrequency){
     cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
-    const candidates=payouts.filter(p=>p.prize>0&&p.matches>=3&&p.matches<=20);
+    const candidates=payouts.filter(p=>p.percent>0&&p.matches>=3&&p.matches<=20);
     for(let trial=0;trial<Math.min(candidates.length*8,250)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
@@ -212,7 +212,6 @@ function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
 }
 const DEMO_BETS=[10,20,50,100];
-const BET_UNIT=10;
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
   const url=key=>assetUrl(assets,key,game.id);
@@ -284,13 +283,13 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const spin=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
     if(spin.error)return spin;
-    // Admin-configured prizes are expressed for the base 10-point stake.
-    const payout=spin.total*(wallet.bet/BET_UNIT);
+    // Percent payouts applied to the current bet. Round each symbol award to whole demo points.
+    const wins=spin.wins.map(w=>({...w,prize:Math.round(wallet.bet*w.percent/100)}));
+    const payout=wins.reduce((sum,w)=>sum+w.prize,0);
     const updatedBalance=wallet.balance-wallet.bet+payout;
     if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
     db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
       .run(updatedBalance,req.user.id,game.id);
-    const wins=spin.wins.map(w=>({...w,prize:w.prize*(wallet.bet/BET_UNIT)}));
     return {...spin,total:payout,wins,balance:updatedBalance,bet:wallet.bet};
   })();
   res.set('Cache-Control','no-store');
