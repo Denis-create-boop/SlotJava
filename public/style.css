@@ -281,3 +281,11 @@ header,main,footer {position:relative;z-index:1}
  .slot-settings-trigger{width:32px;height:32px;font-size:1.1rem}
  .slot-bottom-bar{gap:4px}
 }
+
+/* Winning symbols pulse gently with a soft gold halo */
+.ribbon-tile.is-winning{position:relative;z-index:2;isolation:isolate}
+.ribbon-tile.is-winning::before{content:"";position:absolute;z-index:-1;pointer-events:none;inset:7% 6%;border-radius:18px;background:radial-gradient(ellipse at center,rgba(252,198,96,.19),rgba(230,168,69,.07) 58%,transparent 75%);box-shadow:0 0 15px rgba(232,170,67,.18),inset 0 0 13px rgba(239,199,106,.12);animation:slot-halo 1.5s ease-in-out infinite alternate}
+.ribbon-tile.is-winning img,.ribbon-tile.is-winning .ribbon-symbol-fallback{animation:slot-winner 1.5s ease-in-out infinite alternate;filter:drop-shadow(0 0 8px rgba(255,210,122,.63))}
+@keyframes slot-winner{from{transform:scale(1.045);filter:drop-shadow(0 0 5px rgba(255,210,122,.38))}to{transform:scale(1.12);filter:drop-shadow(0 0 13px rgba(255,209,106,.75))}}
+@keyframes slot-halo{from{opacity:.55}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.ribbon-tile.is-winning::before,.ribbon-tile.is-winning img,.ribbon-tile.is-winning .ribbon-symbol-fallback{animation:none!important}.ribbon-tile.is-winning img,.ribbon-tile.is-winning .ribbon-symbol-fallback{transform:scale(1.06)}}
