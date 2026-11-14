@@ -4,7 +4,7 @@ const { rateLimit } = require('express-rate-limit');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -134,12 +134,23 @@ function authForm(title,action,req,res,error='') {
     '<p class="hint">'+(isRegister?'<a href="/login">Уже есть аккаунт?</a>':'<a href="/register">Создать аккаунт</a>')+'</p></section>',req,error?400:200);
 }
 app.get('/',(req,res)=>{
-  const title=req.user?'Привет, '+h(req.user.username)+'!':'Добро пожаловать';
-  // Logout form includes a server-generated CSRF token.
-  sendPage(res,'Главная','<section class="hero"><p class="eyebrow">Новый проект</p><h1>'+title+'</h1>'+
-    '<p>Мы создаём новую браузерную версию Slot. Пока готова система пользователей; сама игра появится позже.</p>'+
-    (!req.user?'<div class="actions"><a class="primary" href="/register">Зарегистрироваться</a><a class="secondary" href="/login">Войти</a></div>':
-    '<p class="hint">Статус: '+(req.user.role==='admin'?'администратор':'пользователь')+'</p>')+'</section>',req);
+  if(!req.user) {
+    return sendPage(res,'Главная','<section class="hero"><p class="eyebrow">Новый проект</p><h1>Добро пожаловать</h1>'+
+      '<p>Войдите или зарегистрируйтесь, чтобы перейти к играм.</p>'+
+      '<div class="actions"><a class="primary" href="/register">Зарегистрироваться</a><a class="secondary" href="/login">Войти</a></div></section>',req);
+  }
+  const games=listGames(true);
+  const cards=games.map(game=>'<article class="game-card"><a class="game-card-link" href="/games/'+encodeURIComponent(game.slug)+'">'+
+    '<img loading="lazy" src="'+h(game.image_path)+'" alt="Обложка игры '+h(game.title)+'" width="720" height="450">'+
+    '<h2>'+h(game.title)+'</h2></a></article>').join('');
+  sendPage(res,'Игры','<section class="games-section"><div class="section-title"><p class="eyebrow">Каталог игр</p><h1>Выберите игру</h1></div>'+
+    '<div class="games-grid">'+cards+'</div></section>',req);
+});
+app.get('/games/:slug',guarded,(req,res)=>{
+  const slug=req.params.slug;
+  const game=listGames(true).find(item=>item.slug===slug);
+  if(!game) return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/">Все игры</a></section>',req,404);
+  sendPage(res,game.title,'<section class="panel game-placeholder"><img src="'+h(game.image_path)+'" alt="" width="720" height="450"><h1>'+h(game.title)+'</h1><p>Игра находится в разработке.</p><a class="secondary" href="/">Назад к играм</a></section>',req);
 });
 app.get('/register',redirectHomeIfLogged,(req,res)=>authForm('Регистрация','/register',req,res));
 app.post('/register',postGuard,(req,res)=>{
@@ -181,9 +192,22 @@ app.get('/admin',adminOnly,(req,res)=>{
     return '<tr><td>'+user.id+'</td><td>'+h(user.username)+'</td><td>'+h(user.role)+'</td><td>'+
       (user.active?'Активен':'Заблокирован')+'</td><td>'+h(user.created_at)+'</td><td>'+controls+'</td></tr>';
   }).join('');
-  sendPage(res,'Админ-панель','<section class="panel"><h1>Управление сайтом</h1><p>Пользователи: '+users.length+
+  const gameButtons=listGames().map(game=>'<a class="admin-game-link" href="/admin/games/'+game.id+'">'+
+    '<img src="'+h(game.image_path)+'" alt="" width="720" height="450"><span>'+h(game.title)+'</span><small>Настройки игры</small></a>').join('');
+  sendPage(res,'Админ-панель','<div class="admin-content"><section class="panel"><h1>Управление играми</h1>'+
+    '<p class="hint">Выберите игру, чтобы перейти к её настройкам.</p><div class="admin-games-grid">'+gameButtons+'</div></section>'+
+    '<section class="panel"><h2>Управление пользователями</h2><p>Пользователи: '+users.length+
     '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
-    '</tbody></table></div><p class="hint">Функции управления игрой, контентом и настройками добавим по мере разработки.</p></section>',req);
+    '</tbody></table></div></section></div>',req);
+});
+app.get('/admin/games/:id',adminOnly,(req,res)=>{
+  const id=Number(req.params.id);
+  const game=Number.isSafeInteger(id)&&id>0?gameById(id):null;
+  if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">К списку игр</a></section>',req,404);
+  sendPage(res,'Настройки: '+game.title,
+    '<section class="panel game-settings"><a class="back-link" href="/admin">← Вернуться в админку</a>'+
+    '<h1>'+h(game.title)+'</h1><img src="'+h(game.image_path)+'" alt="Обложка игры" width="720" height="450">'+
+    '<p class="hint">Это страница управления выбранной игрой. Настройки и функции добавим позже.</p></section>',req);
 });
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
