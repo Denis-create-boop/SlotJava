@@ -88,14 +88,14 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.prize);}
     const symbolItems=symbols.map(symbol=>{
       const costs=payoutBySymbol.get(symbol.id)||new Map();
-      const cells=Array.from({length:20},(_,i)=>{
-        const count=i+1;
-        return '<label class="payout-input">'+count+' шт.<input type="number" min="0" max="1000000000" step="1" name="p_'+count+'" value="'+(costs.get(count)||0)+'" required></label>';
+      const cells=Array.from({length:3},(_,i)=>{
+        const count=i+3;
+        return '<label class="payout-input">'+count+' барабана<input type="number" min="0" max="1000000000" step="1" name="p_'+count+'" value="'+(costs.get(count)||0)+'" required></label>';
       }).join('');
       return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
         imageBox(id,'symbol_'+symbol.id,'Картинка: '+symbol.name,assets,csrf)+
         '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
-        '<p class="hint">Цена за точное количество этого символа среди 20 ячеек. Ноль — выплаты нет.</p>'+
+        '<p class="hint">Выплата за появление символа хотя бы раз на каждом из первых 3, 4 или 5 барабанов подряд. Повторы на одном барабане не увеличивают комбинацию. Указанная цена действует при ставке 10; при большей ставке увеличивается пропорционально. Ноль — выплаты нет.</p>'+
         '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form></div>';
@@ -107,7 +107,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
       '<section class="panel"><h2>Частота выигрыша</h2>'+
-      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой по таблице символов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
+      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой за 3, 4 или 5 последовательных барабанов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings">'+csrf+
       '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
       '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
@@ -118,7 +118,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<div class="asset-settings-grid">'+rows+'</div></section>'+
       '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
       '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
-      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Выплата рассчитывается по общему количеству одинаковых символов на поле.</p>'+
+      '<section class="panel" id="symbols"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Выигрыш рассчитывается по последовательным барабанам слева направо: одинаковый символ должен встретиться на первых трёх, а затем может продолжиться на четвёртом и пятом.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
@@ -147,7 +147,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     const prices=[];
-    for(let n=1;n<=20;n++){
+    for(let n=3;n<=5;n++){
       const raw=req.body['p_'+n];
       if(typeof raw!=='string'||!/^\d{1,10}$/.test(raw)||Number(raw)>1000000000)
         return show(req,res,'Цены должны быть целыми числами от 0 до 1 000 000 000.',true);
