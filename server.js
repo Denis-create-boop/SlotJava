@@ -152,7 +152,7 @@ function scoreBoard(cells,symbols,payouts){
   // A complete chain starts at the first reel and ends at the first missing reel.
   // Count all occurrences within that chain only, including repeated symbols in a reel.
   const payoutMap=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=20)
-    .map(p=>[p.symbol_id+':'+p.matches,p.percent]));
+    .map(p=>[p.symbol_id+':'+p.matches,p.coefficient_milli]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
@@ -167,10 +167,10 @@ function scoreBoard(cells,symbols,payouts){
       reels++;
     }
     if(reels<3)continue;
-    const percent=payoutMap.get(symbol.id+':'+count)||0;
-    if(percent>0){
-      total+=percent;
-      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,percent});
+    const coefficientMilli=payoutMap.get(symbol.id+':'+count)||0;
+    if(coefficientMilli>0){
+      total+=coefficientMilli;
+      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,coefficientMilli});
     }
   }
   return {total,wins};
@@ -185,7 +185,7 @@ function generateSpin(gameId,winFrequency){
     cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
-    const candidates=payouts.filter(p=>p.percent>0&&p.matches>=3&&p.matches<=20);
+    const candidates=payouts.filter(p=>p.coefficient_milli>0&&p.matches>=3&&p.matches<=20);
     for(let trial=0;trial<Math.min(candidates.length*8,250)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
@@ -284,8 +284,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const spin=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
     if(spin.error)return spin;
-    // Percent payouts applied to the current bet. Round each symbol award to whole demo points.
-    const wins=spin.wins.map(w=>({...w,prize:Math.round(wallet.bet*w.percent/100)}));
+    // Payout = current stake × configured coefficient. Round to demo points.
+    const wins=spin.wins.map(w=>({...w,prize:Math.round(wallet.bet*w.coefficientMilli/1000)}));
     const payout=wins.reduce((sum,w)=>sum+w.prize,0);
     const updatedBalance=wallet.balance-wallet.bet+payout;
     if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
