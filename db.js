@@ -41,7 +41,7 @@ function validUsername(name) {
   return typeof name === 'string' && /^[a-zA-Z0-9_]{3,30}$/.test(name);
 }
 function validPassword(password) {
-  return typeof password === 'string' && password.length >= 5 && Buffer.byteLength(password,'utf8') <= 256;
+  return typeof password === 'string' && password.length >= 12 && Buffer.byteLength(password,'utf8') <= 256;
 }
 function getUserByName(username) {
   return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
