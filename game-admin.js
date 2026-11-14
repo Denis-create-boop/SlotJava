@@ -16,7 +16,7 @@ const assetTypes={
   spin_sound:{label:'Звук вращения барабанов',kind:'audio'},
   win_sound:{label:'Звук выигрыша',kind:'audio'},
 };
-for(let i=1;i<=12;i++)assetTypes['symbol_'+i]={label:'Символ №'+i+' (для всех барабанов)',kind:'image'};
+for(let i=1;i<=20;i++)assetTypes['cell_'+i]={label:'Фон ячейки №'+i+' (строка '+(Math.floor((i-1)/5)+1)+', столбец '+((i-1)%5+1)+')',kind:'image'};
 
 const upload=multer({
   storage:multer.memoryStorage(),
@@ -37,7 +37,30 @@ function gameId(req) {
   const id=Number(req.params.id);
   return Number.isSafeInteger(id) && id>0 ? id : null;
 }
-function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+  function dynamicAsset(id,key) {
+    if(assetTypes[key])return assetTypes[key];
+    const match=/^symbol_(\d+)$/.exec(key);
+    if(!match)return null;
+    const symbolId=Number(match[1]);
+    if(!Number.isSafeInteger(symbolId)||symbolId<1)return null;
+    const row=db.prepare('SELECT id FROM game_symbols WHERE id=? AND game_id=?').get(symbolId,id);
+    return row ? {label:'Изображение символа №'+symbolId,kind:'image'} : null;
+  }
+  function assertOwnSymbol(gameId,symbolId) {
+    if(!Number.isSafeInteger(symbolId)||symbolId<1)return false;
+    return !!db.prepare('SELECT id FROM game_symbols WHERE id=? AND game_id=?').get(symbolId,gameId);
+  }
+  function imageBox(id,key,label,assets,csrf) {
+    const value=assets.get(key),src='/game-assets/'+id+'/'+key;
+    return '<div class="asset-setting"><div class="asset-detail"><strong>'+h(label)+'</strong>'+
+      (value?'<img class="asset-preview" src="'+src+'" alt="'+h(label)+'">':'<span class="asset-empty">Не загружено</span>')+'</div>'+
+      '<div class="asset-actions"><form method="post" action="/admin/games/'+id+'/assets/'+key+'" enctype="multipart/form-data">'+csrf+
+      '<label class="asset-upload-label">Изображение<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
+      '<button class="primary" type="submit">Загрузить</button></form>'+
+      (value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Удалить фон</button></form>':'')+
+      '</div></div>';
+  }
   function show(req,res,message='',error=false) {
     const id=gameId(req);
     const game=id?gameById(id):null;
@@ -45,7 +68,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
     const settings=getGameSettings(id)||{win_frequency:25};
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
     const csrf=csrfInput(req.session.csrf_token);
-    const rows=Object.entries(assetTypes).map(([key,meta])=>{
+    const rows=Object.entries(assetTypes).filter(([key])=>!key.startsWith('cell_')).map(([key,meta])=>{
       const value=assets.get(key);
       const src='/game-assets/'+id+'/'+key;
       const preview=value ? (meta.kind==='image'
@@ -58,20 +81,47 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
         (value?'<form method="post" action="/admin/games/'+id+'/assets/'+key+'/delete">'+csrf+'<button type="submit">Удалить</button></form>':'')+
         '</div></div>';
     }).join('');
+    const symbols=getSymbols(id);
+    const payouts=getPayouts(id);
+    const payoutBySymbol=new Map();
+    for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.prize);}
+    const symbolItems=symbols.map(symbol=>{
+      const costs=payoutBySymbol.get(symbol.id)||new Map();
+      const cells=Array.from({length:19},(_,i)=>{
+        const count=i+2;
+        return '<label class="payout-input">'+count+' шт.<input type="number" min="0" max="1000000000" step="1" name="p_'+count+'" value="'+(costs.get(count)||0)+'" required></label>';
+      }).join('');
+      return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
+        imageBox(id,'symbol_'+symbol.id,'Картинка: '+symbol.name,assets,csrf)+
+        '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
+        '<p class="hint">Цена за точное количество этого символа среди 20 ячеек. Ноль — выплаты нет.</p>'+
+        '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
+        '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
+        '<button type="submit" class="danger-action">Удалить символ</button></form></div>';
+    }).join('');
+    const cellSettings=Array.from({length:20},(_,index)=>imageBox(id,'cell_'+(index+1),
+      'Ячейка №'+(index+1)+' — строка '+(Math.floor(index/5)+1)+', столбец '+((index%5)+1),assets,csrf)).join('');
     const notice=message?'<p class="'+(error?'error':'success-note')+'" role="status">'+h(message)+'</p>':'';
     sendPage(res,'Настройки: '+game.title,
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
       '<section class="panel"><h2>Частота выигрыша</h2>'+
-      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр уже управляет вероятностью совпадения трёх символов на средней линии. Денежные ставки пока не используются.</p>'+
+      '<p class="hint">Вероятность выигрышного вращения, от 0 до 100%. Это не RTP и не доля возвращаемых ставок. Для «Первой игры» параметр задаёт целевую частоту вращений с выплатой по таблице символов. Если ни для одного символа не настроена положительная выплата, выигрышей не будет. Денежные ставки пока не используются.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings">'+csrf+
       '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
       '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
       '<button class="primary" type="submit">Сохранить</button></div></form></section>'+
       '<section class="panel"><h2>Оформление, символы и звук</h2>'+
-      '<p class="hint"><strong>Барабан №1</strong> — слева, <strong>№2</strong> — по центру, <strong>№3</strong> — справа. Поля «Символ №1» … «Символ №12» задают 12 видов картинок, которые появляются на любом из трёх барабанов. Номера символов видны и в самой игре.</p>'+
+      '<p class="hint">Поле 4 строки × 5 столбцов. Символы не закреплены за позициями: при каждом вращении алгоритм выбирает символ для каждой ячейки.</p>'+
       '<p class="hint">Изображения: PNG, JPG, WEBP, GIF (до 5 МБ). Звук: MP3, OGG, WAV (до 12 МБ). Каждый файл закрепляется за этой игрой.</p>'+
-      '<div class="asset-settings-grid">'+rows+'</div></section></div>',req,error?400:200);
+      '<div class="asset-settings-grid">'+rows+'</div></section>'+
+      '<section class="panel"><h2>Фон каждой ячейки (4 × 5)</h2><p class="hint">Номера идут слева направо, сверху вниз. Фон не вращается, изменяется только символ поверх него.</p>'+
+      '<div class="asset-settings-grid">'+cellSettings+'</div></section>'+
+      '<section class="panel"><h2>Символы и таблица цен</h2><p class="hint">Добавьте любой символ. Он участвует в генерации всех 20 ячеек, независимо от столбца. Выплата рассчитывается по общему количеству одинаковых символов на поле.</p>'+
+      '<form method="post" action="/admin/games/'+id+'/symbols" class="new-symbol-form">'+csrf+
+      '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
+      '<button class="primary" type="submit">Добавить символ</button></form>'+
+      '<div class="symbol-admin-list">'+symbolItems+'</div></section></div>',req,error?400:200);
   }
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
   app.post('/admin/games/:id/settings',adminOnly,postGuard,(req,res)=>{
@@ -82,8 +132,43 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
     db.prepare('INSERT INTO game_settings(game_id,win_frequency) VALUES(?,?) ON CONFLICT(game_id) DO UPDATE SET win_frequency=excluded.win_frequency').run(id,Number(value));
     res.redirect('/admin/games/'+id+'?saved=1');
   });
+  app.post('/admin/games/:id/symbols',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req);
+    if(!id||!gameById(id))return res.sendStatus(404);
+    const name=typeof req.body.name==='string'?req.body.name.trim():'';
+    if(name.length<1||name.length>60)return show(req,res,'Имя символа должно содержать от 1 до 60 символов.',true);
+    if(getSymbols(id).length>=50)return show(req,res,'Лимит — 50 символов на игру.',true);
+    const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(id).n;
+    db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
+    res.redirect('/admin/games/'+id+'#symbols');
+  });
+  app.post('/admin/games/:id/symbols/:symbolId/payouts',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId);
+    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    const prices=[];
+    for(let n=2;n<=20;n++){
+      const raw=req.body['p_'+n];
+      if(typeof raw!=='string'||!/^\d{1,10}$/.test(raw)||Number(raw)>1000000000)
+        return show(req,res,'Цены должны быть целыми числами от 0 до 1 000 000 000.',true);
+      prices.push([n,Number(raw)]);
+    }
+    const put=db.prepare('INSERT INTO symbol_payouts(symbol_id,matches,prize) VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET prize=excluded.prize');
+    db.transaction(()=>{for(const [count,price] of prices)put.run(symbolId,count,price);})();
+    res.redirect('/admin/games/'+id+'#symbols');
+  });
+  app.post('/admin/games/:id/symbols/:symbolId/delete',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId);
+    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    const image=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+symbolId);
+    db.transaction(()=>{
+      db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'symbol_'+symbolId);
+      db.prepare('DELETE FROM game_symbols WHERE id=? AND game_id=?').run(symbolId,id);
+    })();
+    if(image)try{fs.unlinkSync(path.join(uploadsDir,image.file_name));}catch{}
+    res.redirect('/admin/games/'+id+'#symbols');
+  });
   app.post('/admin/games/:id/assets/:key',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
-    const id=gameId(req),key=req.params.key,meta=assetTypes[key];
+    const id=gameId(req),key=req.params.key,meta=id?dynamicAsset(id,key):null;
     if(!id||!gameById(id)||!meta)return res.sendStatus(404);
     if(!req.file||!req.file.buffer?.length)return show(req,res,'Выберите файл для загрузки.',true);
     const type=fileType(req.file.buffer);
@@ -101,7 +186,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
   });
   app.post('/admin/games/:id/assets/:key/delete',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),key=req.params.key;
-    if(!id||!gameById(id)||!assetTypes[key])return res.sendStatus(404);
+    if(!id||!gameById(id)||!dynamicAsset(id,key))return res.sendStatus(404);
     const previous=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,key);
     db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,key);
     if(previous)try{fs.unlinkSync(path.join(uploadsDir,previous.file_name));}catch(e){console.warn('Asset removal:',e.code);}
@@ -109,7 +194,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,adminOn
   });
   app.get('/game-assets/:id/:key',guarded,(req,res)=>{
     const id=gameId(req),key=req.params.key;
-    if(!id||!assetTypes[key])return res.sendStatus(404);
+    if(!id||!dynamicAsset(id,key))return res.sendStatus(404);
     const game=gameById(id);
     if(!game||(!game.enabled&&req.user.role!=='admin'))return res.sendStatus(404);
     const row=db.prepare('SELECT file_name,media_type FROM game_assets WHERE game_id=? AND asset_key=?').get(id,key);
