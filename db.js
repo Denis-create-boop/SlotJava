@@ -24,7 +24,24 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+CREATE TABLE IF NOT EXISTS games (
+  id INTEGER PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  image_path TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1
+);
+
 `);
+
+const initialGames=[
+  ['slot-classic','Слот Классик','/static/images/game-slot.svg',1],
+  ['golden-seven','Золотая Семёрка','/static/images/game-seven.svg',2],
+  ['lucky-stars','Счастливые Звёзды','/static/images/game-stars.svg',3]
+];
+const seedGame=db.prepare('INSERT OR IGNORE INTO games(slug,title,image_path,position) VALUES(?,?,?,?)');
+db.transaction(()=>{ for(const game of initialGames) seedGame.run(...game); })();
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16);
@@ -52,4 +69,10 @@ function createUser(username,password,role='user') {
 function countActiveAdmins() {
   return db.prepare("SELECT COUNT(*) AS total FROM users WHERE role='admin' AND active=1").get().total;
 }
-module.exports={db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+function listGames(onlyEnabled=false) {
+  return db.prepare('SELECT id,slug,title,image_path,enabled FROM games '+(onlyEnabled?'WHERE enabled=1 ':'')+'ORDER BY position,id').all();
+}
+function gameById(id) {
+  return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
+}
+module.exports={listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
