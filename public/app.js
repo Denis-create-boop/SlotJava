@@ -78,6 +78,7 @@
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
     tile.className='ribbon-tile';
+    tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
       const img=document.createElement('img');
@@ -143,11 +144,28 @@
     });
   }
 
+  function clearWinningGlow(){
+    root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>tile.classList.remove('is-winning'));
+  }
+  function highlightWinningSymbols(wins){
+    clearWinningGlow();
+    for(const win of wins){
+      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels))continue;
+      const matchingReels=Math.min(5,Math.max(0,win.reels));
+      for(let col=0;col<matchingReels;col++){
+        columns[col].querySelectorAll('.ribbon-tile').forEach(tile=>{
+          if(Number(tile.dataset.symbolId)===win.symbolId)tile.classList.add('is-winning');
+        });
+      }
+    }
+  }
+
   let spinning=false;
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(spinning||!definitions.length)return;
     spinning=true;
+    clearWinningGlow();
     button.disabled=true;
     settingsButton.disabled=true;
     betButton.disabled=true;
@@ -178,6 +196,7 @@
         return animateColumn(col,index,target);
       });
       await Promise.all(animations);
+      highlightWinningSymbols(Array.isArray(result.wins)?result.wins:[]);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=String(result.total);
