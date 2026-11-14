@@ -127,7 +127,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
       const chosen=libraryImages.find(image=>image.id===selected);
       const preview=chosen?'<img class="asset-preview" src="'+h(libraryUrl(id,chosen))+'" alt="'+h(chosen.name)+'">':'';
-      return '<div class="symbol-admin-card"><h3>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></h3>'+
+      return '<details class="symbol-admin-card"><summary class="symbol-admin-summary"><span>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></span><span class="symbol-expand-hint">Настроить <span aria-hidden="true">▾</span></span></summary>'+
         '<div class="symbol-library-picker">'+preview+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/image">'+csrf+
         '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
@@ -137,7 +137,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<p class="hint">Символ учитывается на непрерывной цепочке барабанов слева направо, начиная с первого. Минимум 3 барабана. Повторы суммируются только до первого пропуска. Для каждого количества укажите коэффициент, на который умножается текущая ставка: например, ×1.5 при ставке 20 = 30 очков. Ноль — выплаты нет.</p>'+
         '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
-        '<button type="submit" class="danger-action">Удалить символ</button></form></div>';
+        '<button type="submit" class="danger-action">Удалить символ</button></form></details>';
     }).join('');
     const cellSettings=Array.from({length:20},(_,index)=>imageBox(id,'cell_'+(index+1),
       'Ячейка №'+(index+1)+' — строка '+(Math.floor(index/5)+1)+', столбец '+((index%5)+1),assets,csrf)).join('');
