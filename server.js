@@ -227,7 +227,6 @@ function firstGamePage(game,req){
   ]));
   const url=key=>libraryBackgrounds.get(key)||assetUrl(assets,key,game.id);
   const backgroundImage=(key,cls)=>url(key)?'<img class="'+cls+'" src="'+h(url(key))+'" alt="" aria-hidden="true">':'';
-  const logo=url('logo')?'<img class="slot-logo" src="'+h(url('logo'))+'" alt="'+h(game.title)+'">':'';
 
   const reels=Array.from({length:5},(_,col)=>{
     const reelNumber=col+1;
@@ -250,7 +249,6 @@ function firstGamePage(game,req){
   return '<div class="slot-game" data-game-id="'+game.id+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
-    (logo?'<div class="slot-heading">'+logo+'</div>':'')+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="reel-columns">'+reels+'</div></div>'+
