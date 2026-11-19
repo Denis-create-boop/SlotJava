@@ -596,3 +596,46 @@ header nav .header-user-balance{
     transform:scale(1.06);
   }
 }
+
+/* Layout-specific skins for additional playable games.
+   All pictures are rendered via src attributes so strict CSP remains enabled. */
+.slot-theme-egypt .reel-columns{
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:clamp(3px,.52vw,7px);
+}
+.slot-theme-egypt .slot-reels-ribbon{--reel-cell-height:clamp(67px,7.15vw,95px);padding:clamp(8px,1.3vw,14px)}
+.slot-theme-egypt .reel-column{
+  border:2px solid rgba(239,176,68,.68);
+  border-radius:7px;
+  background-color:rgba(27,13,16,.38);
+  box-shadow:inset 0 0 16px rgba(12,4,8,.78),0 0 8px rgba(232,146,48,.27);
+}
+.slot-theme-egypt .slot-reels-ribbon{border-color:#c48a3f;box-shadow:inset 0 0 18px #050107,0 0 22px rgba(248,169,57,.27)}
+.slot-theme-egypt .slot-meter{border-color:rgba(240,194,97,.52)}
+.slot-theme-egypt .reel-cell-bg{border-bottom:1px solid rgba(225,174,92,.27)}
+.slot-theme-space .reel-columns{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:clamp(4px,.68vw,9px);
+}
+.slot-theme-space .slot-reels-ribbon{--reel-cell-height:clamp(80px,9.6vw,115px);border-color:rgba(101,222,255,.78);
+  box-shadow:inset 0 0 22px #05071b,0 0 23px rgba(102,112,252,.34)}
+.slot-theme-space .reel-window{height:calc(3 * var(--reel-cell-height))}
+.slot-theme-space .reel-backdrops{grid-template-rows:repeat(3,var(--reel-cell-height))}
+.slot-theme-space .reel-column{
+  border:2px solid rgba(137,201,255,.65);
+  background-color:rgba(12,15,45,.42);
+  box-shadow:inset 0 0 17px #02031c,0 0 10px rgba(111,130,243,.3)
+}
+.slot-theme-space .reel-cell-bg{border-bottom:1px solid rgba(111,197,255,.28)}
+.slot-theme-space .slot-meter{border-color:rgba(125,178,255,.63)}
+.slot-theme-space .spin-round{box-shadow:0 0 15px rgba(105,117,250,.55),0 5px 13px #080b25}
+@media(max-width:750px){
+ .slot-theme-egypt .reel-columns{gap:3px}
+ .slot-theme-egypt .slot-reels-ribbon{--reel-cell-height:clamp(48px,11.5vw,72px);padding:5px}
+ .slot-theme-egypt .reel-column{border-width:1px}
+ .slot-theme-space .slot-reels-ribbon{--reel-cell-height:clamp(68px,16vw,96px)}
+}
+@media(max-width:390px){
+ .slot-theme-egypt .slot-reels-ribbon{--reel-cell-height:47px;padding:3px}
+ .slot-theme-space .slot-reels-ribbon{--reel-cell-height:67px}
+}
