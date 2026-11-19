@@ -3,16 +3,17 @@
 // The paid spin is generated first; Scatter probabilities are independent of
 // base-game winning frequency. Each reel has its own trigger probability and
 // maximum number of Scatter cells when the trigger succeeds.
-function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt){
+function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Set()){
   const cells=board.slice();
   let count=0;
   for(let col=0;col<reels;col++){
     const rule=rules.find(r=>r.reel_index===col+1);
     const chance=Math.max(0,Math.min(100,Number(rule?.chance_percent)||0));
-    const max=Math.max(0,Math.min(rows,Number(rule?.max_symbols)||0));
+    const positions=Array.from({length:rows},(_,row)=>row)
+      .filter(row=>!locked.has(row*reels+col));
+    const max=Math.max(0,Math.min(positions.length,Number(rule?.max_symbols)||0));
     if(!max||randomInt(100)>=chance)continue;
     const number=1+randomInt(max);
-    const positions=Array.from({length:rows},(_,row)=>row);
     for(let n=0;n<number;n++){
       const pick=n+randomInt(rows-n);
       [positions[n],positions[pick]]=[positions[pick],positions[n]];
@@ -41,12 +42,18 @@ function winningCells(board,wins,reels,rows){
 // A bonus round spends exactly ONE free spin, regardless of respin count.
 // Lock winning CELLS, not entire columns. Every other cell on every reel
 // rolls again, even if another cell on that same reel is already locked.
-function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16}){
+function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16,scatterId=0,scatterRules=[]}){
   if(!symbols.length)throw Error('Нет игровых символов');
-  let board=randomBoard(symbols,reels,rows,randomInt);
   const frozenCells=new Set(),steps=[];
+  const applyScatter=board=>scatterId
+    ?scatterOnBoard(board,scatterId,scatterRules,rows,reels,randomInt,frozenCells)
+    :{cells:board,count:0};
+  let landed=applyScatter(randomBoard(symbols,reels,rows,randomInt));
+  let board=landed.cells;
+  let scatterCount=0;
   let respins=0;
   while(true){
+    scatterCount+=landed.count;
     const evaluated=scoreBoard(board,symbols,payouts,bet,rows);
     const active=winningCells(board,evaluated.wins,reels,rows);
     const newCells=[];
@@ -57,6 +64,7 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
       cells:board.slice(),
       frozenCells:[...frozenCells].sort((a,b)=>a-b),
       newCells:newCells.sort((a,b)=>a-b),
+      scatterCount:landed.count,
       wins:evaluated.wins
     });
     if(!newCells.length||frozenCells.size===reels*rows||respins>=maxRespins)break;
@@ -64,10 +72,11 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
     for(let pos=0;pos<next.length;pos++){
       if(!frozenCells.has(pos))next[pos]=symbols[randomInt(symbols.length)].id;
     }
-    board=next;
+    landed=applyScatter(next);
+    board=landed.cells;
     respins++;
   }
   const result=scoreBoard(board,symbols,payouts,bet,rows);
-  return {steps,board,total:result.total,wins:result.wins,respins};
+  return {steps,board,total:result.total,wins:result.wins,respins,scatterCount};
 }
 module.exports={scatterOnBoard,freeSpinsFor,playBonusRound,winningCells};
