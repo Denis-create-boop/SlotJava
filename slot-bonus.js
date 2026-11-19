@@ -15,7 +15,7 @@ function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Se
     if(!max||randomInt(100)>=chance)continue;
     const number=1+randomInt(max);
     for(let n=0;n<number;n++){
-      const pick=n+randomInt(rows-n);
+      const pick=n+randomInt(positions.length-n);
       [positions[n],positions[pick]]=[positions[pick],positions[n]];
       cells[positions[n]*reels+col]=scatterId;
       count++;
