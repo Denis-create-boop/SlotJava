@@ -38,41 +38,31 @@ function winningCells(board,wins,reels,rows){
   }
   return indices;
 }
-// Each round costs exactly one free spin. Its extra re-spins do not count.
-// A reel containing a newly frozen winning symbol is held still until this
-// round ends; all other reels continue as vertical strips.
+// A bonus round spends exactly ONE free spin, regardless of respin count.
+// Lock winning CELLS, not entire columns. Every other cell on every reel
+// rolls again, even if another cell on that same reel is already locked.
 function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16}){
   if(!symbols.length)throw Error('Нет игровых символов');
   let board=randomBoard(symbols,reels,rows,randomInt);
-  const frozenReels=new Set();
-  const frozenCells=new Set();
-  const steps=[];
+  const frozenCells=new Set(),steps=[];
   let respins=0;
   while(true){
     const evaluated=scoreBoard(board,symbols,payouts,bet,rows);
     const active=winningCells(board,evaluated.wins,reels,rows);
-    const newlyFrozen=[];
+    const newCells=[];
     for(const pos of active){
-      frozenCells.add(pos);
-      const reel=pos%reels;
-      if(!frozenReels.has(reel)){
-        frozenReels.add(reel);
-        newlyFrozen.push(reel);
-      }
+      if(!frozenCells.has(pos)){frozenCells.add(pos);newCells.push(pos);}
     }
     steps.push({
       cells:board.slice(),
-      frozenReels:[...frozenReels].sort((a,b)=>a-b),
       frozenCells:[...frozenCells].sort((a,b)=>a-b),
-      newReels:newlyFrozen.sort((a,b)=>a-b),
+      newCells:newCells.sort((a,b)=>a-b),
       wins:evaluated.wins
     });
-    if(!newlyFrozen.length||frozenReels.size===reels||respins>=maxRespins)break;
+    if(!newCells.length||frozenCells.size===reels*rows||respins>=maxRespins)break;
     const next=board.slice();
-    for(let col=0;col<reels;col++){
-      if(frozenReels.has(col))continue;
-      for(let row=0;row<rows;row++)
-        next[row*reels+col]=symbols[randomInt(symbols.length)].id;
+    for(let pos=0;pos<next.length;pos++){
+      if(!frozenCells.has(pos))next[pos]=symbols[randomInt(symbols.length)].id;
     }
     board=next;
     respins++;
