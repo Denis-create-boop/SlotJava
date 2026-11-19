@@ -213,6 +213,41 @@ db.transaction(()=>{
     WHERE matches BETWEEN 3 AND 20 AND percent BETWEEN 0 AND 100000`).run();
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
+// New symbol pricing: a percentage of the stake for ONE occurrence,
+// multiplied by the number of occurrences in an uninterrupted reel chain.
+// Reel multipliers are indexed by the last consecutive reel (3,4,5,...).
+// Former per-count coefficient settings are kept intact for historical rollback.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS symbol_unit_prices (
+    symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
+    percent_hundredths INTEGER NOT NULL DEFAULT 0 CHECK(percent_hundredths BETWEEN 0 AND 1000000)
+  );
+  CREATE TABLE IF NOT EXISTS symbol_reel_multipliers (
+    symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+    reel_count INTEGER NOT NULL CHECK(reel_count BETWEEN 3 AND 20),
+    multiplier_milli INTEGER NOT NULL DEFAULT 1000 CHECK(multiplier_milli BETWEEN 0 AND 1000000),
+    PRIMARY KEY(symbol_id,reel_count)
+  );
+`);
+// One-time conversion uses the oldest available non-zero rule to suggest a
+// per-occurrence price: coefficient-at-N / N. This cannot preserve the old
+// per-count paytable exactly; it never overwrites a subsequently edited price.
+db.transaction(()=>{
+  const flag='symbol_unit_prices_migrated_v1';
+  if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
+  const current=db.prepare(`SELECT s.id AS symbol_id,
+    (SELECT coefficient_milli*1.0/matches FROM symbol_payout_multipliers p
+      WHERE p.symbol_id=s.id AND p.coefficient_milli>0
+      ORDER BY matches LIMIT 1) AS unit_coefficient_milli
+    FROM game_symbols s`).all();
+  const add=db.prepare('INSERT OR IGNORE INTO symbol_unit_prices(symbol_id,percent_hundredths) VALUES(?,?)');
+  for(const row of current){
+    const percentHundredths=row.unit_coefficient_milli==null?0:
+      Math.min(1000000,Math.round(row.unit_coefficient_milli*10));
+    add.run(row.symbol_id,percentHundredths);
+  }
+  db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+})();
 const starterImages=[
   ['A','/static/images/symbols/premium-letters.svg#a'],['Q','/static/images/symbols/premium-letters.svg#q'],
   ['J','/static/images/symbols/premium-letters.svg#j'],['K','/static/images/symbols/premium-letters.svg#k'],
@@ -295,7 +330,13 @@ function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
 }
 function getPayouts(gameId){
-  return db.prepare('SELECT p.symbol_id,p.matches,p.coefficient_milli FROM symbol_payout_multipliers p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
+  const prices=db.prepare(`SELECT s.id AS symbol_id,COALESCE(p.percent_hundredths,0) AS percent_hundredths
+    FROM game_symbols s LEFT JOIN symbol_unit_prices p ON p.symbol_id=s.id
+    WHERE s.game_id=? ORDER BY s.position,s.id`).all(gameId);
+  const multipliers=db.prepare(`SELECT r.symbol_id,r.reel_count,r.multiplier_milli
+    FROM symbol_reel_multipliers r JOIN game_symbols s ON s.id=r.symbol_id
+    WHERE s.game_id=? ORDER BY r.symbol_id,r.reel_count`).all(gameId);
+  return {prices,multipliers};
 }
 function getGameSettings(id) {
   return db.prepare('SELECT win_frequency,big_win_multiplier_milli,mega_win_multiplier_milli FROM game_settings WHERE game_id=?').get(id);
