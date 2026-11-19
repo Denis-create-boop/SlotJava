@@ -124,12 +124,9 @@ function layout(title,body,user,csrf,balanceLabel) {
     '<footer>SlotJava · браузерная версия в разработке</footer><script src="/static/app.js" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
-  // The first playable game's demo balance is shown on pages outside gameplay.
-  // Game-specific wallets remain separate; other games can get their own later.
   let balanceLabel=null;
   if(req.user&&!req.path.startsWith('/games/')){
-    const mainGame=db.prepare("SELECT id FROM games WHERE slug='slot-classic'").get();
-    if(mainGame)balanceLabel=getWallet(req.user.id,mainGame.id).balance;
+    balanceLabel=db.prepare('SELECT balance FROM user_balances WHERE user_id=?').get(req.user.id)?.balance??1000;
   }
   res.status(status).send(layout(title,body,req.user,req.session?.csrf_token,balanceLabel));
 }
@@ -241,7 +238,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
 function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
 }
-const DEMO_BETS=[10,20,50,100];
+const DEMO_BETS=[1,2,5,10,15,20,25,30,40,50,75,100,150,200,250,500,750,1000];
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
   const libraryBackgrounds=new Map(getGameBackgroundImages(game.id).map(item=>[
@@ -349,8 +346,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         nextBalance=wallet.balance+accumulated;
         if(!Number.isSafeInteger(nextBalance)||nextBalance<0)
           return {error:'Превышен допустимый баланс.'};
-        db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
-          .run(nextBalance,req.user.id,game.id);
+        db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?')
+          .run(nextBalance,req.user.id);
         db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?')
           .run(req.user.id,game.id);
         completed=true;
@@ -381,8 +378,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const updatedBalance=wallet.balance-wallet.bet+payout;
     if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)
       return {error:'Превышен допустимый баланс.'};
-    db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
-      .run(updatedBalance,req.user.id,game.id);
+    db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?')
+      .run(updatedBalance,req.user.id);
     const bigThreshold=settings?.big_win_multiplier_milli??5000;
     const megaThreshold=settings?.mega_win_multiplier_milli??15000;
     const winTier=payout>0&&payout*1000>=wallet.bet*megaThreshold?'mega'
