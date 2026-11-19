@@ -9,6 +9,24 @@
   const message=document.getElementById('slot-result');
   const balance=document.getElementById('slot-balance');
   const winDisplay=document.getElementById('slot-win');
+  const bigWinOverlay=document.getElementById('slot-big-win-overlay');
+  const bigWinLabel=document.getElementById('slot-big-win-label');
+  let bigWinTimer=null;
+  function hideBigWin(){
+    if(bigWinTimer!==null){window.clearTimeout(bigWinTimer);bigWinTimer=null;}
+    bigWinOverlay.hidden=true;
+    bigWinOverlay.classList.remove('is-visible','is-mega');
+    bigWinLabel.textContent='';
+  }
+  function showBigWin(tier){
+    hideBigWin();
+    if(tier!=='big'&&tier!=='mega')return;
+    bigWinLabel.textContent=tier==='mega'?'Очень крупный выигрыш!':'Крупный выигрыш!';
+    bigWinOverlay.classList.toggle('is-mega',tier==='mega');
+    bigWinOverlay.hidden=false;
+    bigWinOverlay.classList.add('is-visible');
+    bigWinTimer=window.setTimeout(hideBigWin,3800);
+  }
   const betDisplay=document.getElementById('slot-bet');
   const settingsButton=document.getElementById('slot-settings-trigger');
   const betButton=document.getElementById('slot-bet-trigger');
@@ -22,6 +40,7 @@
     soundEnabled=soundToggle.checked;
     try {window.localStorage.setItem('slotjava-sound',soundEnabled?'on':'off');} catch {}
     if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());}
+    else startBackgroundMusic();
   });
   function openSettings(){
     if(spinning)return;
@@ -70,6 +89,15 @@
   }
   const music=sound('music');
   if(music){music.loop=true;music.volume=.18;}
+  function startBackgroundMusic(){
+    if(soundEnabled&&music?.paused){
+      try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
+    }
+  }
+  function stopSpinSound(){
+    const reelSound=sound('spin_sound');
+    if(reelSound){reelSound.pause();reelSound.currentTime=0;}
+  }
 
   function sample(){
     return definitions[Math.floor(Math.random()*definitions.length)].id;
@@ -166,6 +194,8 @@
     if(spinning||!definitions.length)return;
     spinning=true;
     clearWinningGlow();
+    hideBigWin();
+    startBackgroundMusic();
     button.disabled=true;
     settingsButton.disabled=true;
     betButton.disabled=true;
@@ -196,16 +226,24 @@
         return animateColumn(col,index,target);
       });
       await Promise.all(animations);
+      stopSpinSound();
       highlightWinningSymbols(Array.isArray(result.wins)?result.wins:[]);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=String(result.total);
-      message.textContent=result.total>0?'Выигрыш: '+result.total+' тестовых очков!':'Без выигрыша. Попробуйте ещё.';
-      if(result.total>0)play('win_sound');
-      if(music?.paused)play('music');
+      const tier=['none','normal','big','mega'].includes(result.winTier)?result.winTier:'none';
+      const tierText=tier==='mega'?'Очень крупный выигрыш':tier==='big'?'Крупный выигрыш':'Выигрыш';
+      message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!':'Без выигрыша. Попробуйте ещё.';
+      showBigWin(tier);
+      if(result.total>0){
+        const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
+        play(sound(soundKey)?soundKey:'win_sound');
+      }
+      startBackgroundMusic();
     }catch(error){
       message.textContent=error.message+' При необходимости обновите страницу для сверки баланса.';
     }finally{
+      stopSpinSound();
       spinning=false;
       button.disabled=false;
       settingsButton.disabled=false;
