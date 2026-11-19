@@ -270,7 +270,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const changes=[];
     for(let reel=1;reel<=5;reel++){
       const chance=req.body?.['chance_'+reel],max=req.body?.['max_'+reel];
-      if(typeof chance!=='string'||!/^(?:100|[1-9]?\\d)$/.test(chance)||
+      if(typeof chance!=='string'||!/^(?:100|[1-9]?\d)$/.test(chance)||
          typeof max!=='string'||!/^[0-4]$/.test(max))
         return show(req,res,'Для каждого барабана укажите шанс от 0 до 100% и максимум Scatter от 0 до 4.',true,'scatter');
       changes.push([Number(chance),Number(max),id,reel]);
