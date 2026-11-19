@@ -121,8 +121,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const rowsFor=keys=>keys.map(key=>renderAssetRow([key,assetTypes[key]])).join('');
     const symbols=getSymbols(id);
     const payouts=getPayouts(id);
-    const payoutBySymbol=new Map();
-    for(const p of payouts){if(!payoutBySymbol.has(p.symbol_id))payoutBySymbol.set(p.symbol_id,new Map());payoutBySymbol.get(p.symbol_id).set(p.matches,p.coefficient_milli);}
+    const unitPrices=new Map(payouts.prices.map(row=>[row.symbol_id,row.percent_hundredths]));
+    const multipliersBySymbol=new Map();
+    for(const row of payouts.multipliers){
+      if(!multipliersBySymbol.has(row.symbol_id))multipliersBySymbol.set(row.symbol_id,new Map());
+      multipliersBySymbol.get(row.symbol_id).set(row.reel_count,row.multiplier_milli);
+    }
     const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
     const libraryCards=libraryImages.map(image=>{
       const src=libraryUrl(id,image);
@@ -142,10 +146,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<small>Стандартная иллюстрация</small>')+'</div>';
     }).join('');
     const symbolItems=symbols.map(symbol=>{
-      const costs=payoutBySymbol.get(symbol.id)||new Map();
-      const cells=Array.from({length:18},(_,i)=>{
-        const count=i+3;
-        return '<label class="payout-input">'+count+' символов, ×<input type="number" min="0" max="1000" step="0.001" name="p_'+count+'" value="'+((costs.get(count)||0)/1000).toFixed(3)+'" required></label>';
+      const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
+      const multipliers=multipliersBySymbol.get(symbol.id)||new Map();
+      const reelInputs=Array.from({length:3},(_,i)=>{
+        const reel=i+3;
+        return '<label class="payout-input">Цепочка до барабана №'+reel+', ×'+
+          '<input type="number" min="0" max="1000" step="0.001" name="r_'+reel+'" value="'+((multipliers.get(reel)??1000)/1000).toFixed(3)+'" required></label>';
       }).join('');
       const selected=linked.get(symbol.id)||0;
       const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
@@ -158,8 +164,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
         '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
-        '<p class="hint">Символ учитывается на непрерывной цепочке барабанов слева направо, начиная с первого. Минимум 3 барабана. Повторы суммируются только до первого пропуска. Для каждого количества укажите коэффициент, на который умножается текущая ставка: например, ×1.5 при ставке 20 = 30 очков. Ноль — выплаты нет.</p>'+
-        '<div class="payout-grid">'+cells+'</div><button class="primary" type="submit">Сохранить цены</button></form>'+
+        '<p class="hint">Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.</p>'+
+        '<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
+        '<p class="hint">Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.</p>'+
+        '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">Сохранить цену и множители</button></form>'+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form></details>';
     }).join('');
@@ -222,7 +230,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Добавить в папку</button></form>'+
       '<div class="library-images">'+libraryCards+'</div></section>';
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
-      '<p class="hint">Для каждого символа выберите картинку из папки игры и задайте коэффициент выплаты за 3–20 появлений. Выигрышная цепочка должна начинаться на первых трёх барабанах и прерывается при первом пропуске.</p>'+
+      '<p class="hint">Для каждого символа установите цену одной копии в процентах от ставки и множители за достижение 3-го, 4-го или 5-го барабана. Выплата начинается с трёх последовательных барабанов слева направо.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
@@ -328,15 +336,25 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.post('/admin/games/:id/symbols/:symbolId/payouts',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
-    const prices=[];
-    for(let n=3;n<=20;n++){
-      const raw=req.body['p_'+n];
-      if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
-        return show(req,res,'Коэффициент должен быть от 0 до 1000, с точностью до трёх знаков после запятой.',true,'symbols');
-      prices.push([n,Math.round(Number(raw)*1000)]);
+    const percentage=req.body?.unit_percent;
+    if(typeof percentage!=='string'||!/^(?:0|[1-9]\\d{0,4})(?:\\.\\d{1,2})?$/.test(percentage)||Number(percentage)>10000)
+      return show(req,res,'Цена одного символа должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
+    const unit=Math.round(Number(percentage)*100);
+    const entries=[];
+    for(let reel=3;reel<=5;reel++){
+      const raw=req.body?.['r_'+reel];
+      if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,3})?$/.test(raw)||Number(raw)>1000)
+        return show(req,res,'Множитель барабана должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
+      entries.push([reel,Math.round(Number(raw)*1000)]);
     }
-    const put=db.prepare('INSERT INTO symbol_payout_multipliers(symbol_id,matches,coefficient_milli) VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET coefficient_milli=excluded.coefficient_milli');
-    db.transaction(()=>{for(const [count,price] of prices)put.run(symbolId,count,price);})();
+    const putPrice=db.prepare(`INSERT INTO symbol_unit_prices(symbol_id,percent_hundredths) VALUES(?,?)
+      ON CONFLICT(symbol_id) DO UPDATE SET percent_hundredths=excluded.percent_hundredths`);
+    const putReel=db.prepare(`INSERT INTO symbol_reel_multipliers(symbol_id,reel_count,multiplier_milli) VALUES(?,?,?)
+      ON CONFLICT(symbol_id,reel_count) DO UPDATE SET multiplier_milli=excluded.multiplier_milli`);
+    db.transaction(()=>{
+      putPrice.run(symbolId,unit);
+      for(const [reel,ratio] of entries)putReel.run(symbolId,reel,ratio);
+    })();
     res.redirect(sectionUrl(id,'symbols'));
   });
   app.post('/admin/games/:id/symbols/:symbolId/delete',adminOnly,postGuard,(req,res)=>{
