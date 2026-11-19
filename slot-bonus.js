@@ -29,7 +29,7 @@ function randomBoard(symbols,reels,rows,randomInt){
 function winningCells(board,wins,reels,rows){
   const indices=new Set();
   for(const win of wins){
-    if(win.prize<=0||win.reels<3)continue;
+    if(win.reels<3)continue; // Matches freeze even if their configured price is zero.
     for(let col=0;col<Math.min(reels,win.reels);col++)
       for(let row=0;row<rows;row++){
         const pos=row*reels+col;
