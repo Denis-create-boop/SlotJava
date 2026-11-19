@@ -175,17 +175,36 @@
   }
 
   function clearWinningGlow(){
-    root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>tile.classList.remove('is-winning'));
+    root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>{
+      tile.classList.remove('is-winning');
+      tile.querySelectorAll('.slot-symbol-prize').forEach(label=>label.remove());
+      tile.removeAttribute('data-winning-prize');
+    });
   }
   function highlightWinningSymbols(wins){
     clearWinningGlow();
     for(const win of wins){
-      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels))continue;
-      const chainLength=Math.min(columns.length,Math.max(0,win.reels));
+      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels)||win.reels<3)continue;
+      const chainLength=Math.min(columns.length,win.reels);
+      let prizeTile=null;
       for(let col=0;col<chainLength;col++){
-        columns[col].querySelectorAll('.ribbon-tile').forEach(tile=>{
-          if(Number(tile.dataset.symbolId)===win.symbolId){tile.style.setProperty('--win-delay', (col*0.18)+'s');tile.classList.add('is-winning');}
-        });
+        const matching=Array.from(columns[col].querySelectorAll('.ribbon-tile'))
+          .filter(tile=>Number(tile.dataset.symbolId)===win.symbolId);
+        for(const tile of matching){
+          tile.style.setProperty('--win-delay',(col*.18)+'s');
+          tile.classList.add('is-winning');
+        }
+        // Show one prize label per matching symbol type, on its final reel.
+        // The label is a sibling of the animated image and does not spin.
+        if(col===chainLength-1&&matching.length)prizeTile=matching[0];
+      }
+      if(prizeTile&&Number.isSafeInteger(win.prize)&&win.prize>=0){
+        const label=document.createElement('span');
+        label.className='slot-symbol-prize';
+        label.textContent='+'+win.prize;
+        label.title='Выигрыш за '+(win.name||'символ')+': '+win.prize+' очков';
+        prizeTile.dataset.winningPrize=String(win.prize);
+        prizeTile.append(label);
       }
     }
   }
@@ -235,7 +254,10 @@
       winDisplay.textContent=String(result.total);
       const tier=['none','normal','big','mega'].includes(result.winTier)?result.winTier:'none';
       const tierText=tier==='mega'?'Очень крупный выигрыш':tier==='big'?'Крупный выигрыш':'Выигрыш';
-      message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!':'Без выигрыша. Попробуйте ещё.';
+      const matches=Array.isArray(result.wins)?result.wins:[];
+      message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!'
+        :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
+        :'Без выигрыша. Попробуйте ещё.';
       showBigWin(tier);
       if(result.total>0){
         const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
