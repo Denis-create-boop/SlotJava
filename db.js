@@ -113,8 +113,43 @@ if(!gameSettingColumns.includes('mega_win_multiplier_milli')){
 }
 // Existing wallets retain their balance; add a persisted choice of test stake.
 if(!db.pragma('table_info(game_wallets)').some(column=>column.name==='bet')){
-  db.exec('ALTER TABLE game_wallets ADD COLUMN bet INTEGER NOT NULL DEFAULT 10 CHECK(bet IN (10,20,50,100))');
+  db.exec('ALTER TABLE game_wallets ADD COLUMN bet INTEGER NOT NULL DEFAULT 10');
 }
+// Old SQLite CHECK(bet IN (...)) prevents larger and smaller stakes.
+// Rebuild only the local per-game stake table once to remove the obsolete constraint.
+const currentWalletSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_wallets'").get()?.sql||'';
+if(/CHECK\s*\(\s*bet\s+IN\s*\(/i.test(currentWalletSchema)){
+  db.transaction(()=>{
+    db.exec(`
+      CREATE TABLE game_wallets_new(
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        balance INTEGER NOT NULL DEFAULT 1000 CHECK(balance>=0),
+        bet INTEGER NOT NULL DEFAULT 10 CHECK(bet BETWEEN 1 AND 1000),
+        PRIMARY KEY(user_id,game_id)
+      );
+      INSERT INTO game_wallets_new(user_id,game_id,balance,bet)
+      SELECT user_id,game_id,balance,bet FROM game_wallets;
+      DROP TABLE game_wallets;
+      ALTER TABLE game_wallets_new RENAME TO game_wallets;
+    `);
+  })();
+}
+db.exec(`
+ CREATE TABLE IF NOT EXISTS user_balances (
+   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+   balance INTEGER NOT NULL DEFAULT 1000 CHECK(balance>=0)
+ );
+`);
+// Preserve the already played first-game balance as the single source of truth.
+// Do not add the separate default 1000 credits granted to other games.
+db.prepare(`INSERT OR IGNORE INTO user_balances(user_id,balance)
+  SELECT u.id,COALESCE(
+    (SELECT w.balance FROM game_wallets w JOIN games g ON g.id=w.game_id
+      WHERE w.user_id=u.id AND g.slug='slot-classic'),
+    (SELECT w.balance FROM game_wallets w WHERE w.user_id=u.id ORDER BY w.game_id LIMIT 1),
+    1000)
+  FROM users u`).run();
 // Migration for earlier test databases whose payout range started at 2.
 const payoutSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='symbol_payouts'").get()?.sql||'';
 if(/BETWEEN\s+2\s+AND\s+20/i.test(payoutSchema)){
@@ -412,7 +447,7 @@ db.exec(`
     remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 20),
     multiplier INTEGER NOT NULL CHECK(multiplier BETWEEN 2 AND 100),
     bonus_win INTEGER NOT NULL DEFAULT 0 CHECK(bonus_win >= 0),
-    bet INTEGER NOT NULL CHECK(bet IN (10,20,50,100)),
+    bet INTEGER NOT NULL CHECK(bet BETWEEN 1 AND 1000),
     PRIMARY KEY(user_id,game_id)
   );
 `);
@@ -461,7 +496,10 @@ function getSymbolImageLinks(gameId){
 }
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
-  return db.prepare('SELECT balance,bet FROM game_wallets WHERE user_id=? AND game_id=?').get(userId,gameId);
+  db.prepare('INSERT OR IGNORE INTO user_balances(user_id,balance) VALUES(?,1000)').run(userId);
+  return db.prepare(`SELECT b.balance,w.bet FROM game_wallets w
+    JOIN user_balances b ON b.user_id=w.user_id
+    WHERE w.user_id=? AND w.game_id=?`).get(userId,gameId);
 }
 function getSymbols(gameId){
   return db.prepare('SELECT id,game_id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(gameId);
