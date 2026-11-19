@@ -251,6 +251,65 @@ db.transaction(()=>{
   }
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
+const starterImages=[
+  ['A','/static/images/symbols/premium-letters.svg#a'],['Q','/static/images/symbols/premium-letters.svg#q'],
+  ['J','/static/images/symbols/premium-letters.svg#j'],['K','/static/images/symbols/premium-letters.svg#k'],
+  ['10','/static/images/symbols/premium-letters.svg#ten'],['9','/static/images/symbols/premium-letters.svg#nine'],
+  ['Череп','/static/images/symbols/skull.svg'],['Меч','/static/images/symbols/sword.svg'],
+  ['Змея над чашей','/static/images/symbols/snake-cup.svg'],['Дьявол','/static/images/symbols/devil.svg']
+];
+// Keep library image IDs (and symbol assignments) when upgrading the artwork.
+if(firstGame){
+  const upgradeArt=db.prepare('UPDATE game_image_library SET builtin_path=? WHERE game_id=? AND builtin_path=?');
+  db.transaction(()=>{
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#a',firstGame.id,'/static/images/symbols/a.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#q',firstGame.id,'/static/images/symbols/q.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#j',firstGame.id,'/static/images/symbols/j.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#k',firstGame.id,'/static/images/symbols/k.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#ten',firstGame.id,'/static/images/symbols/10.svg');
+    upgradeArt.run('/static/images/symbols/premium-letters.svg#nine',firstGame.id,'/static/images/symbols/9.svg');
+  })();
+}
+if(firstGame){
+  const addImage=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  db.transaction(()=>{for(const row of starterImages)addImage.run(firstGame.id,...row);})();
+}
+// Apply starter art only to untouched placeholder symbols, once per database.
+if(firstGame){
+  db.transaction(()=>{
+    const flag='first_game_starter_symbol_library_links_v1';
+    if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
+    const placeholders=db.prepare('SELECT id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(firstGame.id);
+    const selectImage=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+    const hasAsset=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
+    const link=db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
+    const rename=db.prepare('UPDATE game_symbols SET name=? WHERE id=? AND name=?');
+    for(let index=0;index<Math.min(10,placeholders.length);index++){
+      const symbol=placeholders[index];
+      if(symbol.name!=='Символ №'+symbol.position)continue;
+      if(hasAsset.get(firstGame.id,'symbol_'+symbol.id))continue;
+      const entry=starterImages[index];
+      const image=selectImage.get(firstGame.id,entry[1]);
+      if(!image)continue;
+      link.run(symbol.id,image.id);
+      rename.run(entry[0],symbol.id,symbol.name);
+    }
+    db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+  })();
+}
+// Clean up only untouched demo placeholders without art or payout rules.
+if(firstGame){
+  const placeholders=db.prepare('SELECT id,name,position FROM game_symbols WHERE game_id=? AND position IN (11,12)').all(firstGame.id);
+  for(const symbol of placeholders){
+    if(symbol.name!=='Символ №'+symbol.position)continue;
+    if(db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?').get(firstGame.id,'symbol_'+symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payout_multipliers WHERE symbol_id=? AND coefficient_milli>0').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payout_percentages WHERE symbol_id=? AND percent>0').get(symbol.id))continue;
+    if(db.prepare('SELECT 1 FROM symbol_payouts WHERE symbol_id=? AND prize>0').get(symbol.id))continue;
+    db.prepare('DELETE FROM game_symbols WHERE id=? AND game_id=?').run(symbol.id,firstGame.id);
+  }
+}
 // First-run content for playable games 2 and 3. Existing game records,
 // custom symbols, prices and uploaded backgrounds are not overwritten.
 const themedGames=[
@@ -332,65 +391,6 @@ db.transaction(()=>{
     }
   }
 })();
-const starterImages=[
-  ['A','/static/images/symbols/premium-letters.svg#a'],['Q','/static/images/symbols/premium-letters.svg#q'],
-  ['J','/static/images/symbols/premium-letters.svg#j'],['K','/static/images/symbols/premium-letters.svg#k'],
-  ['10','/static/images/symbols/premium-letters.svg#ten'],['9','/static/images/symbols/premium-letters.svg#nine'],
-  ['Череп','/static/images/symbols/skull.svg'],['Меч','/static/images/symbols/sword.svg'],
-  ['Змея над чашей','/static/images/symbols/snake-cup.svg'],['Дьявол','/static/images/symbols/devil.svg']
-];
-// Keep library image IDs (and symbol assignments) when upgrading the artwork.
-if(firstGame){
-  const upgradeArt=db.prepare('UPDATE game_image_library SET builtin_path=? WHERE game_id=? AND builtin_path=?');
-  db.transaction(()=>{
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#a',firstGame.id,'/static/images/symbols/a.svg');
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#q',firstGame.id,'/static/images/symbols/q.svg');
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#j',firstGame.id,'/static/images/symbols/j.svg');
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#k',firstGame.id,'/static/images/symbols/k.svg');
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#ten',firstGame.id,'/static/images/symbols/10.svg');
-    upgradeArt.run('/static/images/symbols/premium-letters.svg#nine',firstGame.id,'/static/images/symbols/9.svg');
-  })();
-}
-if(firstGame){
-  const addImage=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
-  db.transaction(()=>{for(const row of starterImages)addImage.run(firstGame.id,...row);})();
-}
-// Apply starter art only to untouched placeholder symbols, once per database.
-if(firstGame){
-  db.transaction(()=>{
-    const flag='first_game_starter_symbol_library_links_v1';
-    if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
-    const placeholders=db.prepare('SELECT id,name,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(firstGame.id);
-    const selectImage=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
-    const hasAsset=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
-    const link=db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
-    const rename=db.prepare('UPDATE game_symbols SET name=? WHERE id=? AND name=?');
-    for(let index=0;index<Math.min(10,placeholders.length);index++){
-      const symbol=placeholders[index];
-      if(symbol.name!=='Символ №'+symbol.position)continue;
-      if(hasAsset.get(firstGame.id,'symbol_'+symbol.id))continue;
-      const entry=starterImages[index];
-      const image=selectImage.get(firstGame.id,entry[1]);
-      if(!image)continue;
-      link.run(symbol.id,image.id);
-      rename.run(entry[0],symbol.id,symbol.name);
-    }
-    db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
-  })();
-}
-// Clean up only untouched demo placeholders without art or payout rules.
-if(firstGame){
-  const placeholders=db.prepare('SELECT id,name,position FROM game_symbols WHERE game_id=? AND position IN (11,12)').all(firstGame.id);
-  for(const symbol of placeholders){
-    if(symbol.name!=='Символ №'+symbol.position)continue;
-    if(db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?').get(symbol.id))continue;
-    if(db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?').get(firstGame.id,'symbol_'+symbol.id))continue;
-    if(db.prepare('SELECT 1 FROM symbol_payout_multipliers WHERE symbol_id=? AND coefficient_milli>0').get(symbol.id))continue;
-    if(db.prepare('SELECT 1 FROM symbol_payout_percentages WHERE symbol_id=? AND percent>0').get(symbol.id))continue;
-    if(db.prepare('SELECT 1 FROM symbol_payouts WHERE symbol_id=? AND prize>0').get(symbol.id))continue;
-    db.prepare('DELETE FROM game_symbols WHERE id=? AND game_id=?').run(symbol.id,firstGame.id);
-  }
-}
 function getLibraryImages(gameId){
   return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
 }
