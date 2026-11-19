@@ -838,3 +838,35 @@ header nav .header-user-balance{
 @media(prefers-reduced-motion:reduce){
  .slot-game .ribbon-tile.bonus-cell-spinning::before,.slot-bonus-math .is-revealing{animation:none!important}
 }
+
+/* Per-cell bonus symbols roll as actual vertical strips; only frozen cells stay still. */
+.slot-game .ribbon-tile.bonus-cell-spinning{
+ position:relative;isolation:isolate;overflow:hidden;
+ filter:none;opacity:1;padding:0;background:rgba(12,12,25,.36);
+}
+.slot-game .ribbon-tile.bonus-cell-spinning::before{content:none!important;animation:none!important}
+.slot-game .bonus-mini-reel{
+ position:absolute;inset:0;overflow:hidden;z-index:2;
+ height:100%;width:100%;pointer-events:none;
+}
+.slot-game .bonus-mini-track{
+ position:absolute;inset:0 auto auto 0;width:100%;
+ display:flex;flex-direction:column;will-change:transform;
+}
+.slot-game .bonus-mini-symbol{
+ flex:0 0 auto;position:relative;width:100%;
+ height:var(--reel-cell-height);min-height:var(--reel-cell-height);
+ display:flex;justify-content:center;align-items:center;
+ overflow:hidden;background:rgba(16,12,26,.23);
+}
+.slot-game .bonus-mini-symbol img{
+ display:block;max-width:94%;max-height:92%;
+ width:90%;height:90%;object-fit:contain;animation:none!important;
+ filter:drop-shadow(0 2px 5px rgba(0,0,0,.62));
+}
+.slot-game .bonus-mini-symbol .ribbon-symbol-fallback{
+ font-size:clamp(.65rem,1.3vw,1.1rem);animation:none!important
+}
+@media(prefers-reduced-motion:reduce){
+ .slot-game .bonus-mini-track{transition:none!important}
+}
