@@ -313,6 +313,8 @@ app.post('/games/:slug/bet',guarded,spinLimiter,postGuard,(req,res)=>{
   if(!game||!playableGame(game))return res.sendStatus(404);
   const bet=Number(req.body?.bet);
   if(!DEMO_BETS.includes(bet)||String(bet)!==req.body?.bet)return res.status(400).json({error:'Недопустимая ставка'});
+  if(game.slug==='slot-classic'&&getBonusSession(req.user.id,game.id))
+    return res.status(409).json({error:'Нельзя менять ставку во время бесплатных вращений.'});
   getWallet(req.user.id,game.id);
   db.prepare('UPDATE game_wallets SET bet=? WHERE user_id=? AND game_id=?').run(bet,req.user.id,game.id);
   res.set('Cache-Control','no-store');
@@ -323,15 +325,61 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   if(!game||!playableGame(game))return res.sendStatus(404);
   const result=db.transaction(()=>{
     const wallet=getWallet(req.user.id,game.id);
-    if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const settings=getGameSettings(game.id);
-    const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet,gameLayout(game));
+    const layout=gameLayout(game);
+    const scatter=game.slug==='slot-classic'?getScatterSettings(game.id):null;
+    const active=scatter?getBonusSession(req.user.id,game.id):null;
+    if(active){
+      // Free spins are transacted atomically and have a separate pending
+      // balance. No credits can be applied before the final free spin.
+      const symbols=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+      const round=playBonusRound({
+        symbols,payouts:getPayouts(game.id),bet:active.bet,
+        reels:layout.reels,rows:layout.rows,
+        randomInt:n=>crypto.randomInt(n),scoreBoard
+      });
+      const award=round.total*active.multiplier;
+      const accumulated=active.bonus_win+award;
+      if(!Number.isSafeInteger(award)||!Number.isSafeInteger(accumulated)||accumulated<0)
+        return {error:'Превышен допустимый размер бонусного выигрыша.'};
+      const remaining=active.remaining-1;
+      const nextMultiplier=active.multiplier+(round.total>0?1:0);
+      let nextBalance=wallet.balance,completed=false;
+      if(remaining===0){
+        nextBalance=wallet.balance+accumulated;
+        if(!Number.isSafeInteger(nextBalance)||nextBalance<0)
+          return {error:'Превышен допустимый баланс.'};
+        db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
+          .run(nextBalance,req.user.id,game.id);
+        db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?')
+          .run(req.user.id,game.id);
+        completed=true;
+      }else{
+        db.prepare(`UPDATE game_bonus_sessions SET remaining=?,multiplier=?,bonus_win=?
+          WHERE user_id=? AND game_id=?`)
+          .run(remaining,nextMultiplier,accumulated,req.user.id,game.id);
+      }
+      const bigThreshold=settings?.big_win_multiplier_milli??5000;
+      const megaThreshold=settings?.mega_win_multiplier_milli??15000;
+      const winTier=award>0&&award*1000>=active.bet*megaThreshold?'mega'
+        :award>0&&award*1000>=active.bet*bigThreshold?'big'
+        :award>0?'normal':'none';
+      return {
+        mode:'bonus',cells:round.board,steps:round.steps,
+        total:award,baseWin:round.total,wins:round.wins,
+        balance:nextBalance,bet:active.bet,winTier,
+        bonusRoundWin:award,bonusWin:accumulated,
+        bonusMultiplier:active.multiplier,
+        nextMultiplier,remaining,completedBonus:completed
+      };
+    }
+    if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
+    const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet,layout);
     if(spin.error)return spin;
-    // Awards are already calculated from stake, occurrences and final reel multiplier.
-    const wins=spin.wins;
     const payout=spin.total;
     const updatedBalance=wallet.balance-wallet.bet+payout;
-    if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
+    if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)
+      return {error:'Превышен допустимый баланс.'};
     db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
       .run(updatedBalance,req.user.id,game.id);
     const bigThreshold=settings?.big_win_multiplier_milli??5000;
@@ -339,7 +387,14 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const winTier=payout>0&&payout*1000>=wallet.bet*megaThreshold?'mega'
       :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
       :payout>0?'normal':'none';
-    return {...spin,total:payout,wins,balance:updatedBalance,bet:wallet.bet,winTier};
+    const freeSpins=scatter?freeSpinsFor(spin.scatterCount):0;
+    if(freeSpins){
+      db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
+        VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
+    }
+    return {...spin,mode:'base',total:payout,balance:updatedBalance,bet:wallet.bet,
+      winTier,freeSpins,bonusMultiplier:freeSpins?2:null,
+      bonusWin:freeSpins?0:null,remaining:freeSpins};
   })();
   res.set('Cache-Control','no-store');
   if(result.error)return res.status(400).json({error:result.error});
