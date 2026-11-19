@@ -254,13 +254,14 @@ function firstGamePage(game,req){
     const image=chosenImages.get(symbol.id)||url('symbol_'+symbol.id)||'';
     return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
-  const audio=['music','spin_sound','win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
+  const audio=['music','spin_sound','win_sound','big_win_sound','mega_win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
   return '<div class="slot-game" data-game-id="'+game.id+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
+    '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
     '<div class="reel-columns">'+reels+'</div></div>'+
 
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
@@ -303,7 +304,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   const result=db.transaction(()=>{
     const wallet=getWallet(req.user.id,game.id);
     if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
-    const spin=generateSpin(game.id,getGameSettings(game.id)?.win_frequency ?? 25);
+    const settings=getGameSettings(game.id);
+    const spin=generateSpin(game.id,settings?.win_frequency ?? 25);
     if(spin.error)return spin;
     // Payout = current stake × configured coefficient. Round to demo points.
     const wins=spin.wins.map(w=>({...w,prize:Math.round(wallet.bet*w.coefficientMilli/1000)}));
@@ -312,7 +314,12 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
     db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
       .run(updatedBalance,req.user.id,game.id);
-    return {...spin,total:payout,wins,balance:updatedBalance,bet:wallet.bet};
+    const bigThreshold=settings?.big_win_multiplier_milli??5000;
+    const megaThreshold=settings?.mega_win_multiplier_milli??15000;
+    const winTier=payout>0&&payout*1000>=wallet.bet*megaThreshold?'mega'
+      :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
+      :payout>0?'normal':'none';
+    return {...spin,total:payout,wins,balance:updatedBalance,bet:wallet.bet,winTier};
   })();
   res.set('Cache-Control','no-store');
   if(result.error)return res.status(400).json({error:result.error});
