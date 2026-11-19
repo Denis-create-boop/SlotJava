@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 450"><defs>
+<radialGradient id="sun"><stop stop-color="#ffe7a2"/><stop offset=".35" stop-color="#ebac4e"/><stop offset="1" stop-color="#6e2e20"/></radialGradient>
+<linearGradient id="sand" x2=".25" y2="1"><stop stop-color="#ffe6a2"/><stop offset=".48" stop-color="#d99535"/><stop offset="1" stop-color="#62351d"/></linearGradient>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#1b102b"/><stop offset=".35" stop-color="#572c42"/><stop offset=".67" stop-color="#ac5a3e"/><stop offset="1" stop-color="#2c1416"/></linearGradient>
+<linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#fff2aa"/><stop offset=".24" stop-color="#df9e28"/><stop offset=".53" stop-color="#875014"/><stop offset=".78" stop-color="#efc15a"/><stop offset="1" stop-color="#633514"/></linearGradient>
+<radialGradient id="egyptGlow"><stop stop-color="#ffdc70" stop-opacity=".6"/><stop offset="1" stop-color="#ffbc3f" stop-opacity="0"/></radialGradient>
+<filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+<filter id="shine"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#08010c" flood-opacity=".8"/></filter>
+<pattern id="hieroglyph" width="110" height="120" patternUnits="userSpaceOnUse" opacity=".16">
+<path d="M8 13 h92 M14 49 h83 M8 92 h92" fill="none" stroke="#eac275" stroke-width="2"/>
+<text x="12" y="40" font-size="25" fill="#f8ce7a">𓂀 𓆣</text><text x="18" y="81" font-size="26" fill="#e8bf68">𓋹 𓇳</text><text x="30" y="113" font-size="23" fill="#f7d580">𓅃 𓉐</text>
+</pattern></defs><rect width="720" height="450" rx="35" fill="#180f20"/><circle cx="360" cy="215" r="180" fill="url(#egyptGlow)"/>
+<path d="M225 385 L359 60 L495 385Z" fill="url(#gold)" stroke="#f5d781" stroke-width="9"/><path d="M359 60L495 385H359Z" fill="#724219" opacity=".62"/>
+<g filter="url(#shine)"><path d="M288 215 Q302 107 359 107 Q418 107 432 215 L426 328 Q360 386 293 328Z" fill="#f0b660" stroke="#ffe1a4" stroke-width="7"/><path d="M278 226Q263 126 326 96L360 70L393 96Q456 130 442 226L420 197L408 136L390 181L375 113L360 174L345 113L326 181L311 136L301 197Z" fill="#1067a7" stroke="#e8be61" stroke-width="11"/><path d="M311 228q19 -18 37 0m24 0q21 -19 38 0" fill="none" stroke="#271321" stroke-width="10"/><path d="M346 270q14 15 28 0" fill="none" stroke="#7a3a22" stroke-width="7"/><path d="M328 315h62l-12 44h-37Z" fill="url(#gold)"/></g>
+<text x="360" y="425" fill="#ffdb87" text-anchor="middle" font-family="Georgia,serif" font-size="35" font-weight="bold" letter-spacing="8">EGYPT</text></svg>
