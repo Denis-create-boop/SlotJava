@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
+const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages } = require('./db');
 
 const app = express();
@@ -166,10 +167,10 @@ app.get('/',(req,res)=>{
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
-function scoreBoard(cells,symbols,payouts,bet=10){
+function scoreBoard(cells,symbols,payouts,bet=10,rows=4){
   // Payout = stake * (symbol price % / 100) * matching occurrences
   //        * multiplier for the last consecutive reel. First 3 mandatory.
-  const reelCount=Math.floor(cells.length/4);
+  const reelCount=Math.floor(cells.length/rows);
   const priceMap=new Map(payouts.prices.map(p=>[p.symbol_id,p.percent_hundredths]));
   const reelMultipliers=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
   const wins=[];
@@ -178,7 +179,7 @@ function scoreBoard(cells,symbols,payouts,bet=10){
     let reels=0,count=0;
     for(let col=0;col<reelCount;col++){
       let found=0;
-      for(let row=0;row<4;row++){
+      for(let row=0;row<rows;row++){
         if(cells[row*reelCount+col]===symbol.id)found++;
       }
       if(!found)break;
@@ -199,13 +200,13 @@ function scoreBoard(cells,symbols,payouts,bet=10){
   }
   return {total,wins};
 }
-function generateSpin(gameId,winFrequency,bet){
+function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const symbols=getSymbols(gameId),payouts=getPayouts(gameId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
-  const reelCount=5,rows=4;
+  const reelCount=layout.reels,rows=layout.rows;
   const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
-  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet);
+  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
     cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet);
   }
@@ -220,7 +221,7 @@ function generateSpin(gameId,winFrequency,bet){
       const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
       for(let col=0;col<activeReels;col++)
         arranged[crypto.randomInt(rows)*reelCount+col]=rule.symbol_id;
-      const scored=scoreBoard(arranged,symbols,payouts,bet);
+      const scored=scoreBoard(arranged,symbols,payouts,bet,rows);
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
@@ -238,9 +239,10 @@ function firstGamePage(game,req){
   const url=key=>libraryBackgrounds.get(key)||assetUrl(assets,key,game.id);
   const backgroundImage=(key,cls)=>url(key)?'<img class="'+cls+'" src="'+h(url(key))+'" alt="" aria-hidden="true">':'';
 
-  const reels=Array.from({length:5},(_,col)=>{
+  const {reels:reelCount,rows:rowCount,theme}=gameLayout(game);
+  const reels=Array.from({length:reelCount},(_,col)=>{
     const reelNumber=col+1;
-    const backgrounds=Array.from({length:4},()=>
+    const backgrounds=Array.from({length:rowCount},()=>
       '<div class="reel-cell-bg">'+backgroundImage('cells_background','reel-cell-background-image')+'</div>'
     ).join('');
     return '<div class="reel-column" data-reel="'+col+'">'+
@@ -256,7 +258,7 @@ function firstGamePage(game,req){
   }).join('');
   const audio=['music','spin_sound','win_sound','big_win_sound','mega_win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
-  return '<div class="slot-game" data-game-id="'+game.id+'">'+
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine"><div class="slot-reels slot-reels-ribbon">'+
@@ -285,12 +287,12 @@ function firstGamePage(game,req){
 app.get('/games/:slug',guarded,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/">Все игры</a></section>',req,404);
-  if(game.slug==='slot-classic')return sendPage(res,game.title,firstGamePage(game,req),req);
+  if(playableGame(game))return sendPage(res,game.title,firstGamePage(game,req),req);
   sendPage(res,game.title,'<section class="panel game-placeholder"><img src="'+h(game.image_path)+'" alt="" width="720" height="450"><h1>'+h(game.title)+'</h1><p>Игра находится в разработке.</p><a class="secondary" href="/">Назад к играм</a></section>',req);
 });
 app.post('/games/:slug/bet',guarded,spinLimiter,postGuard,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
-  if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
+  if(!game||!playableGame(game))return res.sendStatus(404);
   const bet=Number(req.body?.bet);
   if(!DEMO_BETS.includes(bet)||String(bet)!==req.body?.bet)return res.status(400).json({error:'Недопустимая ставка'});
   getWallet(req.user.id,game.id);
@@ -300,12 +302,12 @@ app.post('/games/:slug/bet',guarded,spinLimiter,postGuard,(req,res)=>{
 });
 app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
-  if(!game||game.slug!=='slot-classic')return res.sendStatus(404);
+  if(!game||!playableGame(game))return res.sendStatus(404);
   const result=db.transaction(()=>{
     const wallet=getWallet(req.user.id,game.id);
     if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const settings=getGameSettings(game.id);
-    const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet);
+    const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet,gameLayout(game));
     if(spin.error)return spin;
     // Awards are already calculated from stake, occurrences and final reel multiplier.
     const wins=spin.wins;
