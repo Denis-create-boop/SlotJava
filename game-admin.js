@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const multer = require('multer');
+const { gameLayout } = require('./game-layout');
 
 const uploadsDir=path.join(__dirname,'data','game-uploads');
 fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
@@ -9,9 +10,9 @@ fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
 const assetTypes={
   background:{label:'Фон игрового окна',kind:'image'},
   field_background:{label:'Общий фон поля с барабанами',kind:'image'},
-  cells_background:{label:'Общий фон всех 20 ячеек с символами',kind:'image'},
+  cells_background:{label:'Общий фон всех ячеек с символами',kind:'image'},
   logo:{label:'Логотип игры',kind:'image'},
-  reels_background:{label:'Общий фон всех пяти барабанов',kind:'image'},
+  reels_background:{label:'Общий фон игрового поля',kind:'image'},
   bet_panel:{label:'Фон панели ставок',kind:'image'},
   win_panel:{label:'Фон панели выигрыша',kind:'image'},
   music:{label:'Фоновая музыка',kind:'audio'},
@@ -91,6 +92,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req);
     const game=id?gameById(id):null;
     if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">Вернуться</a></section>',req,404);
+    const layout=gameLayout(game);
     const settings=getGameSettings(id)||{win_frequency:25};
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
     const assignedBackgrounds=new Map(getGameBackgroundImages(id).map(item=>[item.asset_key,item]));
@@ -148,7 +150,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const symbolItems=symbols.map(symbol=>{
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
       const multipliers=multipliersBySymbol.get(symbol.id)||new Map();
-      const reelInputs=Array.from({length:3},(_,i)=>{
+      const reelInputs=Array.from({length:layout.reels-2},(_,i)=>{
         const reel=i+3;
         return '<label class="payout-input">Цепочка до барабана №'+reel+', ×'+
           '<input type="number" min="0" max="1000" step="0.001" name="r_'+reel+'" value="'+((multipliers.get(reel)??1000)/1000).toFixed(3)+'" required></label>';
@@ -204,7 +206,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
     if(activeTab==='cells')panel=panelStart('Фон барабанов')+
-      '<p class="hint">Одна картинка повторяется внутри каждой из 20 ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
+      '<p class="hint">Одна картинка повторяется внутри каждой из "' + (layout.reels*layout.rows) + '" ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['cells_background'])+'</div></section>';
     if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
@@ -230,7 +232,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Добавить в папку</button></form>'+
       '<div class="library-images">'+libraryCards+'</div></section>';
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
-      '<p class="hint">Для каждого символа установите цену одной копии в процентах от ставки и множители за достижение 3-го, 4-го или 5-го барабана. Выплата начинается с трёх последовательных барабанов слева направо.</p>'+
+      '<p class="hint">Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
@@ -335,13 +337,14 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   });
   app.post('/admin/games/:id/symbols/:symbolId/payouts',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId);
-    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    const game=gameById(id);
+    if(!game||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     const percentage=req.body?.unit_percent;
     if(typeof percentage!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,2})?$/.test(percentage)||Number(percentage)>10000)
       return show(req,res,'Цена одного символа должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
     const unit=Math.round(Number(percentage)*100);
     const entries=[];
-    for(let reel=3;reel<=5;reel++){
+    for(let reel=3;reel<=gameLayout(game).reels;reel++){
       const raw=req.body?.['r_'+reel];
       if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
         return show(req,res,'Множитель барабана должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
