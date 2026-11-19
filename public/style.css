@@ -740,3 +740,53 @@ header nav .header-user-balance{
 .scatter-rule label{font-size:.82rem;color:#ddd0c4}
 .scatter-rule input{width:100%;max-width:100%}
 .scatter-settings-form>button{justify-self:start}
+
+/* Bonus Scatter intro, then individual spinning cells with stationary locks. */
+.slot-bonus-intro[hidden]{display:none!important}
+.slot-bonus-intro{
+ position:absolute;z-index:45;inset:0;border-radius:15px;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+ padding:15px;text-align:center;pointer-events:none;
+ background:radial-gradient(ellipse at center,rgba(125,38,14,.93),rgba(31,11,25,.96) 68%,rgba(10,8,17,.97));
+ border:3px solid #ffda74;box-shadow:inset 0 0 65px rgba(255,198,85,.48),0 0 20px rgba(255,125,40,.65);
+}
+.slot-bonus-intro strong{font-size:clamp(2rem,6vw,5rem);color:#fff2a8;font-weight:1000;text-shadow:0 0 16px #ffbf51,0 0 33px #ff6219}
+.slot-bonus-intro span{font-size:clamp(1.2rem,3vw,2.5rem);font-weight:900;letter-spacing:.1em;color:#fff5d1}
+.slot-bonus-intro b{font-size:clamp(1.1rem,2.4vw,1.9rem);color:#ffdc84}
+.slot-bonus-intro b em{font-style:normal;font-size:1.7em;color:#fff9c2}
+.slot-bonus-intro small{font-size:clamp(.85rem,1.5vw,1.3rem);font-weight:800;color:#ffe3ab}
+.slot-bonus-intro.is-showing{animation:slot-scatter-intro 1.9s ease-out both}
+@keyframes slot-scatter-intro{
+ 0%{opacity:0;transform:scale(.78)}
+ 17%{opacity:1;transform:scale(1.04)}
+ 35%,85%{opacity:1;transform:scale(1)}
+ 100%{opacity:0;transform:scale(1.045)}
+}
+.slot-game .ribbon-tile.scatter-celebrate{
+ z-index:8;outline:3px solid #fff0a8;outline-offset:-3px;
+ border-radius:9px;box-shadow:0 0 20px #ffca4a,inset 0 0 12px #ffe29d;
+ animation:slot-scatter-shine .48s ease-in-out infinite alternate;
+}
+@keyframes slot-scatter-shine{
+ from{filter:brightness(.85);transform:scale(1)}
+ to{filter:brightness(1.55);transform:scale(1.09)}
+}
+.slot-game .ribbon-tile.bonus-cell-spinning{filter:blur(2px) brightness(1.3);opacity:.87}
+.slot-game .ribbon-tile.bonus-locked{filter:none;opacity:1}
+.slot-theme-egypt .ribbon-tile.is-winning img,
+.slot-theme-egypt .ribbon-tile.is-winning .ribbon-symbol-fallback{
+ animation:slot-egypt-prize-rise 1.28s ease-in-out var(--win-delay,0s) infinite alternate!important;
+ transform-origin:center;
+}
+.slot-theme-egypt .ribbon-tile.is-winning::before{animation:slot-halo 1.28s ease-in-out infinite alternate!important}
+@keyframes slot-egypt-prize-rise{
+ 0%{transform:perspective(540px) translateZ(0) scale(1.06);filter:drop-shadow(0 0 7px rgba(255,204,112,.4))}
+ 60%{transform:perspective(540px) translateZ(43px) scale(1.33);filter:drop-shadow(0 0 14px rgba(255,229,162,.91))}
+ 100%{transform:perspective(540px) translateZ(55px) scale(1.39);filter:drop-shadow(0 0 21px rgba(255,241,184,.98))}
+}
+.slot-theme-egypt .ribbon-tile.is-winning{overflow:visible;z-index:11}
+@media(prefers-reduced-motion:reduce){
+ .slot-bonus-intro.is-showing,.slot-game .ribbon-tile.scatter-celebrate,
+ .slot-theme-egypt .ribbon-tile.is-winning img,
+ .slot-theme-egypt .ribbon-tile.is-winning .ribbon-symbol-fallback{animation:none!important}
+}
