@@ -85,7 +85,7 @@ test('Scatter landing never overwrites a previously frozen cell',()=>{
   const rules=Array.from({length:5},(_,i)=>({
     reel_index:i+1,chance_percent:100,max_symbols:4
   }));
-  const result=scatterOnBoard(Array(20).fill(1),99,rules,4,5,()=>0,locked);
+  const result=scatterOnBoard(Array(20).fill(1),99,rules,4,5,n=>n-1,locked);
   for(const cell of locked)assert.equal(result.cells[cell],1);
   assert.equal(result.count,16);
 });
