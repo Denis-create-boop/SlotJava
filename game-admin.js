@@ -337,13 +337,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     const percentage=req.body?.unit_percent;
-    if(typeof percentage!=='string'||!/^(?:0|[1-9]\\d{0,4})(?:\\.\\d{1,2})?$/.test(percentage)||Number(percentage)>10000)
+    if(typeof percentage!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,2})?$/.test(percentage)||Number(percentage)>10000)
       return show(req,res,'Цена одного символа должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
     const unit=Math.round(Number(percentage)*100);
     const entries=[];
     for(let reel=3;reel<=5;reel++){
       const raw=req.body?.['r_'+reel];
-      if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,3})?$/.test(raw)||Number(raw)>1000)
+      if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
         return show(req,res,'Множитель барабана должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
       entries.push([reel,Math.round(Number(raw)*1000)]);
     }
