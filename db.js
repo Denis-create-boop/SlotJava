@@ -102,6 +102,15 @@ db.transaction(()=>{
     moveLink.run(to,game_id,from);
   }
 })();
+// Big-win thresholds are stored as thousandths of the stake multiplier.
+// Defaults: 5x and 15x. Existing databases are migrated without changing payouts.
+const gameSettingColumns=db.pragma('table_info(game_settings)').map(column=>column.name);
+if(!gameSettingColumns.includes('big_win_multiplier_milli')){
+  db.exec('ALTER TABLE game_settings ADD COLUMN big_win_multiplier_milli INTEGER NOT NULL DEFAULT 5000');
+}
+if(!gameSettingColumns.includes('mega_win_multiplier_milli')){
+  db.exec('ALTER TABLE game_settings ADD COLUMN mega_win_multiplier_milli INTEGER NOT NULL DEFAULT 15000');
+}
 // Existing wallets retain their balance; add a persisted choice of test stake.
 if(!db.pragma('table_info(game_wallets)').some(column=>column.name==='bet')){
   db.exec('ALTER TABLE game_wallets ADD COLUMN bet INTEGER NOT NULL DEFAULT 10 CHECK(bet IN (10,20,50,100))');
@@ -289,7 +298,7 @@ function getPayouts(gameId){
   return db.prepare('SELECT p.symbol_id,p.matches,p.coefficient_milli FROM symbol_payout_multipliers p JOIN game_symbols s ON s.id=p.symbol_id WHERE s.game_id=? ORDER BY p.symbol_id,p.matches').all(gameId);
 }
 function getGameSettings(id) {
-  return db.prepare('SELECT win_frequency FROM game_settings WHERE game_id=?').get(id);
+  return db.prepare('SELECT win_frequency,big_win_multiplier_milli,mega_win_multiplier_milli FROM game_settings WHERE game_id=?').get(id);
 }
 function getGameAssets(id) {
   return db.prepare('SELECT asset_key,file_name,media_type FROM game_assets WHERE game_id=?').all(id);
