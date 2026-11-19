@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850"><defs>
+<radialGradient id="sun"><stop stop-color="#ffe7a2"/><stop offset=".35" stop-color="#ebac4e"/><stop offset="1" stop-color="#6e2e20"/></radialGradient>
+<linearGradient id="sand" x2=".25" y2="1"><stop stop-color="#ffe6a2"/><stop offset=".48" stop-color="#d99535"/><stop offset="1" stop-color="#62351d"/></linearGradient>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#1b102b"/><stop offset=".35" stop-color="#572c42"/><stop offset=".67" stop-color="#ac5a3e"/><stop offset="1" stop-color="#2c1416"/></linearGradient>
+<linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#fff2aa"/><stop offset=".24" stop-color="#df9e28"/><stop offset=".53" stop-color="#875014"/><stop offset=".78" stop-color="#efc15a"/><stop offset="1" stop-color="#633514"/></linearGradient>
+<radialGradient id="egyptGlow"><stop stop-color="#ffdc70" stop-opacity=".6"/><stop offset="1" stop-color="#ffbc3f" stop-opacity="0"/></radialGradient>
+<filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+<filter id="shine"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#08010c" flood-opacity=".8"/></filter>
+<pattern id="hieroglyph" width="110" height="120" patternUnits="userSpaceOnUse" opacity=".16">
+<path d="M8 13 h92 M14 49 h83 M8 92 h92" fill="none" stroke="#eac275" stroke-width="2"/>
+<text x="12" y="40" font-size="25" fill="#f8ce7a">𓂀 𓆣</text><text x="18" y="81" font-size="26" fill="#e8bf68">𓋹 𓇳</text><text x="30" y="113" font-size="23" fill="#f7d580">𓅃 𓉐</text>
+</pattern></defs>
+<rect width="1200" height="850" fill="url(#sky)"/>
+<circle cx="945" cy="300" r="235" fill="url(#egyptGlow)" filter="url(#soft)"/><circle cx="944" cy="302" r="112" fill="url(#sun)" opacity=".83"/>
+<path d="M0 490 Q245 400 485 465 Q750 410 1200 465 V850 H0Z" fill="#5b342c"/>
+<path d="M0 590 Q470 514 780 574 Q980 544 1200 582 V850 H0Z" fill="#2f1d24"/>
+<g fill="url(#sand)" stroke="#f4c56d" stroke-width="4" opacity=".91"><path d="M520 620 L748 186 L994 620Z"/><path d="M160 640 L350 270 L560 640Z"/><path d="M760 640 L935 322 L1130 640Z"/></g>
+<path d="M748 186L994 620H746Z" fill="#78411f" opacity=".68"/><path d="M349 272L560 640H349Z" fill="#8c4b26" opacity=".55"/>
+<g fill="#6e3e26" stroke="#efb65c" stroke-width="6" filter="url(#shine)">
+<path d="M18 15h155v775H18Z M1025 15h155v775h-155Z"/><path d="M2 22h190v52H2z M1009 22h190v52h-190z M2 724h190v60H2z M1009 724h190v60h-190z"/>
+</g><g fill="url(#hieroglyph)"><path d="M35 78h126v643H35Z M1042 78h122v643h-122Z"/></g>
+<g stroke="#fbd47b" stroke-width="4" fill="none" opacity=".65"><path d="M180 70H1020M180 120H1020M180 743H1020"/></g>
+<g fill="#131222"><path d="M180 640h840v210H180Z"/></g>
+<rect x="195" y="659" width="809" height="175" rx="15" fill="url(#hieroglyph)" opacity=".7"/>
+<g filter="url(#shine)"><path d="M60 739h75l-14-36H74Z M1065 739h75l-14-36h-47Z" fill="#ad601f"/><path d="M84 700Q42 649 80 594Q110 648 95 690Z M1091 700Q1051 645 1100 592Q1135 655 1110 693Z" fill="#ffce37"/><path d="M87 704Q62 662 88 629Q107 672 96 700Z M1100 704Q1080 662 1107 629Q1125 672 1109 700Z" fill="#fff2a0"/></g>
+</svg>
