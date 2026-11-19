@@ -456,7 +456,7 @@ app.get('/admin',adminOnly,(req,res)=>{
     '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
     '</tbody></table></div></section></div>',req);
 });
-installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
+installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,getScatterSettings,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
   const user=Number.isSafeInteger(id)?db.prepare('SELECT id,role,active FROM users WHERE id=?').get(id):null;
