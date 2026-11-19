@@ -547,3 +547,52 @@ header nav .header-user-balance{
 .win-threshold-grid input{max-width:100%}
 @media(max-width:550px){.win-threshold-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.slot-big-win-overlay.is-visible strong{animation:none}}
+
+/* Every qualifying symbol chain spins. One stable badge shows its own award. */
+.slot-game .ribbon-tile.is-winning{position:relative;isolation:isolate;z-index:4}
+.slot-game .ribbon-tile.is-winning img,
+.slot-game .ribbon-tile.is-winning .ribbon-symbol-fallback{
+  animation:slot-winning-y-flip 1.35s ease-in-out var(--win-delay,0s) infinite!important;
+  transform-origin:center;
+  backface-visibility:visible;
+}
+.slot-game .ribbon-tile.is-winning::before{
+  animation:slot-halo 1.35s ease-in-out var(--win-delay,0s) infinite alternate!important;
+}
+.slot-symbol-prize{
+  position:absolute;
+  top:2px;
+  right:3px;
+  z-index:6;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:32px;
+  max-width:95%;
+  padding:3px 6px;
+  border-radius:9px;
+  color:#fff3ce;
+  background:rgba(35,20,13,.92);
+  border:1px solid rgba(255,205,108,.92);
+  box-shadow:0 2px 9px rgba(0,0,0,.66),0 0 9px rgba(249,185,63,.44);
+  font-size:clamp(.64rem,1.2vw,.82rem);
+  font-weight:850;
+  line-height:1.2;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  text-shadow:0 1px 2px #000;
+  pointer-events:none;
+}
+.ribbon-tile[data-winning-prize="0"] .slot-symbol-prize{
+  color:#e4d9c6;
+  border-color:rgba(206,191,160,.75);
+  box-shadow:0 2px 7px rgba(0,0,0,.55);
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-game .ribbon-tile.is-winning img,
+  .slot-game .ribbon-tile.is-winning .ribbon-symbol-fallback,
+  .slot-game .ribbon-tile.is-winning::before{
+    animation:none!important;
+    transform:scale(1.06);
+  }
+}
