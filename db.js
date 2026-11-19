@@ -142,6 +142,9 @@ const seedGame=db.prepare('INSERT OR IGNORE INTO games(slug,title,image_path,pos
 db.transaction(()=>{ for(const game of initialGames) seedGame.run(...game); })();
 
 db.prepare("UPDATE games SET title='Первая игра' WHERE slug='slot-classic' AND title='Слот Классик'").run();
+// Set thematic names only while the cards retain their original demo titles.
+db.prepare("UPDATE games SET title='Древний Египет' WHERE slug='golden-seven' AND title='Золотая Семёрка'").run();
+db.prepare("UPDATE games SET title='Космическая одиссея' WHERE slug='lucky-stars' AND title='Счастливые Звёзды'").run();
 const seedSettings=db.prepare('INSERT OR IGNORE INTO game_settings(game_id) VALUES(?)');
 db.transaction(()=>{ for(const game of db.prepare('SELECT id FROM games').all()) seedSettings.run(game.id); })();
 const firstGame=db.prepare("SELECT id FROM games WHERE slug='slot-classic'").get();
