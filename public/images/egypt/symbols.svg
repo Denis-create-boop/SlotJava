@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1024 768"><defs>
+<radialGradient id="aura"><stop stop-color="#fff2b6" stop-opacity=".63"/><stop offset=".46" stop-color="#d68d35" stop-opacity=".26"/><stop offset="1" stop-color="#a94b1c" stop-opacity="0"/></radialGradient>
+<linearGradient id="rim" x2=".7" y2="1"><stop stop-color="#fff3b2"/><stop offset=".2" stop-color="#e5af45"/><stop offset=".55" stop-color="#824016"/><stop offset=".78" stop-color="#ffe8a8"/><stop offset="1" stop-color="#8d471c"/></linearGradient>
+<filter id="drop" x="-30%" y="-30%" width="160%" height="165%"><feDropShadow dx="0" dy="7" stdDeviation="6" flood-color="#130509" flood-opacity=".85"/></filter></defs><view id="pharaoh" viewBox="0 0 256 256"/><view id="cleopatra" viewBox="256 0 256 256"/><view id="anubis" viewBox="512 0 256 256"/><view id="horus" viewBox="768 0 256 256"/><view id="scarab" viewBox="0 256 256 256"/><view id="ankh" viewBox="256 256 256 256"/><view id="pyramid" viewBox="512 256 256 256"/><view id="cobra" viewBox="768 256 256 256"/><view id="sphinx" viewBox="0 512 256 256"/><view id="ra" viewBox="256 512 256 256"/><view id="cat" viewBox="512 512 256 256"/><g transform="translate(0 0)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="177" text-anchor="middle">👑</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(256 0)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="173" text-anchor="middle">👸</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(512 0)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="176" text-anchor="middle">🐺</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(768 0)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><path d="M20 132Q129 42 235 130Q128 215 20 132Z" fill="#e1b456" stroke="#fff0bd" stroke-width="8"/><ellipse cx="129" cy="132" rx="59" ry="59" fill="#166a9e" stroke="#e0ac40" stroke-width="11"/><circle cx="130" cy="132" r="31" fill="#101826"/><circle cx="120" cy="121" r="10" fill="#c4faff"/><path d="M124 188l-12 33h49M31 133l-18 48M213 132l31 32" fill="none" stroke="#e8b553" stroke-width="9"/></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(0 256)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="170" text-anchor="middle">🪲</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(256 256)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><path d="M128 26C42 30 77 117 128 121C178 117 213 30 128 26ZM128 122V232M73 163H184" fill="none" stroke="url(#rim)" stroke-width="28" stroke-linecap="round"/><path d="M128 26C42 30 77 117 128 121C178 117 213 30 128 26ZM128 122V232M73 163H184" fill="none" stroke="#ffe7a9" stroke-width="5"/></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(512 256)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="176" text-anchor="middle">🔺</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(768 256)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="181" text-anchor="middle">🐍</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(0 512)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="178" text-anchor="middle">🦁</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(256 512)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><g fill="url(#rim)" stroke="#fff0bc" stroke-width="5"><circle cx="128" cy="126" r="61"/><path d="M123 7h10v45h-10zM123 199h10v45h-10zM7 122h45v10H7zM204 122h45v10h-45zM40 39l30 31M186 185l31 31M215 41l-31 31M72 184l-33 33" fill="none" stroke-width="15"/></g><circle cx="128" cy="126" r="38" fill="#ffd36e"/></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g><g transform="translate(512 512)"><circle cx="128" cy="127" r="115" fill="url(#aura)"/>
+  <g opacity=".65" stroke="url(#rim)" stroke-width="4" fill="none"><circle cx="128" cy="128" r="110" stroke-dasharray="3 13"/><path d="M128 7v20M128 229v20M7 128h20M229 128h20"/></g>
+  <g filter="url(#drop)"><text x="128" y="186" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="170" text-anchor="middle">🐈</text></g>
+  <path d="M40 48l6 11 11 5-11 4-6 12-5-12-11-4 11-5Z M211 175l4 7 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#fff4c1" opacity=".85"/>
+  </g></svg>
