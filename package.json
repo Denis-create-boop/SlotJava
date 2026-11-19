@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "create-admin": "node scripts/create-admin.js",
-    "reset-admin-password": "node scripts/reset-admin-password.js"
+    "reset-admin-password": "node scripts/reset-admin-password.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
