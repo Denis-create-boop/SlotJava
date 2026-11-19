@@ -250,9 +250,21 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.post('/admin/games/:id/settings',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req);
     if(!id||!gameById(id))return res.sendStatus(404);
-    const value=req.body.win_frequency;
-    if(typeof value!=='string'||!/^(100|[1-9]?\d)$/.test(value))return show(req,res,'Введите целое число от 0 до 100.',true,'frequency');
-    db.prepare('INSERT INTO game_settings(game_id,win_frequency) VALUES(?,?) ON CONFLICT(game_id) DO UPDATE SET win_frequency=excluded.win_frequency').run(id,Number(value));
+    const value=req.body?.win_frequency;
+    if(typeof value!=='string'||!/^(100|[1-9]?\d)$/.test(value))
+      return show(req,res,'Частота выигрышей должна быть целым числом от 0 до 100.',true,'frequency');
+    const toMilli=raw=>{
+      if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw))return null;
+      const number=Number(raw);
+      if(!Number.isFinite(number)||number<1||number>1000)return null;
+      return Math.round(number*1000);
+    };
+    const big=toMilli(req.body?.big_win_multiplier);
+    const mega=toMilli(req.body?.mega_win_multiplier);
+    if(big===null||mega===null||mega<=big)
+      return show(req,res,'Коэффициенты: от ×1 до ×1000, максимум три знака после запятой. Очень крупный выигрыш должен быть больше крупного.',true,'frequency');
+    db.prepare(`UPDATE game_settings SET win_frequency=?,big_win_multiplier_milli=?,mega_win_multiplier_milli=? WHERE game_id=?`)
+      .run(Number(value),big,mega,id);
     res.redirect(sectionUrl(id,'frequency')+'&saved=1');
   });
   app.post('/admin/games/:id/symbols',adminOnly,postGuard,(req,res)=>{
