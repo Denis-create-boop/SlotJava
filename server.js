@@ -166,61 +166,59 @@ app.get('/',(req,res)=>{
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
-function scoreBoard(cells,symbols,payouts){
-  // A complete chain starts at the first reel and ends at the first missing reel.
-  // Count all occurrences within that chain only, including repeated symbols in a reel.
-  const payoutMap=new Map(payouts.filter(p=>p.matches>=3&&p.matches<=20)
-    .map(p=>[p.symbol_id+':'+p.matches,p.coefficient_milli]));
+function scoreBoard(cells,symbols,payouts,bet=10){
+  // Payout = stake * (symbol price % / 100) * matching occurrences
+  //        * multiplier for the last consecutive reel. First 3 mandatory.
+  const reelCount=Math.floor(cells.length/4);
+  const priceMap=new Map(payouts.prices.map(p=>[p.symbol_id,p.percent_hundredths]));
+  const reelMultipliers=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
   const wins=[];
   let total=0;
   for(const symbol of symbols){
     let reels=0,count=0;
-    for(let col=0;col<5;col++){
-      let inReel=0;
+    for(let col=0;col<reelCount;col++){
+      let found=0;
       for(let row=0;row<4;row++){
-        if(cells[row*5+col]===symbol.id)inReel++;
+        if(cells[row*reelCount+col]===symbol.id)found++;
       }
-      if(inReel===0)break;
-      count+=inReel;
+      if(!found)break;
       reels++;
+      count+=found;
     }
     if(reels<3)continue;
-    const coefficientMilli=payoutMap.get(symbol.id+':'+count)||0;
-    if(coefficientMilli>0){
-      total+=coefficientMilli;
-      wins.push({symbolId:symbol.id,name:symbol.name,reels,count,coefficientMilli});
-    }
+    const percentHundredths=priceMap.get(symbol.id)||0;
+    const multiplierMilli=reelMultipliers.get(symbol.id+':'+reels)??1000;
+    if(percentHundredths<=0||multiplierMilli<=0)continue;
+    const prize=Math.round(bet*count*percentHundredths*multiplierMilli/10000000);
+    if(prize<=0)continue;
+    total+=prize;
+    wins.push({symbolId:symbol.id,name:symbol.name,reels,count,
+      percentHundredths,multiplierMilli,prize});
   }
   return {total,wins};
 }
-function generateSpin(gameId,winFrequency){
+function generateSpin(gameId,winFrequency,bet){
   const symbols=getSymbols(gameId),payouts=getPayouts(gameId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
-  const randomBoard=()=>Array.from({length:20},()=>symbols[crypto.randomInt(symbols.length)].id);
+  const reelCount=5,rows=4;
+  const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
-  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts);
+  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
-    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts);
+    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
-    const candidates=payouts.filter(p=>p.coefficient_milli>0&&p.matches>=3&&p.matches<=20);
-    for(let trial=0;trial<Math.min(candidates.length*8,250)&&evaluation.total===0;trial++){
+    const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
+    const candidates=payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
+    for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
-      // Enough reels to hold the exact number, with one guaranteed symbol in each.
-      const reelCount=Math.max(3,Math.ceil(rule.matches/4));
-      const positions=Array.from({length:reelCount},(_,col)=>crypto.randomInt(4)*5+col);
-      const available=Array.from({length:reelCount*4},(_,i)=>Math.floor(i/4)+(i%4)*5)
-        .filter(i=>!positions.includes(i));
-      for(let j=available.length-1;j>0;j--){
-        const k=crypto.randomInt(j+1);
-        [available[j],available[k]]=[available[k],available[j]];
-      }
-      positions.push(...available.slice(0,rule.matches-reelCount));
-      const winningCells=new Set(positions);
-      const arranged=Array.from({length:20},(_,i)=>winningCells.has(i)?
-        rule.symbol_id:others[crypto.randomInt(others.length)].id);
-      const scored=scoreBoard(arranged,symbols,payouts);
+      const activeReels=3+crypto.randomInt(reelCount-2);
+      if((reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
+      const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
+      for(let col=0;col<activeReels;col++)
+        arranged[crypto.randomInt(rows)*reelCount+col]=rule.symbol_id;
+      const scored=scoreBoard(arranged,symbols,payouts,bet);
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
@@ -305,11 +303,11 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const wallet=getWallet(req.user.id,game.id);
     if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
     const settings=getGameSettings(game.id);
-    const spin=generateSpin(game.id,settings?.win_frequency ?? 25);
+    const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet);
     if(spin.error)return spin;
-    // Payout = current stake × configured coefficient. Round to demo points.
-    const wins=spin.wins.map(w=>({...w,prize:Math.round(wallet.bet*w.coefficientMilli/1000)}));
-    const payout=wins.reduce((sum,w)=>sum+w.prize,0);
+    // Awards are already calculated from stake, occurrences and final reel multiplier.
+    const wins=spin.wins;
+    const payout=spin.total;
     const updatedBalance=wallet.balance-wallet.bet+payout;
     if(!Number.isSafeInteger(updatedBalance)||updatedBalance<0)return {error:'Превышен допустимый баланс.'};
     db.prepare('UPDATE game_wallets SET balance=? WHERE user_id=? AND game_id=?')
