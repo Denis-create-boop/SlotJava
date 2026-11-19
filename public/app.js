@@ -89,6 +89,8 @@
   }
   const music=sound('music');
   if(music){music.loop=true;music.volume=.18;}
+  const spinningAudio=sound('spin_sound');
+  if(spinningAudio)spinningAudio.loop=true;
   function startBackgroundMusic(){
     if(soundEnabled&&music?.paused){
       try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
