@@ -366,7 +366,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         :award>0?'normal':'none';
       return {
         mode:'bonus',cells:round.board,steps:round.steps,
-        total:award,baseWin:round.total,wins:round.wins,
+        total:award,baseWin:round.total,
+        wins:round.wins.map(win=>({...win,prize:win.prize*active.multiplier})),
         balance:nextBalance,bet:active.bet,winTier,
         bonusRoundWin:award,bonusWin:accumulated,
         bonusMultiplier:active.multiplier,
