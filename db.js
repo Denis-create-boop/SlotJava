@@ -391,6 +391,59 @@ db.transaction(()=>{
     }
   }
 })();
+// Scatter is a special symbol only for the original 5x4 game. The symbol and
+// its artwork are created once after other games are seeded, so Egypt still
+// gets exactly one more regular symbol than the original game had.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS game_scatter_symbols (
+    game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+    symbol_id INTEGER NOT NULL UNIQUE REFERENCES game_symbols(id) ON DELETE RESTRICT
+  );
+  CREATE TABLE IF NOT EXISTS game_scatter_reels (
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    reel_index INTEGER NOT NULL CHECK(reel_index BETWEEN 1 AND 20),
+    chance_percent INTEGER NOT NULL CHECK(chance_percent BETWEEN 0 AND 100),
+    max_symbols INTEGER NOT NULL CHECK(max_symbols BETWEEN 0 AND 4),
+    PRIMARY KEY(game_id,reel_index)
+  );
+  CREATE TABLE IF NOT EXISTS game_bonus_sessions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 20),
+    multiplier INTEGER NOT NULL CHECK(multiplier BETWEEN 2 AND 100),
+    bonus_win INTEGER NOT NULL DEFAULT 0 CHECK(bonus_win >= 0),
+    bet INTEGER NOT NULL CHECK(bet IN (10,20,50,100)),
+    PRIMARY KEY(user_id,game_id)
+  );
+`);
+if(firstGame){
+  db.transaction(()=>{
+    const find=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(firstGame.id);
+    let symbolId=find?.symbol_id;
+    if(!symbolId){
+      const existing=db.prepare("SELECT id FROM game_symbols WHERE game_id=? AND name='SCATTER' ORDER BY id LIMIT 1").get(firstGame.id);
+      symbolId=existing?.id??db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)')
+        .run(firstGame.id,'SCATTER',db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(firstGame.id).n).lastInsertRowid;
+      db.prepare('INSERT INTO game_scatter_symbols(game_id,symbol_id) VALUES(?,?)').run(firstGame.id,symbolId);
+    }
+    const art='/static/images/symbols/scatter.svg';
+    db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)').run(firstGame.id,'SCATTER — бонус',art);
+    const image=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?').get(firstGame.id,art);
+    db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)').run(symbolId,image.id);
+    // Scatter never pays as a normal chain.
+    db.prepare('INSERT OR IGNORE INTO symbol_unit_prices(symbol_id,percent_hundredths) VALUES(?,0)').run(symbolId);
+    const addRule=db.prepare('INSERT OR IGNORE INTO game_scatter_reels(game_id,reel_index,chance_percent,max_symbols) VALUES(?,?,?,?)');
+    for(let i=1;i<=5;i++)addRule.run(firstGame.id,i,12,1);
+  })();
+}
+function getScatterSettings(gameId){
+  const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
+  if(!symbol)return null;
+  return {symbolId:symbol.symbol_id,rules:db.prepare('SELECT reel_index,chance_percent,max_symbols FROM game_scatter_reels WHERE game_id=? ORDER BY reel_index').all(gameId)};
+}
+function getBonusSession(userId,gameId){
+  return db.prepare('SELECT remaining,multiplier,bonus_win,bet FROM game_bonus_sessions WHERE user_id=? AND game_id=?').get(userId,gameId)||null;
+}
 function getLibraryImages(gameId){
   return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
 }
@@ -460,4 +513,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getGameBackgroundImages,getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getScatterSettings,getBonusSession,getGameBackgroundImages,getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
