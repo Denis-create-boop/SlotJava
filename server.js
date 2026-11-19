@@ -278,6 +278,7 @@ function firstGamePage(game,req){
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
     (scatter?'<div class="slot-bonus-intro" id="slot-bonus-intro" hidden aria-live="polite"><strong>SCATTER!</strong><span>БОНУСНАЯ ИГРА</span><b><em id="slot-bonus-intro-count">10</em> бесплатных вращений</b><small>Начальный множитель ×2</small></div>':'')+
+    (scatter?'<div class="slot-bonus-math" id="slot-bonus-math" hidden aria-live="polite"><span id="slot-bonus-math-caption">Выигрыш за спин</span><strong id="slot-bonus-math-base">0</strong><div id="slot-bonus-math-multiply" hidden><em>×</em><b id="slot-bonus-math-factor">2</b></div><div id="slot-bonus-math-result" hidden><small>Итого за спин</small><strong id="slot-bonus-math-total">0</strong></div></div>':'')+
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
     '<div class="reel-columns">'+reels+'</div></div>'+
 
@@ -334,14 +335,18 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const round=playBonusRound({
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
-        randomInt:n=>crypto.randomInt(n),scoreBoard
+        randomInt:n=>crypto.randomInt(n),scoreBoard,
+        scatterId:scatter.symbolId,scatterRules:scatter.rules
       });
       const award=round.total*active.multiplier;
       const accumulated=active.bonus_win+award;
       if(!Number.isSafeInteger(award)||!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый размер бонусного выигрыша.'};
       const remaining=active.remaining-1;
-      const nextMultiplier=active.multiplier+(round.total>0?1:0);
+      const winIncrease=round.total>0?1:0;
+      const scatterIncrease=Math.min(round.scatterCount,Math.max(0,100-active.multiplier-winIncrease));
+      const appliedWinIncrease=Math.min(winIncrease,Math.max(0,100-active.multiplier));
+      const nextMultiplier=active.multiplier+appliedWinIncrease+scatterIncrease;
       let nextBalance=wallet.balance,completed=false;
       if(remaining===0){
         nextBalance=wallet.balance+accumulated;
@@ -368,7 +373,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         wins:round.wins.map(win=>({...win,prize:win.prize*active.multiplier})),
         balance:nextBalance,bet:active.bet,winTier,
         bonusRoundWin:award,bonusWin:accumulated,
-        bonusMultiplier:active.multiplier,
+        bonusMultiplier:active.multiplier,scatterCount:round.scatterCount,
+        scatterIncrease,winIncrease:appliedWinIncrease,
         nextMultiplier,remaining,completedBonus:completed
       };
     }
