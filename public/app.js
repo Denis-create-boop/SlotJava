@@ -449,12 +449,14 @@
         await Promise.all(animations);
       }
       stopSpinSound();
-      highlightWinningSymbols(Array.isArray(result.wins)?result.wins:[]);
+      highlightWinningSymbols(result.mode==='bonus'
+        ?(Array.isArray(result.wins)?result.wins.filter(win=>win.prize>0):[])
+        :(Array.isArray(result.wins)?result.wins:[]));
       if(result.mode==='bonus'&&result.steps?.length)
         applyBonusLocks(result.steps[result.steps.length-1].frozenCells);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
-      winDisplay.textContent=String(result.total);
+      winDisplay.textContent=result.mode==='bonus'&&result.total===0?'—':String(result.total);
       const tier=['none','normal','big','mega'].includes(result.winTier)?result.winTier:'none';
       const tierText=tier==='mega'?'Очень крупный выигрыш':tier==='big'?'Крупный выигрыш':'Выигрыш';
       const matches=Array.isArray(result.wins)?result.wins:[];
@@ -469,14 +471,17 @@
           ' бесплатных вращений. Начальный множитель ×2!';
       }else if(result.mode==='bonus'){
         hideBigWin();
-        await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
+        // There is nothing to multiply or announce on a no-win bonus spin.
+        if(result.baseWin>0)await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
         if(result.winIncrease)await animateMultiplierIncrease('win',result.winIncrease);
         if(result.scatterIncrease)await animateMultiplierIncrease('scatter',result.scatterIncrease);
         updateBonus(!result.completedBonus,result.remaining||0,result.nextMultiplier||2,result.bonusWin||0);
         message.textContent=result.completedBonus
           ?'Бонус завершён! Всего выиграно '+result.bonusWin+' очков. Сумма зачислена в баланс.'
-          :'Бонус ×'+result.bonusMultiplier+': +'+result.bonusRoundWin+
-            ' очков. Осталось вращений: '+result.remaining+'.';
+          :result.baseWin>0
+            ?'Бонус ×'+result.bonusMultiplier+': +'+result.bonusRoundWin+
+              ' очков. Осталось вращений: '+result.remaining+'.'
+            :'Без выигрыша. Осталось бесплатных вращений: '+result.remaining+'.';
         if(result.completedBonus&&bonusFinish){
           hideBigWin();
           bonusFinishTotal.textContent=String(result.bonusWin);
