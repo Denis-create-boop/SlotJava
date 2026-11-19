@@ -320,6 +320,7 @@ app.post('/games/:slug/bet',guarded,spinLimiter,postGuard,(req,res)=>{
   res.json({bet});
 });
 app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
+  try{
   const game=listGames(true).find(item=>item.slug===req.params.slug);
   if(!game||!playableGame(game))return res.sendStatus(404);
   const result=db.transaction(()=>{
@@ -404,6 +405,11 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   res.set('Cache-Control','no-store');
   if(result.error)return res.status(400).json({error:result.error});
   res.json(result);
+  }catch(error){
+    console.error('Slot spin error:',error);
+    res.set('Cache-Control','no-store');
+    res.status(500).json({error:'Не удалось выполнить вращение. Попробуйте обновить страницу. Подробности записаны в терминале сервера.'});
+  }
 });
 app.get('/register',redirectHomeIfLogged,(req,res)=>authForm('Регистрация','/register',req,res));
 app.post('/register',postGuard,(req,res)=>{
@@ -484,6 +490,10 @@ app.post('/admin/users/:id/role',adminOnly,postGuard,(req,res)=>{
 });
 app.use((req,res)=>sendPage(res,'Не найдено','<section class="panel"><h1>Страница не найдена</h1><a href="/">На главную</a></section>',req,404));
 app.use((err,req,res,next)=>{
+  if(req.path.startsWith('/games/')&&req.method==='POST'){
+    console.error('Slot API error:',err);
+    return res.status(500).json({error:'Ошибка сервера при вращении. Проверьте терминал сервера и обновите страницу.'});
+  }
   if(err?.name==='MulterError')return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).send('Ошибка загрузки: превышен лимит размера файла или количества полей. Вернитесь к настройкам игры.');
   console.error(err);
   res.status(500).send('Ошибка сервера');
