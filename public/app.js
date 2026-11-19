@@ -27,6 +27,44 @@
     bigWinOverlay.classList.add('is-visible');
     bigWinTimer=window.setTimeout(hideBigWin,3800);
   }
+  const scatterId=Number(root.dataset.scatterId)||0;
+  const bonusTop=document.getElementById('slot-bonus-top');
+  const bonusStats=document.getElementById('slot-bonus-stats');
+  const bonusMultiplier=document.getElementById('slot-bonus-multiplier');
+  const bonusRemaining=document.getElementById('slot-bonus-remaining');
+  const bonusTotal=document.getElementById('slot-bonus-total');
+  const bonusPlus=document.getElementById('slot-bonus-plus');
+  const bonusFinish=document.getElementById('slot-bonus-finish');
+  const bonusFinishTotal=document.getElementById('slot-bonus-finish-total');
+  const spinLabel=document.getElementById('slot-spin-label');
+  let bonusActive=root.dataset.bonusActive==='1';
+  bonusFinish?.querySelector('button')?.addEventListener('click',()=>{bonusFinish.hidden=true;});
+  function updateBonus(active,remaining=0,multiplier=2,total=0){
+    bonusActive=active;
+    root.classList.toggle('is-bonus-active',active);
+    if(bonusTop)bonusTop.hidden=!active;
+    if(bonusStats)bonusStats.hidden=!active;
+    if(bonusMultiplier)bonusMultiplier.textContent='×'+multiplier;
+    if(bonusRemaining)bonusRemaining.textContent=String(remaining);
+    if(bonusTotal)bonusTotal.textContent=String(total);
+    if(spinLabel)spinLabel.textContent=active?'БЕСПЛАТНО':'ВРАЩАТЬ';
+    const select=document.getElementById('slot-bet-select');
+    if(select)select.disabled=active;
+    const saveBet=document.querySelector('#slot-bet-form button[type="submit"]');
+    if(saveBet)saveBet.disabled=active;
+  }
+  updateBonus(bonusActive,
+    Number(bonusRemaining?.textContent)||0,
+    Number(bonusMultiplier?.textContent?.replace('×',''))||2,
+    Number(bonusTotal?.textContent)||0);
+  function incrementBonusMultiplier(){
+    if(!bonusPlus||!bonusMultiplier)return;
+    bonusPlus.textContent='+1';
+    bonusPlus.classList.remove('is-pop');
+    void bonusPlus.offsetWidth;
+    bonusPlus.classList.add('is-pop');
+    window.setTimeout(()=>bonusPlus.classList.remove('is-pop'),1000);
+  }
   const betDisplay=document.getElementById('slot-bet');
   const settingsButton=document.getElementById('slot-settings-trigger');
   const betButton=document.getElementById('slot-bet-trigger');
@@ -54,7 +92,7 @@
   });
   betForm.addEventListener('submit',async event=>{
     event.preventDefault();
-    if(spinning)return;
+    if(spinning||bonusActive){message.textContent='Во время бонусной игры ставка фиксирована.';return;}
     const submit=betForm.querySelector('button[type="submit"]');
     submit.disabled=true;
     try{
@@ -81,6 +119,7 @@
     image:node.dataset.image||''
   })).filter(item=>Number.isSafeInteger(item.id));
   const symbols=new Map(definitions.map(item=>[item.id,item]));
+  const regularDefinitions=definitions.filter(item=>item.id!==scatterId);
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
 
   function play(name){
@@ -104,12 +143,13 @@
   }
 
   function sample(){
-    return definitions[Math.floor(Math.random()*definitions.length)].id;
+    const pool=regularDefinitions.length?regularDefinitions:definitions;
+    return pool[Math.floor(Math.random()*pool.length)].id;
   }
   function makeTile(id){
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
-    tile.className='ribbon-tile';
+    tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -211,12 +251,47 @@
     }
   }
 
+  function clearBonusLocks(){
+    root.querySelectorAll('.ribbon-tile.bonus-locked').forEach(tile=>tile.classList.remove('bonus-locked'));
+  }
+  function applyBonusLocks(indices){
+    clearBonusLocks();
+    for(const index of indices||[]){
+      if(!Number.isSafeInteger(index)||index<0||index>=reelCount*rowCount)continue;
+      const col=index%reelCount,row=Math.floor(index/reelCount);
+      const tile=columns[col]?.querySelectorAll('.ribbon-tile')[row];
+      if(tile)tile.classList.add('bonus-locked');
+    }
+  }
+  async function animateBonusSteps(steps){
+    let held=new Set();
+    for(let i=0;i<steps.length;i++){
+      const step=steps[i];
+      if(!Array.isArray(step.cells)||step.cells.length!==reelCount*rowCount)
+        throw new Error('Некорректное поле бонусной игры.');
+      const animations=columns.map((col,index)=>{
+        if(held.has(index))return Promise.resolve();
+        const target=Array.from({length:rowCount},(_,row)=>step.cells[row*reelCount+index]);
+        return animateColumn(col,index,target);
+      });
+      await Promise.all(animations);
+      applyBonusLocks(step.frozenCells);
+      held=new Set(step.frozenReels);
+      if(i<steps.length-1){
+        stopSpinSound();
+        message.textContent='Респин! Выигрышные барабаны зафиксированы.';
+        play('spin_sound');
+        await new Promise(resolve=>window.setTimeout(resolve,420));
+      }
+    }
+  }
   let spinning=false;
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(spinning||!definitions.length)return;
     spinning=true;
     clearWinningGlow();
+    clearBonusLocks();
     hideBigWin();
     startBackgroundMusic();
     button.disabled=true;
@@ -244,13 +319,19 @@
           !Number.isSafeInteger(result.balance)||result.balance<0){
         throw new Error('Некорректный ответ игрового сервера.');
       }
-      const animations=columns.map((col,index)=>{
-        const target=Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index]);
-        return animateColumn(col,index,target);
-      });
-      await Promise.all(animations);
+      if(result.mode==='bonus'&&Array.isArray(result.steps)){
+        await animateBonusSteps(result.steps);
+      }else{
+        const animations=columns.map((col,index)=>{
+          const target=Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index]);
+          return animateColumn(col,index,target);
+        });
+        await Promise.all(animations);
+      }
       stopSpinSound();
       highlightWinningSymbols(Array.isArray(result.wins)?result.wins:[]);
+      if(result.mode==='bonus'&&result.steps?.length)
+        applyBonusLocks(result.steps[result.steps.length-1].frozenCells);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=String(result.total);
@@ -261,6 +342,23 @@
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
       showBigWin(tier);
+      if(result.mode==='base'&&result.freeSpins>0){
+        updateBonus(true,result.freeSpins,2,0);
+        message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
+          ' бесплатных вращений. Начальный множитель ×2!';
+      }else if(result.mode==='bonus'){
+        if(result.baseWin>0&&!result.completedBonus)incrementBonusMultiplier();
+        updateBonus(!result.completedBonus,result.remaining||0,result.nextMultiplier||2,result.bonusWin||0);
+        message.textContent=result.completedBonus
+          ?'Бонус завершён! Всего выиграно '+result.bonusWin+' очков. Сумма зачислена в баланс.'
+          :'Бонус ×'+result.bonusMultiplier+': +'+result.bonusRoundWin+
+            ' очков. Осталось вращений: '+result.remaining+'.';
+        if(result.completedBonus&&bonusFinish){
+          hideBigWin();
+          bonusFinishTotal.textContent=String(result.bonusWin);
+          bonusFinish.hidden=false;
+        }
+      }
       if(result.total>0){
         const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
         play(sound(soundKey)?soundKey:'win_sound');
@@ -273,7 +371,7 @@
       spinning=false;
       button.disabled=false;
       settingsButton.disabled=false;
-      betButton.disabled=false;
+      betButton.disabled=bonusActive;
     }
   });
 })();
