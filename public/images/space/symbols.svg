@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1280 512"><defs><radialGradient id="aura"><stop stop-color="#96e5ff" stop-opacity=".65"/><stop offset=".45" stop-color="#8b62f3" stop-opacity=".35"/><stop offset="1" stop-color="#213ced" stop-opacity="0"/></radialGradient>
+<linearGradient id="neon"><stop stop-color="#e4ffff"/><stop offset=".28" stop-color="#70e3ff"/><stop offset=".55" stop-color="#6159e9"/><stop offset=".8" stop-color="#e490ff"/><stop offset="1" stop-color="#459cff"/></linearGradient>
+<filter id="drop" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#060b25" flood-opacity=".95"/></filter></defs><view id="rocket" viewBox="0 0 256 256"/><view id="saturn" viewBox="256 0 256 256"/><view id="astronaut" viewBox="512 0 256 256"/><view id="galaxy" viewBox="768 0 256 256"/><view id="moon" viewBox="1024 0 256 256"/><view id="satellite" viewBox="0 256 256 256"/><view id="comet" viewBox="256 256 256 256"/><view id="star" viewBox="512 256 256 256"/><view id="ufo" viewBox="768 256 256 256"/><view id="earth" viewBox="1024 256 256 256"/><g transform="translate(0 0)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="170">🚀</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(256 0)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="184">🪐</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(512 0)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="155">👨‍🚀</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(768 0)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><g transform="translate(128 126) rotate(-25)"><ellipse rx="114" ry="52" stroke="url(#neon)" stroke-width="12" fill="none"/><ellipse rx="82" ry="32" stroke="#c184fc" stroke-width="12" fill="none"/><ellipse rx="48" ry="17" stroke="#8ce8fa" stroke-width="10" fill="none"/><circle r="17" fill="#fff5d9"/></g></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(1024 0)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="170">🌕</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(0 256)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="160">🛰️</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(256 256)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="180">☄️</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(512 256)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><path d="M128 18 L160 95 L243 102 L179 152 L200 235 L128 186 L56 235 L77 152 L13 102 L96 95Z" fill="#ffd76d" stroke="#fff6b2" stroke-width="9"/><path d="M128 34 L148 111 L210 110 L162 151 L175 213 L128 174 L81 213 L94 151 L46 110 L108 111Z" fill="#ffbd34" opacity=".76"/></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(768 256)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="184">🛸</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g><g transform="translate(1024 256)"><circle cx="128" cy="127" r="120" fill="url(#aura)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="url(#neon)" stroke-width="3" stroke-dasharray="2 18" opacity=".68"/>
+  <g filter="url(#drop)"><text x="128" y="184" text-anchor="middle" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif" font-size="180">🌍</text></g>
+  <path d="M30 54h24m-12-12v24M215 200h17m-8-8v17" stroke="#eafaff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+</g></svg>
