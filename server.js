@@ -6,7 +6,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession } = require('./db');
+const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -201,7 +202,9 @@ function scoreBoard(cells,symbols,payouts,bet=10,rows=4){
   return {total,wins};
 }
 function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
-  const symbols=getSymbols(gameId),payouts=getPayouts(gameId);
+  const scatter=getScatterSettings(gameId);
+  const symbols=getSymbols(gameId).filter(symbol=>symbol.id!==scatter?.symbolId);
+  const payouts=getPayouts(gameId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
   const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
@@ -225,7 +228,15 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
-  return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0};
+  // Scatter positions are placed only after normal board generation; this
+  // decouples the free-spin trigger from regular winning-chain frequency.
+  let scatterCount=0;
+  if(scatter&&layout.reels===5&&layout.rows===4){
+    const placed=scatterOnBoard(cells,scatter.symbolId,scatter.rules,rows,reelCount,n=>crypto.randomInt(n));
+    cells=placed.cells;scatterCount=placed.count;
+    evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
+  }
+  return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0,scatterCount};
 }
 function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
