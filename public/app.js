@@ -284,26 +284,13 @@
           if(prior)prior.replaceWith(tile);
           else track.append(tile);
           tile.classList.add('bonus-cell-spinning');
-          cellsToSpin.push({track,row,pos,tile,target:step.cells[pos]});
+          cellsToSpin.push({tile,target:step.cells[pos]});
         }
       }
-      const duration=reducedMotion?0:690+i%3*100;
-      if(duration){
-        const started=performance.now();
-        await new Promise(resolve=>{
-          const cycle=window.setInterval(()=>{
-            for(const item of cellsToSpin){
-              const next=makeTile(sample());
-              next.classList.add('bonus-cell-spinning');
-              item.tile.replaceWith(next);
-              item.tile=next;
-            }
-          },78);
-          window.setTimeout(()=>{
-            window.clearInterval(cycle);
-            resolve();
-          },duration);
-        });
+      // Symbols stay visible while a slow strip of light moves behind them.
+      // No image flicker; only at the end is the server-selected symbol shown.
+      if(!reducedMotion&&cellsToSpin.length){
+        await new Promise(resolve=>window.setTimeout(resolve,1120+i%3*130));
       }
       for(const item of cellsToSpin){
         const settled=makeTile(item.target);
@@ -311,13 +298,59 @@
       }
       applyBonusLocks(step.frozenCells);
       locked=new Set(step.frozenCells);
+      if(step.scatterCount>0){
+        root.querySelectorAll('.ribbon-tile.is-scatter').forEach(tile=>tile.classList.add('scatter-celebrate'));
+        message.textContent='SCATTER в бонусе: +'+step.scatterCount+' к множителю!';
+        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?100:550));
+        root.querySelectorAll('.ribbon-tile.scatter-celebrate').forEach(tile=>tile.classList.remove('scatter-celebrate'));
+      }
       if(i<steps.length-1){
         stopSpinSound();
-        message.textContent='Респин! Зафиксированные ячейки остаются на месте.';
+        message.textContent='Респин! Незамороженные ячейки продолжают вращаться.';
         play('spin_sound');
-        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:350));
+        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:300));
       }
     }
+  }
+  const bonusMath=document.getElementById('slot-bonus-math');
+  const bonusMathBase=document.getElementById('slot-bonus-math-base');
+  const bonusMathFactor=document.getElementById('slot-bonus-math-factor');
+  const bonusMathTotal=document.getElementById('slot-bonus-math-total');
+  const bonusMathMultiply=document.getElementById('slot-bonus-math-multiply');
+  const bonusMathResult=document.getElementById('slot-bonus-math-result');
+  const delay=ms=>new Promise(resolve=>window.setTimeout(resolve,reducedMotion?Math.min(ms,150):ms));
+  async function showBonusCalculation(base,factor,total){
+    if(!bonusMath)return;
+    bonusMathBase.textContent=String(base);
+    bonusMathFactor.textContent=String(factor);
+    bonusMathTotal.textContent=String(total);
+    bonusMathMultiply.hidden=true;
+    bonusMathResult.hidden=true;
+    bonusMath.hidden=false;
+    await delay(820);
+    bonusMathMultiply.hidden=false;
+    bonusMathMultiply.classList.remove('is-revealing');
+    void bonusMathMultiply.offsetWidth;
+    bonusMathMultiply.classList.add('is-revealing');
+    await delay(850);
+    bonusMathResult.hidden=false;
+    bonusMathResult.classList.remove('is-revealing');
+    void bonusMathResult.offsetWidth;
+    bonusMathResult.classList.add('is-revealing');
+    await delay(1450);
+    bonusMath.hidden=true;
+  }
+  async function animateMultiplierIncrease(cause,count){
+    if(!count||!bonusPlus||!bonusMultiplier)return;
+    bonusPlus.textContent='+'+count+(cause==='scatter'?' SCATTER!':' ЗА ВЫИГРЫШ');
+    bonusPlus.classList.remove('is-pop');
+    void bonusPlus.offsetWidth;
+    bonusPlus.classList.add('is-pop');
+    message.textContent=cause==='scatter'
+      ?'SCATTER ×'+count+' — множитель увеличился на +'+count+'!'
+      :'Выигрыш увеличил множитель на +'+count+'!';
+    await delay(1250);
+    bonusPlus.classList.remove('is-pop');
   }
   const bonusIntro=document.getElementById('slot-bonus-intro');
   const bonusIntroCount=document.getElementById('slot-bonus-intro-count');
@@ -400,7 +433,10 @@
         message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
           ' бесплатных вращений. Начальный множитель ×2!';
       }else if(result.mode==='bonus'){
-        if(result.baseWin>0&&!result.completedBonus)incrementBonusMultiplier();
+        hideBigWin();
+        await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
+        if(result.winIncrease)await animateMultiplierIncrease('win',result.winIncrease);
+        if(result.scatterIncrease)await animateMultiplierIncrease('scatter',result.scatterIncrease);
         updateBonus(!result.completedBonus,result.remaining||0,result.nextMultiplier||2,result.bonusWin||0);
         message.textContent=result.completedBonus
           ?'Бонус завершён! Всего выиграно '+result.bonusWin+' очков. Сумма зачислена в баланс.'
