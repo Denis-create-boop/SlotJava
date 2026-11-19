@@ -342,6 +342,8 @@
   }
   async function animateMultiplierIncrease(cause,count){
     if(!count||!bonusPlus||!bonusMultiplier)return;
+    const shownMultiplier=Number(bonusMultiplier.textContent.replace('×',''))||2;
+    bonusMultiplier.textContent='×'+(shownMultiplier+count);
     bonusPlus.textContent='+'+count+(cause==='scatter'?' SCATTER!':' ЗА ВЫИГРЫШ');
     bonusPlus.classList.remove('is-pop');
     void bonusPlus.offsetWidth;
