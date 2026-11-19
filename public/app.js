@@ -263,15 +263,52 @@
       if(tile)tile.classList.add('bonus-locked');
     }
   }
-  // Bonus respins animate individual slots, not complete columns: locked
-  // symbols stay as the very same DOM nodes while every other cell cycles.
+  // Every unfrozen CELL has its own vertical symbol ribbon. Locked cells
+  // remain in place, even when their other neighbours on the same reel spin.
+  function makeBonusMiniSymbol(id){
+    const tile=makeTile(id);
+    tile.className='bonus-mini-symbol';
+    return tile;
+  }
+  function animateBonusCell(tile,target,stagger=0){
+    if(reducedMotion){
+      tile.replaceWith(makeTile(target));
+      return Promise.resolve();
+    }
+    const reel=document.createElement('div');
+    reel.className='bonus-mini-reel';
+    const track=document.createElement('div');
+    track.className='bonus-mini-track';
+    reel.append(track);
+    // Display the target at the top of a moving vertical symbol strip.
+    const fillers=6+Math.min(2,stagger);
+    track.append(makeBonusMiniSymbol(target));
+    for(let n=0;n<fillers;n++)track.append(makeBonusMiniSymbol(sample()));
+    const viewHeight=tile.getBoundingClientRect().height;
+    tile.classList.add('bonus-cell-spinning');
+    tile.replaceChildren(reel);
+    track.style.transition='none';
+    track.style.transform='translate3d(0,'+(-fillers*viewHeight)+'px,0)';
+    void track.offsetHeight;
+    return new Promise(resolve=>{
+      const duration=1420+stagger*135;
+      window.setTimeout(()=>{
+        track.style.transition='transform '+duration+'ms cubic-bezier(.19,.65,.12,1)';
+        track.style.transform='translate3d(0,0,0)';
+        window.setTimeout(()=>{
+          tile.replaceWith(makeTile(target));
+          resolve();
+        },duration+50);
+      },stagger*80);
+    });
+  }
   async function animateBonusSteps(steps){
     let locked=new Set();
     for(let i=0;i<steps.length;i++){
       const step=steps[i];
       if(!Array.isArray(step.cells)||step.cells.length!==reelCount*rowCount)
         throw new Error('Некорректное поле бонусной игры.');
-      const cellsToSpin=[];
+      const animations=[];
       for(let col=0;col<reelCount;col++){
         const track=columns[col].querySelector('.reel-track');
         track.style.transition='none';
@@ -283,19 +320,10 @@
           const tile=makeTile(prior&&Number(prior.dataset.symbolId)||sample());
           if(prior)prior.replaceWith(tile);
           else track.append(tile);
-          tile.classList.add('bonus-cell-spinning');
-          cellsToSpin.push({tile,target:step.cells[pos]});
+          animations.push(animateBonusCell(tile,step.cells[pos],col%3));
         }
       }
-      // Symbols stay visible while a slow strip of light moves behind them.
-      // No image flicker; only at the end is the server-selected symbol shown.
-      if(!reducedMotion&&cellsToSpin.length){
-        await new Promise(resolve=>window.setTimeout(resolve,1120+i%3*130));
-      }
-      for(const item of cellsToSpin){
-        const settled=makeTile(item.target);
-        item.tile.replaceWith(settled);
-      }
+      await Promise.all(animations);
       applyBonusLocks(step.frozenCells);
       locked=new Set(step.frozenCells);
       if(step.scatterCount>0){
@@ -306,9 +334,9 @@
       }
       if(i<steps.length-1){
         stopSpinSound();
-        message.textContent='Респин! Незамороженные ячейки продолжают вращаться.';
+        message.textContent='Респин! Выигравшие ячейки замерли, остальные вращаются.';
         play('spin_sound');
-        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:300));
+        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:320));
       }
     }
   }
