@@ -206,7 +206,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
     if(activeTab==='cells')panel=panelStart('Фон барабанов')+
-      '<p class="hint">Одна картинка повторяется внутри каждой из "' + (layout.reels*layout.rows) + '" ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
+      '<p class="hint">Одна картинка повторяется внутри каждой из ' + (layout.reels*layout.rows) + ' ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['cells_background'])+'</div></section>';
     if(activeTab==='panels')panel=panelStart('Панели ставок и выигрыша')+
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
