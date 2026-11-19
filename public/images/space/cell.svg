@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs>
+<radialGradient id="nebula"><stop stop-color="#f06df1"/><stop offset=".28" stop-color="#6e38bf"/><stop offset=".62" stop-color="#244189"/><stop offset="1" stop-color="#060719"/></radialGradient>
+<radialGradient id="planet"><stop stop-color="#c2f0ff"/><stop offset=".28" stop-color="#368cbe"/><stop offset=".7" stop-color="#17427e"/><stop offset="1" stop-color="#111331"/></radialGradient>
+<linearGradient id="deep" x2=".35" y2="1"><stop stop-color="#040b26"/><stop offset=".52" stop-color="#15134b"/><stop offset="1" stop-color="#060b21"/></linearGradient>
+<linearGradient id="neon"><stop stop-color="#92fbff"/><stop offset=".32" stop-color="#28b5ec"/><stop offset=".63" stop-color="#4a3bd2"/><stop offset="1" stop-color="#d75bfb"/></linearGradient>
+<radialGradient id="star"><stop stop-color="#fff"/><stop offset=".19" stop-color="#8ff5ff"/><stop offset="1" stop-color="#4e53ff" stop-opacity="0"/></radialGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="12"/></filter>
+<filter id="shade"><feDropShadow dx="0" dy="3" stdDeviation="10" flood-color="#060521" flood-opacity=".95"/></filter>
+<pattern id="stars" width="133" height="113" patternUnits="userSpaceOnUse"><circle cx="16" cy="21" r="1.6" fill="#bfe7ff"/><circle cx="87" cy="76" r="2" fill="#bed3ff"/><circle cx="121" cy="14" r="1.1" fill="#fff"/><circle cx="54" cy="102" r="1" fill="#73caff"/><path d="M80 4v8M76 8h8" stroke="#d7ecff" stroke-width="1" opacity=".55"/></pattern></defs><rect width="256" height="256" fill="#0c1131"/><rect width="256" height="256" fill="url(#stars)" opacity=".65"/><ellipse cx="128" cy="128" rx="154" ry="105" fill="url(#nebula)" opacity=".24"/><path d="M0 0H256V5H0zM0 251H256V256H0z" fill="url(#neon)" opacity=".68"/><path d="M12 12h232v232H12Z" fill="none" stroke="#53b7eb" stroke-width="2" opacity=".2"/></svg>
