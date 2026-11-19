@@ -502,3 +502,48 @@ header nav .header-user-balance{
   header nav .header-user-balance{padding:5px 9px;gap:6px}
   .header-user-balance strong{font-size:.95rem}
 }
+
+/* Big and mega win celebrations: overlay the reels, without moving the layout. */
+.slot-reels.slot-reels-ribbon{position:relative}
+.slot-big-win-overlay{
+  position:absolute;
+  z-index:20;
+  inset:0;
+  display:grid;
+  place-items:center;
+  padding:14px;
+  pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(20,13,12,.38),rgba(13,10,17,.14) 68%,transparent 100%);
+}
+.slot-big-win-overlay[hidden]{display:none!important}
+.slot-big-win-overlay strong{
+  display:block;
+  max-width:100%;
+  text-align:center;
+  font-size:clamp(1.35rem,5.8vw,3.65rem);
+  font-weight:1000;
+  line-height:1.1;
+  letter-spacing:.025em;
+  text-transform:uppercase;
+  overflow-wrap:anywhere;
+  color:#ffe0a1;
+  -webkit-text-stroke:.5px rgba(93,47,12,.72);
+  text-shadow:0 3px 1px #6d2b0e,0 6px 12px #000,0 0 19px rgba(255,187,53,.95),0 0 32px rgba(238,116,25,.8);
+}
+.slot-big-win-overlay.is-mega{background:radial-gradient(ellipse at center,rgba(53,22,12,.49),rgba(20,10,25,.21) 74%,transparent)}
+.slot-big-win-overlay.is-mega strong{
+  color:#fff1b4;
+  text-shadow:0 3px 1px #7d290c,0 6px 12px #000,0 0 25px #ffcc41,0 0 47px rgba(255,101,11,.9),0 0 65px rgba(251,182,21,.64);
+}
+.slot-big-win-overlay.is-visible strong{animation:slot-big-win-appear .65s cubic-bezier(.2,.9,.2,1) both,slot-big-win-shimmer 1.4s ease-in-out .65s infinite alternate}
+@keyframes slot-big-win-appear{
+  from{opacity:0;transform:scale(.45) rotate(-5deg)}
+  65%{opacity:1;transform:scale(1.16) rotate(1deg)}
+  to{opacity:1;transform:scale(1)}
+}
+@keyframes slot-big-win-shimmer{from{filter:brightness(.94)}to{filter:brightness(1.28)}}
+.win-threshold-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.win-threshold-grid label{min-width:0}
+.win-threshold-grid input{max-width:100%}
+@media(max-width:550px){.win-threshold-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.slot-big-win-overlay.is-visible strong{animation:none}}
