@@ -322,6 +322,9 @@ db.transaction(()=>{
     if(empty){
       const created=db.prepare('SELECT id,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(game.id);
       for(const symbol of created){
+        const artEntry=item.symbols[(symbol.position-1)%item.symbols.length];
+        const image=selectArt.get(game.id,'/static/images/'+item.folder+'/symbols.svg#'+artEntry[1]);
+        if(image)assignSymbol.run(symbol.id,image.id);
         seedPrice.run(symbol.id,1100+(symbol.position%5)*350);
         for(let reel=3;reel<=(isEgypt?6:5);reel++)
           seedMultiplier.run(symbol.id,reel,reel===3?1000:reel===4?1400:reel===5?1800:2200);
