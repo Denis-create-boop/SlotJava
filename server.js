@@ -208,7 +208,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const wantWin=crypto.randomInt(100)<winFrequency;
   let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
-    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet);
+    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
