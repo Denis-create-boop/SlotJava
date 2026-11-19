@@ -42,7 +42,7 @@ function gameId(req) {
   const id=Number(req.params.id);
   return Number.isSafeInteger(id) && id>0 ? id : null;
 }
-function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,getScatterSettings,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
   function dynamicAsset(id,key) {
     if(assetTypes[key])return assetTypes[key];
     const match=/^symbol_(\d+)$/.exec(key);
@@ -94,6 +94,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">Вернуться</a></section>',req,404);
     const layout=gameLayout(game);
     const settings=getGameSettings(id)||{win_frequency:25};
+    const scatter=game.slug==='slot-classic'?getScatterSettings(id):null;
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
     const assignedBackgrounds=new Map(getGameBackgroundImages(id).map(item=>[item.asset_key,item]));
     const libraryImages=getLibraryImages(id);
@@ -148,6 +149,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<small>Стандартная иллюстрация</small>')+'</div>';
     }).join('');
     const symbolItems=symbols.map(symbol=>{
+      const isScatter=scatter&&symbol.id===scatter.symbolId;
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
       const multipliers=multipliersBySymbol.get(symbol.id)||new Map();
       const reelInputs=Array.from({length:layout.reels-2},(_,i)=>{
@@ -165,13 +167,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
-        '<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
+        (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.</p>'+
         '<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
         '<p class="hint">Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.</p>'+
-        '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">Сохранить цену и множители</button></form>'+
-        '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
-        '<button type="submit" class="danger-action">Удалить символ</button></form></details>';
+        '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">Сохранить цену и множители</button></form>')+
+        (isScatter?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
+        '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
     }).join('');
     const tabs=[
       ['name','Название игры','Название в каталоге и админке','image'],
@@ -183,6 +185,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
       ['symbols','Символы и коэффициенты','Символы и таблица выплат','star'],
       ['frequency','Частота и размеры выигрыша','Вероятность и пороги крупного выигрыша','percent']
+      ,...(scatter?[['scatter','Бонусная игра SCATTER','Шанс и лимит Scatter на каждом барабане','star']]:[])
     ];
     const validTabs=new Set(tabs.map(tab=>tab[0]));
     const activeTab=forcedTab&&validTabs.has(forcedTab)?forcedTab:(typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview');
@@ -231,6 +234,20 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
       '<button class="primary" type="submit">Добавить в папку</button></form>'+
       '<div class="library-images">'+libraryCards+'</div></section>';
+    if(activeTab==='scatter'&&scatter){
+      const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
+      const inputs=Array.from({length:layout.reels},(_,i)=>{
+        const reel=i+1,rule=ruleByReel.get(reel)||{chance_percent:0,max_symbols:0};
+        return '<div class="scatter-rule"><strong>Барабан №'+reel+'</strong>'+
+          '<label>Шанс выпадения, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
+          '<label>Максимум Scatter на барабане<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label></div>';
+      }).join('');
+      panel=panelStart('Настройки бонусной игры SCATTER')+
+        '<p class="hint">Для каждого барабана задаётся независимый шанс появления Scatter при платном вращении. Если шанс сработал, выпадет от 1 до указанного максимума Scatter на случайных местах этого барабана. 0% или максимум 0 отключают появление. Это не гарантия числа Scatter на каждом вращении.</p>'+
+        '<p class="hint">3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.</p>'+
+        '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
+        '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
+    }
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
       '<p class="hint">Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
@@ -247,6 +264,21 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '</div>',req,error?400:200);
   }
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
+  app.post('/admin/games/:id/scatter',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(!game||game.slug!=='slot-classic'||!getScatterSettings(id))return res.sendStatus(404);
+    const changes=[];
+    for(let reel=1;reel<=5;reel++){
+      const chance=req.body?.['chance_'+reel],max=req.body?.['max_'+reel];
+      if(typeof chance!=='string'||!/^(?:100|[1-9]?\\d)$/.test(chance)||
+         typeof max!=='string'||!/^[0-4]$/.test(max))
+        return show(req,res,'Для каждого барабана укажите шанс от 0 до 100% и максимум Scatter от 0 до 4.',true,'scatter');
+      changes.push([Number(chance),Number(max),id,reel]);
+    }
+    const update=db.prepare('UPDATE game_scatter_reels SET chance_percent=?,max_symbols=? WHERE game_id=? AND reel_index=?');
+    db.transaction(()=>{for(const row of changes)update.run(...row);})();
+    res.redirect(sectionUrl(id,'scatter')+'&saved=1');
+  });
   app.post('/admin/games/:id/title',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req);
     if(!id||!gameById(id))return res.sendStatus(404);
@@ -339,6 +371,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     const game=gameById(id);
     if(!game||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
     const percentage=req.body?.unit_percent;
     if(typeof percentage!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,2})?$/.test(percentage)||Number(percentage)>10000)
       return show(req,res,'Цена одного символа должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
@@ -363,6 +396,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.post('/admin/games/:id/symbols/:symbolId/delete',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
     const image=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+symbolId);
     db.transaction(()=>{
       db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'symbol_'+symbolId);
