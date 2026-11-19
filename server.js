@@ -277,6 +277,7 @@ function firstGamePage(game,req){
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
+    (scatter?'<div class="slot-bonus-intro" id="slot-bonus-intro" hidden aria-live="polite"><strong>SCATTER!</strong><span>БОНУСНАЯ ИГРА</span><b><em id="slot-bonus-intro-count">10</em> бесплатных вращений</b><small>Начальный множитель ×2</small></div>':'')+
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
     '<div class="reel-columns">'+reels+'</div></div>'+
 
