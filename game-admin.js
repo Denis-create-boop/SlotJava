@@ -17,6 +17,8 @@ const assetTypes={
   music:{label:'Фоновая музыка',kind:'audio'},
   spin_sound:{label:'Звук вращения барабанов',kind:'audio'},
   win_sound:{label:'Звук выигрыша',kind:'audio'},
+  big_win_sound:{label:'Звук крупного выигрыша',kind:'audio'},
+  mega_win_sound:{label:'Звук очень крупного выигрыша',kind:'audio'},
 };
 for(let i=1;i<=20;i++)assetTypes['cell_'+i]={label:'Фон ячейки №'+i+' (строка '+(Math.floor((i-1)/5)+1)+', столбец '+((i-1)%5+1)+')',kind:'image'};
 
@@ -78,7 +80,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
-    if(key==='music'||key==='spin_sound'||key==='win_sound')return 'audio';
+    if(['music','spin_sound','win_sound','big_win_sound','mega_win_sound'].includes(key))return 'audio';
     if(/^symbol_\d+$/.test(key))return 'symbols';
     return 'overview';
   }
@@ -170,7 +172,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ['audio','Музыка и звуки','Музыка, вращение и выигрыш','music'],
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
       ['symbols','Символы и коэффициенты','Символы и таблица выплат','star'],
-      ['frequency','Частота выигрыша','Вероятность выигрышных вращений','percent']
+      ['frequency','Частота и размеры выигрыша','Вероятность и пороги крупного выигрыша','percent']
     ];
     const validTabs=new Set(tabs.map(tab=>tab[0]));
     const activeTab=forcedTab&&validTabs.has(forcedTab)?forcedTab:(typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview');
@@ -200,14 +202,18 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
       rowsFor(['bet_panel','win_panel'])+'</div></section>';
     if(activeTab==='audio')panel=panelStart('Музыка и звуки')+
-      '<p class="hint">Добавьте фоновую музыку и звуки вращения и выигрыша. Форматы MP3, OGG, WAV до 12 МБ.</p>'+
-      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound'])+'</div></section>';
-    if(activeTab==='frequency')panel=panelStart('Частота выигрыша')+
+      '<p class="hint">Загрузите музыку и отдельные звуки вращения, обычного, крупного и очень крупного выигрыша. Форматы MP3, OGG, WAV до 12 МБ. Звуки зависят от коэффициента итогового выигрыша.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound','big_win_sound','mega_win_sound'])+'</div></section>';
+    if(activeTab==='frequency')panel=panelStart('Частота и размеры выигрышей')+
       '<p class="hint">Целевой процент выигрышных вращений от 0 до 100. Это не RTP и не доля возвращаемых ставок. При отсутствии положительных коэффициентов выигрышей не будет.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings?tab=frequency">'+csrf+
       '<label for="win_frequency">Частота выигрыша, %</label><div class="win-setting-controls">'+
-      '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required>'+
-      '<button class="primary" type="submit">Сохранить</button></div></form></section>';
+      '<input id="win_frequency" type="number" min="0" max="100" step="1" name="win_frequency" value="'+h(settings.win_frequency)+'" required></div>'+
+      '<div class="win-threshold-grid">'+
+      '<label for="big_win_multiplier">Крупный выигрыш (× от ставки)<input id="big_win_multiplier" type="number" min="1" max="1000" step="0.001" name="big_win_multiplier" value="'+(settings.big_win_multiplier_milli/1000).toFixed(3)+'" required></label>'+
+      '<label for="mega_win_multiplier">Очень крупный выигрыш (× от ставки)<input id="mega_win_multiplier" type="number" min="1" max="1000" step="0.001" name="mega_win_multiplier" value="'+(settings.mega_win_multiplier_milli/1000).toFixed(3)+'" required></label></div>'+
+      '<p class="hint">Например: при ставке 20 пороги ×5 и ×15 означают 100 и 300 очков. Очень крупный должен быть больше крупного. Считается общий выигрыш одного вращения, а не отдельного символа.</p>'+
+      '<button class="primary" type="submit">Сохранить настройки</button></form></section>';
     if(activeTab==='library')panel=panelStart('Папка изображений игры')+
       '<p class="hint">Картинки сохраняются в библиотеке именно этой игры. После загрузки их можно выбирать для символов. PNG, JPG, WEBP, GIF до 5 МБ.</p>'+
       '<form class="library-upload" method="post" action="/admin/games/'+id+'/library?tab=library" enctype="multipart/form-data">'+csrf+
