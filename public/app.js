@@ -263,27 +263,79 @@
       if(tile)tile.classList.add('bonus-locked');
     }
   }
+  // Bonus respins animate individual slots, not complete columns: locked
+  // symbols stay as the very same DOM nodes while every other cell cycles.
   async function animateBonusSteps(steps){
-    let held=new Set();
+    let locked=new Set();
     for(let i=0;i<steps.length;i++){
       const step=steps[i];
       if(!Array.isArray(step.cells)||step.cells.length!==reelCount*rowCount)
         throw new Error('Некорректное поле бонусной игры.');
-      const animations=columns.map((col,index)=>{
-        if(held.has(index))return Promise.resolve();
-        const target=Array.from({length:rowCount},(_,row)=>step.cells[row*reelCount+index]);
-        return animateColumn(col,index,target);
-      });
-      await Promise.all(animations);
+      const cellsToSpin=[];
+      for(let col=0;col<reelCount;col++){
+        const track=columns[col].querySelector('.reel-track');
+        track.style.transition='none';
+        track.style.transform='translate3d(0,0,0)';
+        for(let row=0;row<rowCount;row++){
+          const pos=row*reelCount+col;
+          if(locked.has(pos))continue;
+          const prior=track.children[row];
+          const tile=makeTile(prior&&Number(prior.dataset.symbolId)||sample());
+          if(prior)prior.replaceWith(tile);
+          else track.append(tile);
+          tile.classList.add('bonus-cell-spinning');
+          cellsToSpin.push({track,row,pos,tile,target:step.cells[pos]});
+        }
+      }
+      const duration=reducedMotion?0:690+i%3*100;
+      if(duration){
+        const started=performance.now();
+        await new Promise(resolve=>{
+          const cycle=window.setInterval(()=>{
+            for(const item of cellsToSpin){
+              const next=makeTile(sample());
+              next.classList.add('bonus-cell-spinning');
+              item.tile.replaceWith(next);
+              item.tile=next;
+            }
+          },78);
+          window.setTimeout(()=>{
+            window.clearInterval(cycle);
+            resolve();
+          },duration);
+        });
+      }
+      for(const item of cellsToSpin){
+        const settled=makeTile(item.target);
+        item.tile.replaceWith(settled);
+      }
       applyBonusLocks(step.frozenCells);
-      held=new Set(step.frozenReels);
+      locked=new Set(step.frozenCells);
       if(i<steps.length-1){
         stopSpinSound();
-        message.textContent='Респин! Выигрышные барабаны зафиксированы.';
+        message.textContent='Респин! Зафиксированные ячейки остаются на месте.';
         play('spin_sound');
-        await new Promise(resolve=>window.setTimeout(resolve,420));
+        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:350));
       }
     }
+  }
+  const bonusIntro=document.getElementById('slot-bonus-intro');
+  const bonusIntroCount=document.getElementById('slot-bonus-intro-count');
+  async function celebrateScatter(count,freeSpins){
+    if(!bonusIntro)return;
+    const scatterTiles=Array.from(root.querySelectorAll('.ribbon-tile'))
+      .filter(tile=>Number(tile.dataset.symbolId)===scatterId);
+    scatterTiles.forEach(tile=>tile.classList.add('scatter-celebrate'));
+    if(bonusIntroCount)bonusIntroCount.textContent=String(freeSpins);
+    bonusIntro.hidden=false;
+    bonusIntro.classList.remove('is-showing');
+    void bonusIntro.offsetWidth;
+    bonusIntro.classList.add('is-showing');
+    message.textContent='SCATTER ×'+count+'! '+freeSpins+' бесплатных вращений!';
+    await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?350:1900));
+    bonusIntro.hidden=true;
+    bonusIntro.classList.remove('is-showing');
+    scatterTiles.forEach(tile=>tile.classList.remove('scatter-celebrate'));
   }
   let spinning=false;
   form.addEventListener('submit',async event=>{
@@ -343,6 +395,7 @@
         :'Без выигрыша. Попробуйте ещё.';
       showBigWin(tier);
       if(result.mode==='base'&&result.freeSpins>0){
+        await celebrateScatter(result.scatterCount,result.freeSpins);
         updateBonus(true,result.freeSpins,2,0);
         message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
           ' бесплатных вращений. Начальный множитель ×2!';
