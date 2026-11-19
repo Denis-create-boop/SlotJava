@@ -248,6 +248,84 @@ db.transaction(()=>{
   }
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
+// First-run content for playable games 2 and 3. Existing game records,
+// custom symbols, prices and uploaded backgrounds are not overwritten.
+const themedGames=[
+  {
+    slug:'golden-seven',folder:'egypt',
+    symbols:[
+      ['Фараон','pharaoh'],['Клеопатра','cleopatra'],['Анубис','anubis'],
+      ['Глаз Гора','horus'],['Скарабей','scarab'],['Анкх','ankh'],
+      ['Пирамида','pyramid'],['Кобра','cobra'],['Сфинкс','sphinx'],
+      ['Солнце Ра','ra'],['Священная кошка','cat']
+    ]
+  },
+  {
+    slug:'lucky-stars',folder:'space',
+    symbols:[
+      ['Ракета','rocket'],['Сатурн','saturn'],['Астронавт','astronaut'],
+      ['Галактика','galaxy'],['Луна','moon'],['Спутник','satellite'],
+      ['Комета','comet'],['Звезда','star'],['НЛО','ufo'],['Земля','earth']
+    ]
+  }
+];
+db.transaction(()=>{
+  const selectGame=db.prepare('SELECT id FROM games WHERE slug=?');
+  const countSymbols=db.prepare('SELECT COUNT(*) AS count FROM game_symbols WHERE game_id=?');
+  const insSymbol=db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)');
+  const selectSymbol=db.prepare('SELECT id FROM game_symbols WHERE game_id=? AND position=?');
+  const insertArt=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  const selectArt=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+  const assignSymbol=db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
+  const assignBackground=db.prepare('INSERT OR IGNORE INTO game_background_images(game_id,asset_key,library_image_id) VALUES(?,?,?)');
+  const existingUpload=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
+  const seedPrice=db.prepare('INSERT OR IGNORE INTO symbol_unit_prices(symbol_id,percent_hundredths) VALUES(?,?)');
+  const seedMultiplier=db.prepare('INSERT OR IGNORE INTO symbol_reel_multipliers(symbol_id,reel_count,multiplier_milli) VALUES(?,?,?)');
+  const classicCount=firstGame?countSymbols.get(firstGame.id).count:10;
+  for(const item of themedGames){
+    const game=selectGame.get(item.slug);if(!game)continue;
+    const isEgypt=item.slug==='golden-seven';
+    const desiredCount=isEgypt?classicCount+1:item.symbols.length;
+    const empty=countSymbols.get(game.id).count===0;
+    if(empty){
+      for(let n=0;n<desiredCount;n++){
+        const entry=item.symbols[n%item.symbols.length];
+        const title=n<item.symbols.length?entry[0]:entry[0]+' '+(Math.floor(n/item.symbols.length)+1);
+        insSymbol.run(game.id,title,n+1);
+      }
+    }
+    const assets=[
+      ['background','Фон игры','background.svg'],
+      ['reels_background','Общий фон игрового поля','field.svg'],
+      ['cells_background','Фон ячеек','cell.svg'],
+      ['logo','Логотип игры','logo.svg']
+    ];
+    for(const [key,name,file] of assets){
+      const src='/static/images/'+item.folder+'/'+file;
+      insertArt.run(game.id,name,src);
+      const art=selectArt.get(game.id,src);
+      if(art&&!existingUpload.get(game.id,key))assignBackground.run(game.id,key,art.id);
+    }
+    // Images in each game's own folder; symbols may be reassigned by admin.
+    for(const [idx,entry] of item.symbols.entries()){
+      const src='/static/images/'+item.folder+'/symbols.svg#'+entry[1];
+      insertArt.run(game.id,entry[0],src);
+      const art=selectArt.get(game.id,src);
+      if(empty&&art){
+        const symbol=selectSymbol.get(game.id,idx+1);
+        if(symbol)assignSymbol.run(symbol.id,art.id);
+      }
+    }
+    if(empty){
+      const created=db.prepare('SELECT id,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(game.id);
+      for(const symbol of created){
+        seedPrice.run(symbol.id,1100+(symbol.position%5)*350);
+        for(let reel=3;reel<=(isEgypt?6:5);reel++)
+          seedMultiplier.run(symbol.id,reel,reel===3?1000:reel===4?1400:reel===5?1800:2200);
+      }
+    }
+  }
+})();
 const starterImages=[
   ['A','/static/images/symbols/premium-letters.svg#a'],['Q','/static/images/symbols/premium-letters.svg#q'],
   ['J','/static/images/symbols/premium-letters.svg#j'],['K','/static/images/symbols/premium-letters.svg#k'],
