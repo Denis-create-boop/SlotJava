@@ -1,4 +1,4 @@
-// Five continuous reel strips. The server is authoritative for spins, awards and balance.
+// Variable-size continuous reel strips; the server decides wins and balance.
 (() => {
   'use strict';
   const root=document.querySelector('.slot-game');
@@ -73,6 +73,8 @@
   });
 
   const columns=Array.from(root.querySelectorAll('.reel-column'));
+  const reelCount=columns.length;
+  const rowCount=Number(root.dataset.rows)||4;
   const definitions=Array.from(document.querySelectorAll('[data-symbol-def]')).map(node=>({
     id:Number(node.dataset.symbolId),
     name:node.dataset.name||'Символ',
@@ -137,7 +139,7 @@
   }
 
   if(definitions.length){
-    columns.forEach(col=>showStatic(col,Array.from({length:4},sample)));
+    columns.forEach(col=>showStatic(col,Array.from({length:rowCount},sample)));
   }else{
     message.textContent='В игре пока нет символов. Добавьте их через админку.';
     button.disabled=true;
@@ -151,10 +153,10 @@
     }
     const track=col.querySelector('.reel-track');
     const view=col.querySelector('.reel-window');
-    const rowHeight=view.getBoundingClientRect().height/4;
+    const rowHeight=view.getBoundingClientRect().height/rowCount;
     const extra=16+index*3;
-    // The four target items are at the top of the strip; the remainder are
-    // filler. Sliding the whole strip DOWN reveals the four target items.
+    // The target items are at the top of the strip; the rest are filler.
+    // Sliding the continuous strip DOWN reveals the planned final symbols.
     const strip=finalIds.concat(Array.from({length:extra},sample));
     track.style.transition='none';
     track.replaceChildren(buildStrip(strip));
@@ -236,14 +238,14 @@
       });
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||'Ошибка вращения ('+response.status+').');
-      if(!Array.isArray(result.cells)||result.cells.length!==20||
+      if(!Array.isArray(result.cells)||result.cells.length!==rowCount*reelCount||
           !result.cells.every(id=>symbols.has(id))||
           !Number.isSafeInteger(result.total)||result.total<0||
           !Number.isSafeInteger(result.balance)||result.balance<0){
         throw new Error('Некорректный ответ игрового сервера.');
       }
       const animations=columns.map((col,index)=>{
-        const target=Array.from({length:4},(_,row)=>result.cells[row*5+index]);
+        const target=Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index]);
         return animateColumn(col,index,target);
       });
       await Promise.all(animations);
