@@ -188,9 +188,11 @@ function scoreBoard(cells,symbols,payouts,bet=10){
     if(reels<3)continue;
     const percentHundredths=priceMap.get(symbol.id)||0;
     const multiplierMilli=reelMultipliers.get(symbol.id+':'+reels)??1000;
-    if(percentHundredths<=0||multiplierMilli<=0)continue;
-    const prize=Math.round(bet*count*percentHundredths*multiplierMilli/10000000);
-    if(prize<=0)continue;
+    const prize=percentHundredths>0&&multiplierMilli>0
+      ?Math.round(bet*count*percentHundredths*multiplierMilli/10000000):0;
+    // All qualifying left-to-right chains are returned for visual highlights,
+    // even when the price is unset, disabled or rounds down to zero.
+    // Only positive awards contribute to the wallet and winning frequency.
     total+=prize;
     wins.push({symbolId:symbol.id,name:symbol.name,reels,count,
       percentHundredths,multiplierMilli,prize});
