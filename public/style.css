@@ -790,3 +790,51 @@ header nav .header-user-balance{
  .slot-theme-egypt .ribbon-tile.is-winning img,
  .slot-theme-egypt .ribbon-tile.is-winning .ribbon-symbol-fallback{animation:none!important}
 }
+
+/* Free-spin result is shown in stages: base win, multiplier and final prize. */
+.slot-bonus-math[hidden],.slot-bonus-math [hidden]{display:none!important}
+.slot-bonus-math{
+  position:absolute;inset:0;z-index:32;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  border-radius:14px;padding:18px;
+  background:radial-gradient(ellipse at center,rgba(30,11,19,.94),rgba(14,9,21,.89) 75%);
+  border:2px solid rgba(255,218,119,.91);color:#fff2ce;
+  text-shadow:0 2px 6px #160a0b;
+}
+.slot-bonus-math>span{font-size:clamp(.9rem,2.3vw,1.5rem);font-weight:800;letter-spacing:.05em}
+.slot-bonus-math>strong{font-size:clamp(2rem,6vw,4.2rem);font-weight:1000;color:#ffe4a1;text-shadow:0 0 16px #faac3d}
+.slot-bonus-math>div{display:flex;align-items:center;justify-content:center;gap:12px}
+.slot-bonus-math>div>em{font-style:normal;font-size:clamp(1.5rem,4vw,2.6rem);color:#ffc164}
+.slot-bonus-math>div>b{font-size:clamp(2rem,5vw,3.5rem);color:#fff7c0}
+.slot-bonus-math #slot-bonus-math-result{flex-direction:column;gap:4px}
+.slot-bonus-math #slot-bonus-math-result small{font-size:clamp(.9rem,2vw,1.2rem)}
+.slot-bonus-math #slot-bonus-math-result strong{font-size:clamp(2.2rem,6.3vw,4.7rem);color:#b8ffb0;text-shadow:0 0 20px #53cf68}
+.slot-bonus-math .is-revealing{animation:bonus-math-pop .7s cubic-bezier(.19,.9,.2,1) both}
+@keyframes bonus-math-pop{from{opacity:0;transform:scale(.45)}65%{opacity:1;transform:scale(1.18)}to{opacity:1;transform:scale(1)}}
+/* The symbol is visually still; the deeper strip of light slides slowly behind it. */
+.slot-game .ribbon-tile.bonus-cell-spinning{
+  position:relative;isolation:isolate;filter:none;opacity:1;overflow:hidden;
+  background:rgba(19,17,31,.40);
+}
+.slot-game .ribbon-tile.bonus-cell-spinning::before{
+  content:"";position:absolute;inset:-210% -15%;z-index:-1;pointer-events:none;
+  background:repeating-linear-gradient(
+    180deg,rgba(40,35,51,.1) 0%,rgba(255,191,95,.45) 12%,
+    rgba(24,16,36,.83) 24%,rgba(255,180,72,.26) 36%,
+    rgba(16,13,29,.78) 50%);
+  background-size:100% 34%;
+  animation:bonus-underlying-strip 1.25s linear infinite;
+  box-shadow:inset 0 0 13px rgba(255,211,119,.35);
+}
+.slot-game .ribbon-tile.bonus-cell-spinning img,
+.slot-game .ribbon-tile.bonus-cell-spinning .ribbon-symbol-fallback{
+  position:relative;z-index:1;animation:none!important;filter:drop-shadow(0 3px 6px #000a)
+}
+@keyframes bonus-underlying-strip{
+  from{background-position:center 0}
+  to{background-position:center 100%}
+}
+.slot-bonus-top em{right:7%;max-width:45%;font-size:clamp(1rem,2.4vw,1.9rem);text-align:center}
+@media(prefers-reduced-motion:reduce){
+ .slot-game .ribbon-tile.bonus-cell-spinning::before,.slot-bonus-math .is-revealing{animation:none!important}
+}
