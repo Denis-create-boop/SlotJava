@@ -398,7 +398,12 @@
         },
         body:new URLSearchParams(new FormData(form))
       });
-      const result=await response.json();
+      const responseText=await response.text();
+      let result;
+      try{result=JSON.parse(responseText);}
+      catch{
+        throw new Error('Сервер вернул ошибку '+response.status+' вместо результата вращения. Подробности смотрите в терминале npm start.');
+      }
       if(!response.ok)throw new Error(result.error||'Ошибка вращения ('+response.status+').');
       if(!Array.isArray(result.cells)||result.cells.length!==rowCount*reelCount||
           !result.cells.every(id=>symbols.has(id))||
