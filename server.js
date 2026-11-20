@@ -339,15 +339,23 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         randomInt:n=>crypto.randomInt(n),scoreBoard,
         scatterId:scatter.symbolId,scatterRules:scatter.rules
       });
-      const award=round.total*active.multiplier;
+      // Scatter raises the multiplier immediately during this free spin,
+      // before its award is calculated. The ordinary win +1 applies AFTER.
+      let roundMultiplier=active.multiplier;
+      const steps=round.steps.map(step=>{
+        const applied=Math.min(step.scatterCount,Math.max(0,100-roundMultiplier));
+        roundMultiplier+=applied;
+        return {...step,scatterIncrease:applied,multiplierAfterScatter:roundMultiplier};
+      });
+      const scatterIncrease=roundMultiplier-active.multiplier;
+      const award=round.total*roundMultiplier;
       const accumulated=active.bonus_win+award;
       if(!Number.isSafeInteger(award)||!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый размер бонусного выигрыша.'};
       const remaining=active.remaining-1;
       const winIncrease=round.total>0?1:0;
-      const scatterIncrease=Math.min(round.scatterCount,Math.max(0,100-active.multiplier-winIncrease));
-      const appliedWinIncrease=Math.min(winIncrease,Math.max(0,100-active.multiplier));
-      const nextMultiplier=active.multiplier+appliedWinIncrease+scatterIncrease;
+      const appliedWinIncrease=Math.min(winIncrease,Math.max(0,100-roundMultiplier));
+      const nextMultiplier=roundMultiplier+appliedWinIncrease;
       let nextBalance=wallet.balance,completed=false;
       if(remaining===0){
         nextBalance=wallet.balance+accumulated;
@@ -369,12 +377,12 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         :award>0&&award*1000>=active.bet*bigThreshold?'big'
         :award>0?'normal':'none';
       return {
-        mode:'bonus',cells:round.board,steps:round.steps,
+        mode:'bonus',cells:round.board,steps,
         total:award,baseWin:round.total,
-        wins:round.wins.map(win=>({...win,prize:win.prize*active.multiplier})),
+        wins:round.wins.map(win=>({...win,prize:win.prize*roundMultiplier})),
         balance:nextBalance,bet:active.bet,winTier,
         bonusRoundWin:award,bonusWin:accumulated,
-        bonusMultiplier:active.multiplier,scatterCount:round.scatterCount,
+        bonusMultiplier:roundMultiplier,scatterCount:round.scatterCount,
         scatterIncrease,winIncrease:appliedWinIncrease,
         nextMultiplier,remaining,completedBonus:completed
       };
@@ -440,7 +448,9 @@ app.post('/logout',postGuard,(req,res)=>{
   res.redirect('/');
 });
 app.get('/admin',adminOnly,(req,res)=>{
-  const users=db.prepare('SELECT id,username,role,active,created_at FROM users ORDER BY id').all();
+  const users=db.prepare(`SELECT u.id,u.username,u.role,u.active,u.created_at,
+    COALESCE(b.balance,1000) AS balance FROM users u
+    LEFT JOIN user_balances b ON b.user_id=u.id ORDER BY u.id`).all();
   const csrf=req.session.csrf_token;
   const rows=users.map(user=>{
     const controls=user.id===req.user.id?'<small>Вы</small>':
@@ -448,8 +458,13 @@ app.get('/admin',adminOnly,(req,res)=>{
         '<button type="submit">'+(user.active?'Заблокировать':'Разблокировать')+'</button></form> '+
       '<form method="post" action="/admin/users/'+user.id+'/role" class="inline">'+csrfInput(csrf)+
         '<button type="submit">'+(user.role==='admin'?'Снять права':'Сделать админом')+'</button></form>';
+    const balanceForm='<form method="post" action="/admin/users/'+user.id+'/balance" class="inline">'+csrfInput(csrf)+
+      '<input type="number" name="balance" min="0" max="1000000000" step="1" value="'+user.balance+
+      '" aria-label="Баланс пользователя '+h(user.username)+'" required> '+
+      '<button type="submit">Сохранить</button></form>';
     return '<tr><td>'+user.id+'</td><td>'+h(user.username)+'</td><td>'+h(user.role)+'</td><td>'+
-      (user.active?'Активен':'Заблокирован')+'</td><td>'+h(user.created_at)+'</td><td>'+controls+'</td></tr>';
+      (user.active?'Активен':'Заблокирован')+'</td><td>'+h(user.created_at)+'</td><td>'+balanceForm+
+      '</td><td>'+controls+'</td></tr>';
   }).join('');
   const gameButtons=listGames().map(game=>{
     const assigned=getGameBackgroundImages(game.id).find(image=>image.asset_key==='logo');
@@ -464,10 +479,22 @@ app.get('/admin',adminOnly,(req,res)=>{
   sendPage(res,'Админ-панель','<div class="admin-content"><section class="panel"><h1>Управление играми</h1>'+
     '<p class="hint">Выберите игру, чтобы перейти к её настройкам.</p><div class="admin-games-grid">'+gameButtons+'</div></section>'+
     '<section class="panel"><h2>Управление пользователями</h2><p>Пользователи: '+users.length+
-    '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr></thead><tbody>'+rows+
+    '</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Общий баланс</th><th>Действия</th></tr></thead><tbody>'+rows+
     '</tbody></table></div></section></div>',req);
 });
 installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,getScatterSettings,adminOnly,guarded,postGuard,sendPage,h,csrfInput});
+app.post('/admin/users/:id/balance',adminOnly,postGuard,(req,res)=>{
+  const id=Number(req.params.id),raw=String(req.body?.balance??'');
+  if(!Number.isSafeInteger(id)||id<1||!db.prepare('SELECT 1 FROM users WHERE id=?').get(id))
+    return res.sendStatus(404);
+  if(!/^(0|[1-9]\\d*)$/.test(raw))return res.status(400).send('Баланс должен быть целым неотрицательным числом.');
+  const amount=Number(raw);
+  if(!Number.isSafeInteger(amount)||amount>1000000000)
+    return res.status(400).send('Баланс должен быть от 0 до 1 000 000 000.');
+  db.prepare('INSERT INTO user_balances(user_id,balance) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET balance=excluded.balance')
+    .run(id,amount);
+  res.redirect('/admin');
+});
 app.post('/admin/users/:id/toggle',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id);
   const user=Number.isSafeInteger(id)?db.prepare('SELECT id,role,active FROM users WHERE id=?').get(id):null;
