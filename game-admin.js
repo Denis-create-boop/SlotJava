@@ -12,6 +12,7 @@ const assetTypes={
   field_background:{label:'Общий фон поля с барабанами',kind:'image'},
   cells_background:{label:'Общий фон всех ячеек с символами',kind:'image'},
   logo:{label:'Логотип игры',kind:'image'},
+  bonus_frame:{label:'Демон, обхватывающий игровое поле (только в бонусе)',kind:'image'},
   reels_background:{label:'Общий фон игрового поля',kind:'image'},
   bet_panel:{label:'Фон панели ставок',kind:'image'},
   win_panel:{label:'Фон панели выигрыша',kind:'image'},
@@ -93,7 +94,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       .get(gameId,imageId);
   }
   function assetTab(key){
-    if(key==='background'||key==='logo')return 'background';
+    if(key==='background'||key==='logo'||key==='bonus_frame')return 'background';
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
@@ -243,8 +244,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
-      '<p class="hint">Изменяйте фон игрового окна и логотип игры.</p><div class="asset-settings-grid">'+
-      rowsFor(['background','logo'])+'</div></section>';
+      '<p class="hint">Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.</p><div class="asset-settings-grid">'+
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:['background','logo'])+'</div></section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
