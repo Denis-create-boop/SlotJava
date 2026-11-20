@@ -6,6 +6,7 @@
 function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Set()){
   const cells=board.slice();
   let count=0;
+  const positionsLanded=[];
   for(let col=0;col<reels;col++){
     const rule=rules.find(r=>r.reel_index===col+1);
     const chance=Math.max(0,Math.min(100,Number(rule?.chance_percent)||0));
@@ -21,11 +22,13 @@ function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Se
     for(let n=0;n<number;n++){
       const pick=n+randomInt(positions.length-n);
       [positions[n],positions[pick]]=[positions[pick],positions[n]];
-      cells[positions[n]*reels+col]=scatterId;
+      const index=positions[n]*reels+col;
+      cells[index]=scatterId;
+      positionsLanded.push(index);
       count++;
     }
   }
-  return {cells,count};
+  return {cells,count,positions:positionsLanded};
 }
 function freeSpinsFor(count){return count>=5?20:count===4?15:count===3?10:0;}
 function randomBoard(symbols,reels,rows,randomInt){
@@ -51,7 +54,7 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
   const frozenCells=new Set(),steps=[];
   const applyScatter=board=>scatterId
     ?scatterOnBoard(board,scatterId,scatterRules,rows,reels,randomInt,frozenCells)
-    :{cells:board,count:0};
+    :{cells:board,count:0,positions:[]};
   let landed=applyScatter(randomBoard(symbols,reels,rows,randomInt));
   let board=landed.cells;
   let scatterCount=0;
@@ -69,6 +72,7 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
       frozenCells:[...frozenCells].sort((a,b)=>a-b),
       newCells:newCells.sort((a,b)=>a-b),
       scatterCount:landed.count,
+      scatterPositions:landed.positions||[],
       wins:evaluated.wins
     });
     if(!newCells.length||frozenCells.size===reels*rows||respins>=maxRespins)break;
