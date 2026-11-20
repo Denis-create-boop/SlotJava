@@ -118,7 +118,9 @@ if(!db.pragma('table_info(game_wallets)').some(column=>column.name==='bet')){
 // Old SQLite CHECK(bet IN (...)) prevents larger and smaller stakes.
 // Rebuild only the local per-game stake table once to remove the obsolete constraint.
 const currentWalletSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_wallets'").get()?.sql||'';
-if(/CHECK\s*\(\s*bet\s+IN\s*\(/i.test(currentWalletSchema)){
+// SQLite may preserve legacy CHECK syntax with column quotes or parentheses.
+// Match the restricted bet list itself rather than one formatting variant.
+if(/["'`\[]?bet["'`\]]?\s+IN\s*\(/i.test(currentWalletSchema)){
   db.transaction(()=>{
     db.exec(`
       CREATE TABLE game_wallets_new(
@@ -453,6 +455,30 @@ db.exec(`
     PRIMARY KEY(user_id,game_id)
   );
 `);
+// Old installations can also retain a restricted stake list in BONUS sessions.
+// At high bets, creating the bonus then fails and rolls back the entire paid
+// spin. Rebuild the table in place while preserving active sessions, multipliers,
+// remaining spins and accumulated bonus winnings.
+const bonusSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_bonus_sessions'").get()?.sql||'';
+if(/["'`\[]?bet["'`\]]?\s+IN\s*\(/i.test(bonusSchema)){
+  db.transaction(()=>{
+    db.exec(`
+      CREATE TABLE game_bonus_sessions_new (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 20),
+        multiplier INTEGER NOT NULL CHECK(multiplier BETWEEN 2 AND 100),
+        bonus_win INTEGER NOT NULL DEFAULT 0 CHECK(bonus_win >= 0),
+        bet INTEGER NOT NULL CHECK(bet BETWEEN 1 AND 1000),
+        PRIMARY KEY(user_id,game_id)
+      );
+      INSERT INTO game_bonus_sessions_new(user_id,game_id,remaining,multiplier,bonus_win,bet)
+      SELECT user_id,game_id,remaining,multiplier,bonus_win,bet FROM game_bonus_sessions;
+      DROP TABLE game_bonus_sessions;
+      ALTER TABLE game_bonus_sessions_new RENAME TO game_bonus_sessions;
+    `);
+  })();
+}
 // Probability weights for exactly 1..4 Scatter on each reel.
 // Weights are normalized at spin time; existing per-reel trigger chances stay unchanged.
 for(const [column,defaultWeight] of [['weight_1',65],['weight_2',23],['weight_3',8],['weight_4',4]]){
