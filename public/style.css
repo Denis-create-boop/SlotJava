@@ -933,3 +933,11 @@ header nav .header-user-balance{
 .slot-autoplay .slot-auto-status{flex-basis:100%;text-align:center;font-size:.82rem;line-height:1.35;color:#d8c8b0}
 .slot-autoplay select:disabled{opacity:.6}
 @media(max-width:650px){.slot-autoplay{gap:8px;padding:10px}.slot-autoplay select{min-width:110px}.slot-autoplay .slot-auto-start,.slot-autoplay .slot-auto-stop{padding:9px 12px}}
+
+/* Cinematic bonus demon: hugs the live × multiplier, rather than a static illustration. */
+.slot-bonus-top{overflow:visible;min-height:122px;padding:16px 28px;gap:18px;isolation:isolate}
+.slot-bonus-top>span{position:relative;z-index:4;flex-shrink:0}
+.slot-bonus-top .slot-devil-hug{position:relative;display:block;min-width:285px;width:285px;height:90px;padding:0;overflow:visible;isolation:isolate;flex-shrink:0}
+.slot-bonus-top .slot-devil-hug .bonus-devil-art{position:absolute;z-index:1;top:-59px;left:-5px;display:block;width:290px;height:145px;max-width:none;object-fit:contain;filter:drop-shadow(0 0 13px rgba(255,82,9,.52));pointer-events:none}
+.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{position:absolute;z-index:3;left:50%;top:61%;transform:translate(-50%,-50%);font-size:clamp(2.5rem,5vw,4.6rem);line-height:1;min-width:0;color:#ffe6a4;-webkit-text-stroke:1px #9c3811;text-shadow:0 2px 3px #490d04,0 0 12px #ff8800,0 0 25px #ff5f00;white-space:nowrap}
+@media(max-width:650px){.slot-bonus-top{min-height:96px;padding:8px 11px;gap:3px}.slot-bonus-top>span{font-size:.74rem}.slot-bonus-top .slot-devil-hug{width:178px;min-width:178px;height:76px}.slot-bonus-top .slot-devil-hug .bonus-devil-art{width:188px;height:94px;top:-24px;left:-3px}.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:2.6rem;top:61%}}
