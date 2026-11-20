@@ -424,9 +424,16 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
   if(result.error)return res.status(400).json({error:result.error});
   res.json(result);
   }catch(error){
-    console.error('Slot spin error:',error);
+    const issueId=crypto.randomBytes(4).toString('hex');
+    console.error('Slot spin error ['+issueId+']:',error);
     res.set('Cache-Control','no-store');
-    res.status(500).json({error:'Не удалось выполнить вращение. Попробуйте обновить страницу. Подробности записаны в терминале сервера.'});
+    // Detailed error text is visible only to an authenticated admin in development.
+    // This helps diagnose database migration and payout errors without exposing
+    // internals to regular players or changing balances after a failed transaction.
+    const details=!IS_PRODUCTION&&req.user?.role==='admin'
+      ?' ['+issueId+'] '+String(error?.code||error?.name||'Error')+': '+String(error?.message||'Неизвестная ошибка').slice(0,300)
+      :' Код: '+issueId+'.';
+    res.status(500).json({error:'Ошибка сервера при вращении.'+details});
   }
 });
 app.get('/register',redirectHomeIfLogged,(req,res)=>authForm('Регистрация','/register',req,res));
