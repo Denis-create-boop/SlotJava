@@ -641,15 +641,15 @@
     clearWinningGlow();
     clearBonusLocks();
     hideBigWin();
-    startBackgroundMusic();
     button.disabled=true;
     settingsButton.disabled=true;
     betButton.disabled=true;
     message.textContent='Барабаны вращаются…';
     winDisplay.textContent='0';
-    play('spin_sound');
-
     try{
+      // Audio must never prevent a spin or leave its button locked.
+      try {startBackgroundMusic();} catch(error) {console.warn('Background audio unavailable:',error);}
+      try {play('spin_sound');} catch(error) {console.warn('Spin audio unavailable:',error);}
       const response=await fetch(form.action,{
         method:'POST',
         credentials:'same-origin',
@@ -734,12 +734,12 @@
           play(sound(soundKey)?soundKey:'win_sound');
         }
       }
-      startBackgroundMusic();
+      try {startBackgroundMusic();} catch(error) {console.warn('Background audio unavailable:',error);}
     }catch(error){
       if(/недостаточно/i.test(error.message))showInsufficientFunds();
       message.textContent=error.message+' При необходимости обновите страницу для сверки баланса.';
     }finally{
-      stopSpinSound();
+      try {stopSpinSound();} catch(error) {console.warn('Spin audio stop failed:',error);}
       spinning=false;
       button.disabled=false;
       settingsButton.disabled=false;
