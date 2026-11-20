@@ -77,7 +77,7 @@
   soundToggle.addEventListener('change',()=>{
     soundEnabled=soundToggle.checked;
     try {window.localStorage.setItem('slotjava-sound',soundEnabled?'on':'off');} catch {}
-    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());}
+    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}}
     else startBackgroundMusic();
   });
   function openSettings(){
@@ -123,13 +123,40 @@
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
   const classicSounds=root.classList.contains('slot-theme-classic')||root.dataset.scatterId!=='0';
   let audioContext=null;
+  let ambientMusicTimer=null;
+  let ambientStep=0;
+  function getAudioContext(){
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)return null;
+    audioContext??=new AudioCtx();
+    if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
+    return audioContext;
+  }
+  function synthesizedNote(hz,at,duration,volume=.035,type='sine'){
+    const ctx=getAudioContext();
+    if(!ctx)return;
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type=type;
+    osc.frequency.setValueAtTime(hz,at);
+    gain.gain.setValueAtTime(.0001,at);
+    gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),at+.025);
+    gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(at);osc.stop(at+duration+.02);
+  }
   function playGeneratedSound(name){
     if(!classicSounds||!soundEnabled||name==='music')return;
     try{
-      const AudioCtx=window.AudioContext||window.webkitAudioContext;
-      if(!AudioCtx)return;
-      audioContext??=new AudioCtx();
-      if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
+      const ctx=getAudioContext();
+      if(!ctx)return;
+      if(name==='bonus_sound'){
+        // Original short arcade fanfare, distinct from the ordinary win sound.
+        const notes=[392,523.25,659.25,783.99,1046.5,1318.5];
+        notes.forEach((hz,index)=>synthesizedNote(hz,ctx.currentTime+index*.16,index===5?.85:.33,.10,index===5?'triangle':'sawtooth'));
+        synthesizedNote(261.63,ctx.currentTime+.67,1,.042,'triangle');
+        synthesizedNote(523.25,ctx.currentTime+.67,1,.06,'triangle');
+        return;
+      }
       const notes=name==='spin_sound'?[220,247,262,294,330,294,262,247]
         :name==='mega_win_sound'?[523,659,784,1047,1318]
         :name==='big_win_sound'?[440,554,659,880]
@@ -139,7 +166,7 @@
         const t=audioContext.currentTime+index*(name==='spin_sound'?.075:.11);
         osc.type='sine';osc.frequency.setValueAtTime(hz,t);
         gain.gain.setValueAtTime(.0001,t);
-        gain.gain.exponentialRampToValueAtTime(name==='spin_sound'?.025:.065,t+.015);
+        gain.gain.exponentialRampToValueAtTime(name==='spin_sound'?.055:.065,t+.015);
         gain.gain.exponentialRampToValueAtTime(.0001,t+(name==='spin_sound'?.095:.22));
         osc.connect(gain).connect(audioContext.destination);
         osc.start(t);osc.stop(t+(name==='spin_sound'?.11:.24));
@@ -154,13 +181,29 @@
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
   }
   const music=sound('music');
-  if(music){music.loop=true;music.volume=.18;}
+  if(music){music.loop=true;music.volume=.22;}
   const spinningAudio=sound('spin_sound');
-  if(spinningAudio)spinningAudio.loop=true;
+  if(spinningAudio){spinningAudio.loop=true;spinningAudio.volume=.8;}
   function startBackgroundMusic(){
-    if(soundEnabled&&music?.paused){
-      try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
+    if(!soundEnabled)return;
+    if(music){
+      if(music.paused)try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
+      return;
     }
+    if(!classicSounds||ambientMusicTimer!==null)return;
+    // Original, subtle background melody. Starts only on user interaction.
+    const chords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[174.61,220,293.66]];
+    const playMeasure=()=>{
+      if(!soundEnabled||!audioContext)return;
+      const ctx=getAudioContext();if(!ctx)return;
+      const chord=chords[ambientStep%chords.length];
+      const start=ctx.currentTime+.03;
+      chord.forEach((note,index)=>synthesizedNote(note,start+index*.06,2.9,.007,'sine'));
+      [0,1,2,1].forEach((i,index)=>synthesizedNote(chord[i]*2,start+.2+index*.65,.38,.012,'triangle'));
+      ambientStep++;
+    };
+    getAudioContext();playMeasure();
+    ambientMusicTimer=window.setInterval(playMeasure,3100);
   }
   function stopSpinSound(){
     const reelSound=sound('spin_sound');
@@ -424,6 +467,8 @@
     void bonusIntro.offsetWidth;
     bonusIntro.classList.add('is-showing');
     message.textContent='SCATTER ×'+count+'! '+freeSpins+' бесплатных вращений!';
+    stopSpinSound();
+    play('bonus_sound');
     await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?350:1900));
     bonusIntro.hidden=true;
     bonusIntro.classList.remove('is-showing');
