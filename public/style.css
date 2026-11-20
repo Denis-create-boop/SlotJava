@@ -1096,3 +1096,33 @@ header nav .header-user-balance{
     width:133%;height:151%;left:-16.5%;top:-44%;
   }
 }
+
+/* Bonus artwork final alignment: slightly smaller demon, larger fire
+   behind the frame, multiplier raised above the upper-right corner. */
+.slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+  width:135%;
+  height:159%;
+  left:-17.5%;
+  top:-48%;
+}
+.slot-game.is-bonus-active>.slot-full-background{
+  transform:scale(1.09);
+  transform-origin:center center;
+  object-fit:cover;
+  object-position:center;
+}
+.slot-game.is-bonus-active .slot-bonus-top{
+  top:-20px;
+  right:1px;
+}
+@media(max-width:680px){
+  .slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+    width:130%;
+    height:148%;
+    left:-15%;
+    top:-42%;
+  }
+  .slot-game.is-bonus-active .slot-bonus-top{
+    top:-10px;
+  }
+}
