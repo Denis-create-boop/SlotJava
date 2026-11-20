@@ -451,6 +451,13 @@ db.exec(`
     PRIMARY KEY(user_id,game_id)
   );
 `);
+// Probability weights for exactly 1..4 Scatter on each reel.
+// Weights are normalized at spin time; existing per-reel trigger chances stay unchanged.
+for(const [column,defaultWeight] of [['weight_1',65],['weight_2',23],['weight_3',8],['weight_4',4]]){
+  if(!db.pragma('table_info(game_scatter_reels)').some(item=>item.name===column))
+    db.exec('ALTER TABLE game_scatter_reels ADD COLUMN '+column+
+      ' INTEGER NOT NULL DEFAULT '+defaultWeight+' CHECK('+column+' BETWEEN 0 AND 100)');
+}
 if(firstGame){
   db.transaction(()=>{
     const find=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(firstGame.id);
@@ -474,7 +481,7 @@ if(firstGame){
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
-  return {symbolId:symbol.symbol_id,rules:db.prepare('SELECT reel_index,chance_percent,max_symbols FROM game_scatter_reels WHERE game_id=? ORDER BY reel_index').all(gameId)};
+  return {symbolId:symbol.symbol_id,rules:db.prepare('SELECT reel_index,chance_percent,max_symbols,weight_1,weight_2,weight_3,weight_4 FROM game_scatter_reels WHERE game_id=? ORDER BY reel_index').all(gameId)};
 }
 function getBonusSession(userId,gameId){
   return db.prepare('SELECT remaining,multiplier,bonus_win,bet FROM game_bonus_sessions WHERE user_id=? AND game_id=?').get(userId,gameId)||null;
