@@ -890,3 +890,13 @@ header nav .header-user-balance{
 .game-admin-rename-label{display:grid;gap:6px;min-width:0}
 .game-admin-rename-label input{width:100%;min-width:0}
 @media(max-width:720px){.game-admin-menu,.game-admin-rename-grid{grid-template-columns:1fr}}
+
+
+/* Music and Scatter probability controls */
+.slot-settings-dialog .music-volume-control{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:0 0 9px;font-weight:650}
+.slot-settings-dialog .music-volume-control output{font-variant-numeric:tabular-nums;color:#f1dca3}
+.slot-settings-dialog #slot-music-volume{display:block;width:100%;accent-color:#dcb46d;cursor:pointer;margin:0 0 24px}
+.scatter-count-weights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.scatter-count-weights label{display:grid;gap:5px;min-width:0}
+.scatter-count-weights input{max-width:100%}
+@media(max-width:550px){.scatter-count-weights{grid-template-columns:1fr}}
