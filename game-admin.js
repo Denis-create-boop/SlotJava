@@ -43,6 +43,21 @@ function gameId(req) {
   return Number.isSafeInteger(id) && id>0 ? id : null;
 }
 function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymbols,getPayouts,getLibraryImages,getSymbolImageLinks,getGameBackgroundImages,getScatterSettings,adminOnly,guarded,postGuard,sendPage,h,csrfInput}) {
+  // Display labels are optional per-game overrides; functional route keys stay fixed.
+  db.exec(`CREATE TABLE IF NOT EXISTS game_admin_menu_labels (
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    tab_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    PRIMARY KEY(game_id,tab_key)
+  )`);
+  const menuGroups=[
+    {key:'appearance',label:'Управление фонами',items:['background','reels','cells','panels','library']},
+    {key:'sounds',label:'Управление звуками',items:['audio']},
+    {key:'gameplay',label:'Настройки игры',items:['symbols','frequency','scatter']},
+    {key:'general',label:'Общие настройки',items:['name','menu-labels']}
+  ];
+  const defaultMenuLabel='Названия кнопок';
+  const allowedMenuKeys=new Set([...menuGroups.map(group=>group.key),...menuGroups.flatMap(group=>group.items)]);
   function dynamicAsset(id,key) {
     if(assetTypes[key])return assetTypes[key];
     const match=/^symbol_(\d+)$/.exec(key);
@@ -185,18 +200,42 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
       ['symbols','Символы и коэффициенты','Символы и таблица выплат','star'],
       ['frequency','Частота и размеры выигрыша','Вероятность и пороги крупного выигрыша','percent']
-      ,...(scatter?[['scatter','Бонусная игра SCATTER','Шанс и лимит Scatter на каждом барабане','star']]:[])
+      ,...(scatter?[['scatter','Бонусная игра SCATTER','Шанс и лимит Scatter на каждом барабане','star']]:[]),
+      ['menu-labels',defaultMenuLabel,'Переименование разделов и кнопок','image']
     ];
     const validTabs=new Set(tabs.map(tab=>tab[0]));
     const activeTab=forcedTab&&validTabs.has(forcedTab)?forcedTab:(typeof req.query.tab==='string'&&validTabs.has(req.query.tab)?req.query.tab:'overview');
-    const tabButtons=tabs.map(([key,title,description,icon])=>
-      '<a class="game-admin-menu-button'+(activeTab===key?' is-active':'')+'" href="/admin/games/'+id+'?tab='+key+'"'+
-      (activeTab===key?' aria-current="page"':'')+'>'+
-      '<span class="game-admin-menu-icon" aria-hidden="true">'+
-      ({image:'▧',columns:'▥',grid:'▦',wallet:'▣',music:'♫',folder:'▤',star:'★',percent:'%'}[icon])+
-      '</span><span><strong>'+title+'</strong><small>'+description+'</small></span></a>').join('');
+    const savedLabels=new Map(db.prepare('SELECT tab_key,label FROM game_admin_menu_labels WHERE game_id=?').all(id).map(row=>[row.tab_key,row.label]));
+    const defaultTabs=new Map(tabs.map(tab=>[tab[0],tab]));
+    const menuLabel=(key,defaultLabel)=>savedLabels.get(key)||defaultLabel;
+    const tabButtons=menuGroups.map(group=>{
+      const items=group.items.filter(key=>defaultTabs.has(key));
+      const selected=items.includes(activeTab);
+      const links=items.map(key=>{
+        const [_,title,description,icon]=defaultTabs.get(key);
+        return '<a class="game-admin-submenu-link'+(activeTab===key?' is-active':'')+'" href="/admin/games/'+id+'?tab='+key+'"'+
+          (activeTab===key?' aria-current="page"':'')+'>'+
+          '<span>'+h(menuLabel(key,title))+'</span><small>'+h(description)+'</small></a>';
+      }).join('');
+      return '<details class="game-admin-menu-group"'+(selected?' open':'')+'><summary>'+
+        '<strong>'+h(menuLabel(group.key,group.label))+'</strong><span aria-hidden="true">▾</span></summary>'+
+        '<div class="game-admin-submenu">'+links+'</div></details>';
+    }).join('');
     const panelStart=(title)=>'<section class="panel game-admin-selected" id="'+activeTab+'"><h2>'+title+'</h2>';
     let panel='';
+    if(activeTab==='menu-labels'){
+      const allLabels=[...menuGroups.map(group=>[group.key,group.label]),
+        ...tabs.filter(tab=>tab[0]!=='menu-labels').map(tab=>[tab[0],tab[1]]),
+        ['menu-labels',defaultMenuLabel]];
+      const fields=allLabels.map(([key,defaultLabel])=>
+        '<label class="game-admin-rename-label">'+h(defaultLabel)+
+        '<input type="text" name="'+key+'" maxlength="60" value="'+h(menuLabel(key,defaultLabel))+'" required></label>').join('');
+      panel=panelStart('Переименование кнопок')+
+        '<p class="hint">Названия сохраняются отдельно для этой игры. Изменение названия не затрагивает сами настройки и ссылки.</p>'+
+        '<form method="post" action="/admin/games/'+id+'/menu-labels">'+csrf+
+        '<div class="game-admin-rename-grid">'+fields+'</div>'+
+        '<button class="primary" type="submit">Сохранить названия</button></form></section>';
+    }
     if(activeTab==='name')panel=panelStart('Название игры')+
       '<p class="hint">Название отображается в каталоге игр и на карточке админки. Ссылка на игру и настройки при переименовании сохраняются.</p>'+
       '<form method="post" class="game-title-form" action="/admin/games/'+id+'/title">'+csrf+
@@ -263,6 +302,21 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Выберите нужный раздел кнопкой выше. Настройки, файлы и коэффициенты сохраняются отдельно для каждой игры.</p></section>')+
       '</div>',req,error?400:200);
   }
+  app.post('/admin/games/:id/menu-labels',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(!game)return res.sendStatus(404);
+    const changes=[];
+    for(const key of allowedMenuKeys){
+      const label=req.body?.[key];
+      if(typeof label!=='string'||!label.trim()||label.trim().length>60)
+        return show(req,res,'Каждое название должно содержать от 1 до 60 символов.',true,'menu-labels');
+      changes.push([key,label.trim()]);
+    }
+    const upsert=db.prepare(`INSERT INTO game_admin_menu_labels(game_id,tab_key,label)
+      VALUES(?,?,?) ON CONFLICT(game_id,tab_key) DO UPDATE SET label=excluded.label`);
+    db.transaction(()=>{for(const [key,label] of changes)upsert.run(id,key,label);})();
+    res.redirect(sectionUrl(id,'menu-labels')+'&saved=1');
+  });
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
   app.post('/admin/games/:id/scatter',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
