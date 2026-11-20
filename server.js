@@ -487,7 +487,7 @@ app.post('/admin/users/:id/balance',adminOnly,postGuard,(req,res)=>{
   const id=Number(req.params.id),raw=String(req.body?.balance??'');
   if(!Number.isSafeInteger(id)||id<1||!db.prepare('SELECT 1 FROM users WHERE id=?').get(id))
     return res.sendStatus(404);
-  if(!/^(0|[1-9]\\d*)$/.test(raw))return res.status(400).send('Баланс должен быть целым неотрицательным числом.');
+  if(!/^(0|[1-9][0-9]*)$/.test(raw))return res.status(400).send('Баланс должен быть целым неотрицательным числом.');
   const amount=Number(raw);
   if(!Number.isSafeInteger(amount)||amount>1000000000)
     return res.status(400).send('Баланс должен быть от 0 до 1 000 000 000.');
