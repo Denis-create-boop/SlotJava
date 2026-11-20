@@ -290,6 +290,12 @@ function firstGamePage(game,req){
     '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span id="slot-spin-label">'+(bonusVisible?'БЕСПЛАТНО':'ВРАЩАТЬ')+'</span></button></form></div>'+
+    '<div class="slot-autoplay" aria-label="Автоматические вращения">'+
+    '<label for="slot-auto-count">Автоигра</label><select id="slot-auto-count" aria-label="Количество платных автовращений">'+
+    [5,10,25,50,100,250].map(n=>'<option value="'+n+'"'+(n===10?' selected':'')+'>'+n+' вращений</option>').join('')+'</select>'+
+    '<button type="button" id="slot-auto-start" class="slot-auto-start">▶ Запустить</button>'+
+    '<button type="button" id="slot-auto-stop" class="slot-auto-stop" hidden>■ Остановить</button>'+
+    '<span id="slot-auto-status" class="slot-auto-status" role="status" aria-live="polite">Выберите количество вращений.</span></div>'+
     '<p class="slot-message" id="slot-result" role="status" aria-live="polite">Нажмите на круглую кнопку для вращения.</p></div>'+
     '<dialog class="slot-settings-dialog" id="slot-settings-dialog" aria-labelledby="slot-settings-heading">'+
     '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть настройки">×</button></form>'+
