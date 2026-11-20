@@ -419,6 +419,14 @@
   const bonusMathMultiply=document.getElementById('slot-bonus-math-multiply');
   const bonusMathResult=document.getElementById('slot-bonus-math-result');
   const delay=ms=>new Promise(resolve=>window.setTimeout(resolve,reducedMotion?Math.min(ms,150):ms));
+  async function showBonusWinIntro(tier){
+    if(tier!=='big'&&tier!=='mega')return;
+    showBigWin(tier);
+    message.textContent=tier==='mega'?'Очень крупный выигрыш!':'Крупный выигрыш!';
+    play(tier==='mega'?'mega_win_sound':'big_win_sound');
+    await delay(3000);
+    hideBigWin();
+  }
   async function showBonusCalculation(base,factor,total){
     if(!bonusMath)return;
     bonusMathBase.textContent=String(base);
@@ -537,16 +545,19 @@
       message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!'
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
-      showBigWin(tier);
+      if(result.mode!=='bonus')showBigWin(tier);
       if(result.mode==='base'&&result.freeSpins>0){
         await celebrateScatter(result.scatterCount,result.freeSpins);
         updateBonus(true,result.freeSpins,2,0);
         message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
           ' бесплатных вращений. Начальный множитель ×2!';
       }else if(result.mode==='bonus'){
-        hideBigWin();
-        // There is nothing to multiply or announce on a no-win bonus spin.
-        if(result.baseWin>0)await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
+        // The tier is based on the final multiplied award, supplied by the server.
+        // Announce a large bonus win first, and only then reveal its calculation.
+        if(result.baseWin>0){
+          await showBonusWinIntro(tier);
+          await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
+        }
         if(result.winIncrease)await animateMultiplierIncrease('win',result.winIncrease);
         updateBonus(!result.completedBonus,result.remaining||0,result.nextMultiplier||2,result.bonusWin||0);
         message.textContent=result.completedBonus
@@ -562,8 +573,12 @@
         }
       }
       if(result.total>0){
-        const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
-        play(sound(soundKey)?soundKey:'win_sound');
+        // Large bonus wins already played their fanfare before multiplication.
+        const announcedBonus=result.mode==='bonus'&&(tier==='big'||tier==='mega');
+        if(!announcedBonus){
+          const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
+          play(sound(soundKey)?soundKey:'win_sound');
+        }
       }
       startBackgroundMusic();
     }catch(error){
