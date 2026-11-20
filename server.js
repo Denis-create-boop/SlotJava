@@ -294,6 +294,8 @@ function firstGamePage(game,req){
     '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть настройки">×</button></form>'+
     '<h2 id="slot-settings-heading">Настройки игры</h2>'+
     '<label class="sound-toggle"><input type="checkbox" id="slot-sound-toggle" checked> Включить звук</label>'+
+    '<label class="music-volume-control" for="slot-music-volume">Громкость фоновой музыки <output id="slot-music-volume-value">65%</output></label>'+
+    '<input type="range" id="slot-music-volume" min="0" max="100" step="1" value="65" aria-label="Громкость фоновой музыки">'+
     '<form method="post" id="slot-bet-form" action="/games/'+h(game.slug)+'/bet">'+csrfInput(req.session.csrf_token)+
     '<label for="slot-bet-select">Ставка за вращение</label><select id="slot-bet-select" name="bet">'+
     DEMO_BETS.map(bet=>'<option value="'+bet+'"'+(wallet.bet===bet?' selected':'')+'>'+bet+' очков</option>').join('')+
