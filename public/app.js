@@ -182,19 +182,40 @@
         synthesizedNote(523.25,ctx.currentTime+.67,1,.06,'triangle');
         return;
       }
-      const notes=name==='spin_sound'?[220,247,262,294,330,294,262,247]
-        :name==='mega_win_sound'?[523,659,784,1047,1318]
-        :name==='big_win_sound'?[440,554,659,880]
-        :name==='win_sound'?[523,659,784]:[440];
+      if(name==='win_sound'||name==='big_win_sound'||name==='mega_win_sound'){
+        // A gentle, original victory chime with a bright metallic shimmer;
+        // it evokes a reward without imitating literal falling coins.
+        const isMega=name==='mega_win_sound',isBig=name==='big_win_sound';
+        const notes=isMega?[659.25,830.61,987.77,1318.51,1567.98,1975.53]:
+          isBig?[587.33,739.99,880,1174.66,1479.98]:
+          [659.25,830.61,987.77,1318.51];
+        const start=ctx.currentTime+.015;
+        notes.forEach((hz,index)=>{
+          const at=start+index*(isMega?.115:.135);
+          const duration=(index===notes.length-1?(isMega?1.15:.78):.48);
+          for(const [ratio,level] of [[1,.046],[2.01,.013],[3.92,.005]]){
+            const oscillator=ctx.createOscillator(),gain=ctx.createGain();
+            oscillator.type='sine';
+            oscillator.frequency.setValueAtTime(hz*ratio,at);
+            gain.gain.setValueAtTime(.0001,at);
+            gain.gain.exponentialRampToValueAtTime(level*(isMega?1.2:isBig?1.1:1),at+.012);
+            gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+            oscillator.connect(gain).connect(ctx.destination);
+            oscillator.start(at);oscillator.stop(at+duration+.02);
+          }
+        });
+        return;
+      }
+      const notes=[220,247,262,294,330,294,262,247];
       notes.forEach((hz,index)=>{
-        const osc=audioContext.createOscillator(),gain=audioContext.createGain();
-        const t=audioContext.currentTime+index*(name==='spin_sound'?.075:.11);
+        const osc=ctx.createOscillator(),gain=ctx.createGain();
+        const t=ctx.currentTime+index*.075;
         osc.type='sine';osc.frequency.setValueAtTime(hz,t);
         gain.gain.setValueAtTime(.0001,t);
-        gain.gain.exponentialRampToValueAtTime(name==='spin_sound'?.055:.065,t+.015);
-        gain.gain.exponentialRampToValueAtTime(.0001,t+(name==='spin_sound'?.095:.22));
-        osc.connect(gain).connect(audioContext.destination);
-        osc.start(t);osc.stop(t+(name==='spin_sound'?.11:.24));
+        gain.gain.exponentialRampToValueAtTime(.055,t+.015);
+        gain.gain.exponentialRampToValueAtTime(.0001,t+.095);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);osc.stop(t+.11);
       });
     }catch{}
   }
@@ -243,6 +264,24 @@
       osc.connect(filter).connect(envelope).connect(ambientGain);
       osc.start(at);osc.stop(at+duration+.1);
     };
+    // Gentle, low-volume distorted power-chord riff behind the ambient layers.
+    const guitarPluck=(hz,at,duration=.34)=>{
+      const osc=ctx.createOscillator(),filter=ctx.createBiquadFilter(),
+        drive=ctx.createWaveShaper(),envelope=ctx.createGain();
+      const curve=new Float32Array(256);
+      for(let i=0;i<curve.length;i++){
+        const x=i*2/(curve.length-1)-1;
+        curve[i]=Math.tanh(x*2.7);
+      }
+      drive.curve=curve;drive.oversample='2x';
+      osc.type='sawtooth';osc.frequency.setValueAtTime(hz,at);
+      filter.type='lowpass';filter.frequency.value=920;
+      envelope.gain.setValueAtTime(.0001,at);
+      envelope.gain.exponentialRampToValueAtTime(.032,at+.013);
+      envelope.gain.exponentialRampToValueAtTime(.0001,at+duration);
+      osc.connect(drive).connect(filter).connect(envelope).connect(ambientGain);
+      osc.start(at);osc.stop(at+duration+.02);
+    };
     const playMeasure=()=>{
       if(!soundEnabled)return;
       const chord=harmony[ambientStep%harmony.length];
@@ -252,6 +291,13 @@
       tone(chord.bass/2,start,4.15,.07,'sine',220,.8);
       chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.052,'triangle',950,1.05));
       chord.flute.forEach((hz,index)=>tone(hz,start+.4+index*.88,.92,.095,'sine',1450,.16));
+      // A restrained heavy-rock hint: short palm-muted fifths, not a lead solo.
+      const riff=[0,.48,.96,1.92,2.4,3.34];
+      riff.forEach((offset,index)=>{
+        const root=chord.bass*(index===3?2:1);
+        guitarPluck(root,start+offset,index===3?.46:.29);
+        guitarPluck(root*1.5,start+offset,index===3?.46:.29);
+      });
       ambientStep++;
     };
     playMeasure();
