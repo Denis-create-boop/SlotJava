@@ -941,3 +941,29 @@ header nav .header-user-balance{
 .slot-bonus-top .slot-devil-hug .bonus-devil-art{position:absolute;z-index:1;top:-59px;left:-5px;display:block;width:290px;height:145px;max-width:none;object-fit:contain;filter:drop-shadow(0 0 13px rgba(255,82,9,.52));pointer-events:none}
 .slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{position:absolute;z-index:3;left:50%;top:61%;transform:translate(-50%,-50%);font-size:clamp(2.5rem,5vw,4.6rem);line-height:1;min-width:0;color:#ffe6a4;-webkit-text-stroke:1px #9c3811;text-shadow:0 2px 3px #490d04,0 0 12px #ff8800,0 0 25px #ff5f00;white-space:nowrap}
 @media(max-width:650px){.slot-bonus-top{min-height:96px;padding:8px 11px;gap:3px}.slot-bonus-top>span{font-size:.74rem}.slot-bonus-top .slot-devil-hug{width:178px;min-width:178px;height:76px}.slot-bonus-top .slot-devil-hug .bonus-devil-art{width:188px;height:94px;top:-24px;left:-3px}.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:2.6rem;top:61%}}
+
+/* Optional PNG demon frame uploaded in Admin > Appearance.
+   The picture is an overlay, not a reel background: the transparent middle
+   leaves all symbols visible and the claws hold the edges of the playing field. */
+.slot-game .slot-bonus-field-frame{display:none!important}
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame){overflow:visible;isolation:isolate}
+.slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+  position:absolute;display:block!important;z-index:9;
+  width:150%;height:185%;left:-25%;top:-66%;
+  max-width:none;object-fit:fill;pointer-events:none;user-select:none
+}
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame)>.reel-columns{position:relative;z-index:2}
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame)>.slot-big-win-overlay,
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame)>.slot-bonus-intro,
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame)>.slot-bonus-math,
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame)>.slot-bonus-finish{z-index:20}
+/* The live multiplier stays readable without any broken-image placeholder. */
+.slot-bonus-top .slot-devil-hug{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;width:auto;height:auto;padding:0}
+.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{
+ position:relative;left:auto;top:auto;transform:none;font-size:clamp(2.5rem,5vw,4.5rem);
+ line-height:1;white-space:nowrap
+}
+@media(max-width:650px){
+ .slot-bonus-top .slot-devil-hug{width:auto;min-width:0;height:auto}
+ .slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:2.7rem;left:auto;top:auto;transform:none}
+}
