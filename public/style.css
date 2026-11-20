@@ -900,3 +900,17 @@ header nav .header-user-balance{
 .scatter-count-weights label{display:grid;gap:5px;min-width:0}
 .scatter-count-weights input{max-width:100%}
 @media(max-width:550px){.scatter-count-weights{grid-template-columns:1fr}}
+
+
+/* Bonus mascot with outstretched arms around the current multiplier */
+.slot-bonus-top .slot-devil-hug{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:0;min-width:115px;padding-top:32px;isolation:isolate}
+.slot-bonus-top .slot-devil-hug .devil-face{position:absolute;z-index:2;top:-11px;left:50%;transform:translateX(-50%);font-size:clamp(2rem,4.4vw,3.1rem);filter:drop-shadow(0 0 11px rgba(233,57,88,.65));line-height:1}
+.slot-bonus-top .slot-devil-hug strong{position:relative;z-index:2;display:inline-block;min-width:2ch;text-align:center;text-shadow:0 0 15px #f6af38}
+.slot-bonus-top .slot-devil-hug .devil-arm{align-self:center;font-weight:1000;line-height:.8;color:#bc363d;font-size:clamp(2rem,5vw,3.8rem);text-shadow:0 2px 5px #22050b,0 0 9px #e85353}
+.slot-bonus-top .slot-devil-hug .devil-arm-left{transform:rotate(-23deg) translate(9px,3px)}
+.slot-bonus-top .slot-devil-hug .devil-arm-right{transform:rotate(23deg) translate(-9px,3px)}
+.slot-insufficient-overlay{position:absolute;z-index:35;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:15px;text-align:center;padding:25px;border-radius:12px;background:rgba(19,5,15,.93);box-shadow:inset 0 0 80px rgba(225,52,67,.27)}
+.slot-insufficient-overlay[hidden]{display:none!important}
+.slot-insufficient-overlay strong{font-size:clamp(1.3rem,4.7vw,3rem);line-height:1.18;letter-spacing:.015em;color:#fff1c7;text-shadow:0 2px 15px rgba(255,80,84,.8)}
+.slot-insufficient-overlay span{color:#f8c9bc;font-size:clamp(.9rem,2vw,1.3rem);line-height:1.4}
+@media(max-width:600px){.slot-bonus-top .slot-devil-hug{min-width:85px;padding-top:26px}.slot-bonus-top .slot-devil-hug .devil-face{top:-8px}}
