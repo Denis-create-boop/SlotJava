@@ -645,13 +645,68 @@
     bonusIntro.classList.remove('is-showing');
     scatterTiles.forEach(tile=>tile.classList.remove('scatter-celebrate'));
   }
+  // Autoplay always uses the existing server-validated spin endpoint.
+  // Counts paid spins only; bonus/free spins do not consume the selected quota.
+  const autoCount=document.getElementById('slot-auto-count');
+  const autoStart=document.getElementById('slot-auto-start');
+  const autoStop=document.getElementById('slot-auto-stop');
+  const autoStatus=document.getElementById('slot-auto-status');
+  let autoRunning=false;
+  let autoRemaining=0;
+  let autoTimer=null;
+  let autoDispatching=false;
+  function paintAutoplay(){
+    if(!autoStart||!autoStop||!autoCount)return;
+    autoStart.hidden=autoRunning;
+    autoStop.hidden=!autoRunning;
+    autoCount.disabled=autoRunning;
+    if(autoRunning)autoStatus.textContent='Осталось платных вращений: '+autoRemaining+(bonusActive?' · бонусные вращения бесплатно':'');
+  }
+  function stopAutoplay(reason='Автоигра остановлена.'){
+    autoRunning=false;
+    if(autoTimer!==null){window.clearTimeout(autoTimer);autoTimer=null;}
+    if(autoStatus)autoStatus.textContent=reason;
+    paintAutoplay();
+    if(!spinning){button.disabled=false;settingsButton.disabled=false;betButton.disabled=bonusActive;}
+  }
+  function scheduleAutoplay(){
+    if(!autoRunning||spinning)return;
+    if(!bonusActive&&autoRemaining<=0){stopAutoplay('Выбранные вращения завершены.');return;}
+    if(!bonusActive&&Number(balance.textContent)<Number(betDisplay.textContent)){
+      showInsufficientFunds();
+      stopAutoplay('Автоигра остановлена: недостаточно средств.');
+      return;
+    }
+    paintAutoplay();
+    autoTimer=window.setTimeout(()=>{
+      autoTimer=null;
+      if(!autoRunning||spinning)return;
+      autoDispatching=true;
+      try{form.requestSubmit(button);}finally{autoDispatching=false;}
+    },1000);
+  }
+  if(autoStart&&autoStop&&autoCount){
+    autoStart.addEventListener('click',()=>{
+      if(spinning||autoRunning||!definitions.length)return;
+      const count=Number(autoCount.value);
+      if(!Number.isSafeInteger(count)||count<1||count>250)return;
+      autoRemaining=count;
+      autoRunning=true;
+      if(bonusFinish)bonusFinish.hidden=true;
+      paintAutoplay();
+      scheduleAutoplay();
+    });
+    autoStop.addEventListener('click',()=>stopAutoplay('Автоигра остановлена пользователем.'));
+  }
   let spinning=false;
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(spinning||!definitions.length)return;
+    if(autoRunning&&!autoDispatching)return;
     if(!bonusActive&&Number(balance.textContent)<Number(betDisplay.textContent)){
       showInsufficientFunds();
       message.textContent='Недостаточно денежных средств для ставки.';
+      if(autoRunning)stopAutoplay('Автоигра остановлена: недостаточно средств.');
       return;
     }
     spinning=true;
@@ -692,6 +747,9 @@
           !Number.isSafeInteger(result.balance)||result.balance<0){
         throw new Error('Некорректный ответ игрового сервера.');
       }
+      // Decrement only a paid spin, never a free bonus spin.
+      if(autoRunning&&result.mode==='base')autoRemaining=Math.max(0,autoRemaining-1);
+      if(autoRunning)paintAutoplay();
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
         await animateBonusSteps(result.steps);
       }else{
@@ -740,7 +798,7 @@
         if(result.completedBonus&&bonusFinish){
           hideBigWin();
           bonusFinishTotal.textContent=String(result.bonusWin);
-          bonusFinish.hidden=false;
+          bonusFinish.hidden=autoRunning;
         }
       }
       if(result.total>0){
@@ -753,6 +811,7 @@
       }
       try {startBackgroundMusic();} catch(error) {console.warn('Background audio unavailable:',error);}
     }catch(error){
+      if(autoRunning)stopAutoplay('Автоигра остановлена из-за ошибки.');
       if(/недостаточно/i.test(error.message))showInsufficientFunds();
       message.textContent=error.message+' При необходимости обновите страницу для сверки баланса.';
     }finally{
@@ -761,6 +820,7 @@
       button.disabled=false;
       settingsButton.disabled=false;
       betButton.disabled=bonusActive;
+      if(autoRunning)scheduleAutoplay();
     }
   });
 })();
