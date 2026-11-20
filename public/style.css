@@ -914,3 +914,10 @@ header nav .header-user-balance{
 .slot-insufficient-overlay strong{font-size:clamp(1.3rem,4.7vw,3rem);line-height:1.18;letter-spacing:.015em;color:#fff1c7;text-shadow:0 2px 15px rgba(255,80,84,.8)}
 .slot-insufficient-overlay span{color:#f8c9bc;font-size:clamp(.9rem,2vw,1.3rem);line-height:1.4}
 @media(max-width:600px){.slot-bonus-top .slot-devil-hug{min-width:85px;padding-top:26px}.slot-bonus-top .slot-devil-hug .devil-face{top:-8px}}
+
+/* High-contrast red demon art and a separately updated multiplier. */
+.slot-bonus-top .slot-devil-hug{display:flex;align-items:center;justify-content:center;gap:10px;padding:0;min-width:0;flex-shrink:0}
+.slot-bonus-top .slot-devil-hug .bonus-devil-art{display:block;position:relative;width:clamp(74px,10vw,116px);height:clamp(74px,10vw,116px);object-fit:contain;filter:drop-shadow(0 0 10px rgba(255,77,22,.42));flex-shrink:0}
+.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:clamp(2.3rem,5.8vw,4.8rem);position:relative;z-index:2;min-width:2ch;text-shadow:0 1px 2px #4d1300,0 0 16px #ff9a17,0 0 28px #ff6f00}
+.slot-bonus-top{min-height:105px}
+@media(max-width:600px){.slot-bonus-top{gap:8px;min-height:82px;padding:7px}.slot-bonus-top .slot-devil-hug{padding:0;min-width:0;gap:3px}.slot-bonus-top .slot-devil-hug .bonus-devil-art{width:clamp(60px,19vw,82px);height:clamp(60px,19vw,82px)}.slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:clamp(1.9rem,8vw,3.3rem)}}
