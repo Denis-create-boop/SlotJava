@@ -1019,3 +1019,55 @@ header nav .header-user-balance{
     width:112%;left:-6%;height:120%;top:-20%;
   }
 }
+
+/* Compact machine layout: keep the full demon artwork, shrink the game itself. */
+.slot-game{width:min(100%,800px);max-width:800px;margin:8px auto 12px;padding:clamp(9px,1.5vw,16px);overflow:hidden}
+.slot-game .slot-machine{position:relative;width:100%;max-width:760px;gap:clamp(5px,1vh,11px)}
+.slot-game .slot-reels.slot-reels-ribbon{--reel-cell-height:clamp(48px,7.5vh,77px);padding:clamp(6px,1vw,11px)}
+.slot-game .slot-meter{min-height:clamp(56px,7.2vh,76px);padding:5px 4px;gap:3px}
+.slot-game .slot-bottom-bar{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:clamp(5px,1vw,10px);align-items:center}
+.slot-game .slot-bottom-bar .slot-meters{min-width:0}
+.slot-game #slot-spin-button.spin-round{width:clamp(65px,8.5vh,94px);height:clamp(65px,8.5vh,94px);padding:5px}
+.slot-game .spin-round-icon{font-size:clamp(1.9rem,4.3vh,3.1rem)}
+.slot-game .slot-auto-trigger.spin-round{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;width:clamp(54px,7vh,76px);height:clamp(54px,7vh,76px);min-width:0;padding:4px;border-radius:50%;border:2px solid #deb678;background:radial-gradient(circle at 25% 22%,#ac85d5,#5f418d 63%,#33274e);color:#fff4d9;font-weight:850;font-size:.66rem;box-shadow:0 0 14px #0009;cursor:pointer}
+.slot-game .slot-auto-trigger.spin-round .spin-round-icon{font-size:clamp(1.6rem,3.1vh,2.4rem);line-height:1.1}
+.slot-game .slot-auto-trigger.is-auto-running{background:radial-gradient(circle at 30% 25%,#e58d70,#a2323c 60%,#522027);border-color:#ffb89a}
+.slot-game .slot-auto-trigger:disabled{opacity:.5}
+.slot-auto-dialog .slot-auto-dialog-options{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:22px}
+.slot-auto-dialog .slot-auto-dialog-options select{background:#211a2d;color:#fff;border:1px solid #b58c62;border-radius:9px;padding:10px}
+.slot-auto-dialog .slot-auto-start,.slot-auto-dialog .slot-auto-stop{border:1px solid #dab471;background:linear-gradient(135deg,#8d582c,#503325);color:#fff4dc;padding:12px 18px;border-radius:10px;font-weight:800;cursor:pointer}
+.slot-auto-status{display:block;text-align:center;font-size:.8rem;line-height:1.2;min-height:0;color:#f0d5ac}
+.slot-auto-status:empty{display:none}
+.slot-game .slot-bonus-top{
+  position:absolute;right:0;top:0;left:auto;z-index:55;isolation:isolate;
+  width:auto;min-height:0;height:auto;margin:0;padding:4px 12px;
+  display:flex;justify-content:center;align-items:center;gap:6px;
+  background:linear-gradient(110deg,rgba(40,12,13,.82),rgba(90,27,13,.84));
+  border:1px solid rgba(255,194,95,.78);border-radius:12px;
+  box-shadow:0 0 15px rgba(255,120,29,.28)
+}
+.slot-game .slot-bonus-top[hidden]{display:none!important}
+.slot-game .slot-bonus-top .slot-devil-hug{min-width:0;width:auto;height:auto;padding:0}
+.slot-game .slot-bonus-top #slot-bonus-multiplier{font-size:clamp(2.4rem,6vh,4rem);z-index:56}
+.slot-game .slot-bonus-top #slot-bonus-plus{position:absolute;right:100%;top:0;z-index:57;white-space:nowrap}
+.slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+  /* Original oversized demon frame; surrounding game has been compacted instead. */
+  width:150%;height:185%;left:-25%;top:-66%;
+  display:block!important;z-index:3;pointer-events:none;object-fit:fill;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame){overflow:visible}
+.slot-game .slot-bonus-stats{margin:0;padding:6px 10px;gap:10px;min-height:32px}
+.slot-game .slot-message{margin:0;padding:2px 5px;min-height:0;font-size:.82rem}
+@media(max-width:680px){
+ .slot-game{width:100%;padding:8px;border-radius:13px}
+ .slot-game .slot-reels.slot-reels-ribbon{--reel-cell-height:clamp(45px,12vw,66px)}
+ .slot-game .slot-bottom-bar{gap:4px;grid-template-columns:auto minmax(0,1fr) auto auto}
+ .slot-game .slot-meter{min-height:54px;padding:3px 1px}
+ .slot-game .slot-meter span{font-size:.6rem}
+ .slot-game .slot-meter strong{font-size:clamp(.8rem,2.7vw,1.15rem)}
+ .slot-game #slot-spin-button.spin-round{width:clamp(52px,12vw,69px);height:clamp(52px,12vw,69px)}
+ .slot-game .slot-auto-trigger.spin-round{width:clamp(43px,10vw,57px);height:clamp(43px,10vw,57px);font-size:.52rem}
+ .slot-game .slot-auto-trigger.spin-round .spin-round-icon{font-size:1.55rem}
+ .slot-game .slot-bonus-top{padding:3px 6px}
+ .slot-game .slot-bonus-top #slot-bonus-multiplier{font-size:2rem}
+}
