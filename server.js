@@ -273,7 +273,7 @@ function firstGamePage(game,req){
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
-    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><span>БОНУСНАЯ ИГРА</span><div class="slot-devil-hug" aria-hidden="true"><img class="bonus-devil-art" src="/static/images/bonus-devil.svg" alt=""><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-hidden="true"></em></div>':'')+
+    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><span>БОНУСНАЯ ИГРА</span><div class="slot-devil-hug" aria-hidden="true"><img class="bonus-devil-art" src="/static/images/bonus-devil.webp" alt=""><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-hidden="true"></em></div>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
