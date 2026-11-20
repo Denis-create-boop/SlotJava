@@ -11,6 +11,15 @@
   const winDisplay=document.getElementById('slot-win');
   const bigWinOverlay=document.getElementById('slot-big-win-overlay');
   const bigWinLabel=document.getElementById('slot-big-win-label');
+  const insufficientOverlay=document.getElementById('slot-insufficient-overlay');
+  let insufficientTimer=null;
+  function showInsufficientFunds(){
+    if(!insufficientOverlay)return;
+    if(insufficientTimer!==null)window.clearTimeout(insufficientTimer);
+    insufficientOverlay.hidden=false;
+    insufficientTimer=window.setTimeout(()=>{insufficientOverlay.hidden=true;insufficientTimer=null;},3900);
+  }
+
   let bigWinTimer=null;
   function hideBigWin(){
     if(bigWinTimer!==null){window.clearTimeout(bigWinTimer);bigWinTimer=null;}
@@ -275,9 +284,9 @@
       }
       drive.curve=curve;drive.oversample='2x';
       osc.type='sawtooth';osc.frequency.setValueAtTime(hz,at);
-      filter.type='lowpass';filter.frequency.value=920;
+      filter.type='lowpass';filter.frequency.value=1420;
       envelope.gain.setValueAtTime(.0001,at);
-      envelope.gain.exponentialRampToValueAtTime(.032,at+.013);
+      envelope.gain.exponentialRampToValueAtTime(.065,at+.013);
       envelope.gain.exponentialRampToValueAtTime(.0001,at+duration);
       osc.connect(drive).connect(filter).connect(envelope).connect(ambientGain);
       osc.start(at);osc.stop(at+duration+.02);
@@ -292,11 +301,12 @@
       chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.052,'triangle',950,1.05));
       chord.flute.forEach((hz,index)=>tone(hz,start+.4+index*.88,.92,.095,'sine',1450,.16));
       // A restrained heavy-rock hint: short palm-muted fifths, not a lead solo.
-      const riff=[0,.48,.96,1.92,2.4,3.34];
+      const riff=[0,.4,.8,1.25,1.65,2.08,2.5,2.95,3.37,3.77];
       riff.forEach((offset,index)=>{
         const root=chord.bass*(index===3?2:1);
-        guitarPluck(root,start+offset,index===3?.46:.29);
-        guitarPluck(root*1.5,start+offset,index===3?.46:.29);
+        guitarPluck(root,start+offset,index===3?.54:.39);
+        guitarPluck(root*1.5,start+offset,index===3?.54:.39);
+        guitarPluck(root*2,start+offset,index===3?.4:.3);
       });
       ambientStep++;
     };
@@ -596,6 +606,11 @@
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(spinning||!definitions.length)return;
+    if(!bonusActive&&Number(balance.textContent)<Number(betDisplay.textContent)){
+      showInsufficientFunds();
+      message.textContent='Недостаточно денежных средств для ставки.';
+      return;
+    }
     spinning=true;
     clearWinningGlow();
     clearBonusLocks();
@@ -624,7 +639,10 @@
       catch{
         throw new Error('Сервер вернул ошибку '+response.status+' вместо результата вращения. Подробности смотрите в терминале npm start.');
       }
-      if(!response.ok)throw new Error(result.error||'Ошибка вращения ('+response.status+').');
+      if(!response.ok){
+        if(typeof result.error==='string'&&/недостаточно/i.test(result.error))showInsufficientFunds();
+        throw new Error(result.error||'Ошибка вращения ('+response.status+').');
+      }
       if(!Array.isArray(result.cells)||result.cells.length!==rowCount*reelCount||
           !result.cells.every(id=>symbols.has(id))||
           !Number.isSafeInteger(result.total)||result.total<0||
@@ -692,6 +710,7 @@
       }
       startBackgroundMusic();
     }catch(error){
+      if(/недостаточно/i.test(error.message))showInsufficientFunds();
       message.textContent=error.message+' При необходимости обновите страницу для сверки баланса.';
     }finally{
       stopSpinSound();
