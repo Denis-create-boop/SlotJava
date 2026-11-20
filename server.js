@@ -264,7 +264,7 @@ function firstGamePage(game,req){
     const image=chosenImages.get(symbol.id)||url('symbol_'+symbol.id)||'';
     return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
-  const audio=['music','spin_sound','win_sound','big_win_sound','mega_win_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
+  const audio=['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
   const scatter=game.slug==='slot-classic'?getScatterSettings(game.id):null;
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
