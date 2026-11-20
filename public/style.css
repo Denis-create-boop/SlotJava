@@ -1162,3 +1162,47 @@ header nav .header-user-balance{
   }
   .slot-game.is-bonus-active .slot-bonus-top{top:-23px}
 }
+
+/* Bonus screen: preserve the cinematic composition but keep all four
+   symbol rows completely inside the decorative demon's inner border. */
+.slot-game.is-bonus-active .slot-reels.slot-reels-ribbon{
+  padding:clamp(9px,1.4vw,15px);
+  padding-bottom:clamp(17px,2.5vw,24px);
+}
+.slot-game.is-bonus-active .slot-reels-ribbon > .slot-bonus-field-frame{
+  width:135%;
+  left:-17.5%;
+  height:165%;
+  top:-54%;
+  max-width:none;
+  object-fit:fill;
+  pointer-events:none;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon > .reel-columns{
+  position:relative;
+  z-index:8;
+  overflow:visible;
+}
+.slot-game.is-bonus-active .reel-column,
+.slot-game.is-bonus-active .reel-window{
+  box-sizing:border-box;
+}
+.slot-game.is-bonus-active .slot-bonus-top{
+  top:-46px;
+  right:2px;
+}
+@media(max-width:680px){
+  .slot-game.is-bonus-active .slot-reels.slot-reels-ribbon{
+    padding:5px;
+    padding-bottom:11px;
+  }
+  .slot-game.is-bonus-active .slot-reels-ribbon > .slot-bonus-field-frame{
+    width:129%;
+    left:-14.5%;
+    height:153%;
+    top:-45%;
+  }
+  .slot-game.is-bonus-active .slot-bonus-top{
+    top:-23px;
+  }
+}
