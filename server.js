@@ -238,7 +238,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
 function assetUrl(assets,key,gameId){
   return assets.has(key)?'/game-assets/'+gameId+'/'+key:null;
 }
-const DEMO_BETS=[1,2,5,10,15,20,25,30,40,50,75,100,150,200,250,500,750,1000];
+const DEMO_BETS=[5,10,15,20,25,30,40,50,75,100,150,200,250,500,750,1000];
 function firstGamePage(game,req){
   const assets=new Set(getGameAssets(game.id).map(a=>a.asset_key));
   const libraryBackgrounds=new Map(getGameBackgroundImages(game.id).map(item=>[
