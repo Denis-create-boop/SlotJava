@@ -328,8 +328,9 @@
       locked=new Set(step.frozenCells);
       if(step.scatterCount>0){
         root.querySelectorAll('.ribbon-tile.is-scatter').forEach(tile=>tile.classList.add('scatter-celebrate'));
-        message.textContent='SCATTER в бонусе: +'+step.scatterCount+' к множителю!';
-        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?100:550));
+        const increase=Number(step.scatterIncrease)||0;
+        // Update the visible multiplier at the moment Scatter lands, not after payout.
+        for(let n=0;n<increase;n++)await animateMultiplierIncrease('scatter',1);
         root.querySelectorAll('.ribbon-tile.scatter-celebrate').forEach(tile=>tile.classList.remove('scatter-celebrate'));
       }
       if(i<steps.length-1){
@@ -474,7 +475,6 @@
         // There is nothing to multiply or announce on a no-win bonus spin.
         if(result.baseWin>0)await showBonusCalculation(result.baseWin,result.bonusMultiplier,result.bonusRoundWin);
         if(result.winIncrease)await animateMultiplierIncrease('win',result.winIncrease);
-        if(result.scatterIncrease)await animateMultiplierIncrease('scatter',result.scatterIncrease);
         updateBonus(!result.completedBonus,result.remaining||0,result.nextMultiplier||2,result.bonusWin||0);
         message.textContent=result.completedBonus
           ?'Бонус завершён! Всего выиграно '+result.bonusWin+' очков. Сумма зачислена в баланс.'
