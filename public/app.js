@@ -257,11 +257,12 @@
       ambientGain.connect(ctx.destination);
     }
     updateMusicVolume();
+    // Original dark minor-key rock ambience; custom admin music overrides it.
     const harmony=[
-      {bass:130.81,chord:[261.63,311.13,392],flute:[523.25,622.25,587.33,523.25]},
-      {bass:116.54,chord:[233.08,293.66,349.23],flute:[466.16,523.25,587.33,466.16]},
-      {bass:103.83,chord:[207.65,261.63,311.13],flute:[415.30,466.16,523.25,466.16]},
-      {bass:116.54,chord:[233.08,293.66,392],flute:[587.33,523.25,466.16,523.25]}
+      {bass:110.00,chord:[220,261.63,329.63]},
+      {bass:98.00,chord:[196,233.08,293.66]},
+      {bass:87.31,chord:[174.61,220,261.63]},
+      {bass:98.00,chord:[196,246.94,293.66]}
     ];
     const tone=(hz,at,duration,level,wave,cutoff,attack=.25)=>{
       const osc=ctx.createOscillator(),envelope=ctx.createGain(),filter=ctx.createBiquadFilter();
@@ -296,15 +297,15 @@
       if(!soundEnabled)return;
       const chord=harmony[ambientStep%harmony.length];
       const start=ctx.currentTime+.05;
-      // Long bowed bass, very soft chord pad and spaced breathy flute melody.
+      // Deep bass and restrained minor chords under the guitar rhythm.
       tone(chord.bass,start,4.15,.055,'sawtooth',285,.8);
       tone(chord.bass/2,start,4.15,.035,'sine',220,.8);
       chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.032,'triangle',850,1.05));
-      // Reduce the repeated breathy "woo" instrument to a few soft accents.
-      if(ambientStep%2===0){
-        [chord.flute[0],chord.flute[2]].forEach((hz,index)=>
-          tone(hz,start+1+index*1.9,1.12,.026,'sine',1250,.32));
-      }
+      // Sparse low percussive pulses replace the former high flute melody.
+      [0,1.04,2.08,3.12].forEach((offset,index)=>{
+        tone(chord.bass/2,start+offset,.34,index===0?.10:.065,'sine',210,.018);
+        if(index===1||index===3)tone(chord.bass*2,start+offset+.14,.28,.013,'triangle',440,.025);
+      });
       // Longer connected guitar notes, overlapping rather than sharp staccato.
       const riff=[0,1.06,2.13,3.15];
       riff.forEach((offset,index)=>{
