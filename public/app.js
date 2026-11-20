@@ -395,14 +395,24 @@
       applyBonusLocks(step.frozenCells);
       locked=new Set(step.frozenCells);
       if(step.scatterCount>0){
-        root.querySelectorAll('.ribbon-tile.is-scatter').forEach(tile=>tile.classList.add('scatter-celebrate'));
         const increase=Number(step.scatterIncrease)||0;
-        // Update the visible multiplier at the moment Scatter lands, not after payout.
+        // Highlight each NEW Scatter separately, in the exact landing order.
+        // Never highlight an old Scatter still visible from a previous respin.
+        const landed=Array.isArray(step.scatterPositions)?step.scatterPositions:[];
         for(let n=0;n<increase;n++){
-          playGeneratedSound('win_sound');
+          const index=landed[n];
+          const col=Number.isInteger(index)?index%reelCount:-1;
+          const row=Number.isInteger(index)?Math.floor(index/reelCount):-1;
+          const tile=col>=0?columns[col]?.querySelector('.reel-track')?.children[row]:null;
+          if(tile&&Number(tile.dataset.symbolId)===scatterId){
+            tile.classList.remove('scatter-celebrate');
+            void tile.offsetWidth;
+            tile.classList.add('scatter-celebrate');
+          }
+          play('win_sound');
           await animateMultiplierIncrease('scatter',1);
+          if(tile)tile.classList.remove('scatter-celebrate');
         }
-        root.querySelectorAll('.ribbon-tile.scatter-celebrate').forEach(tile=>tile.classList.remove('scatter-celebrate'));
       }
       if(i<steps.length-1){
         stopSpinSound();
@@ -449,18 +459,20 @@
     bonusMath.hidden=true;
   }
   async function animateMultiplierIncrease(cause,count){
-    if(!count||!bonusPlus||!bonusMultiplier)return;
+    if(!count||!bonusMultiplier)return;
     const shownMultiplier=Number(bonusMultiplier.textContent.replace('×',''))||2;
     bonusMultiplier.textContent='×'+(shownMultiplier+count);
-    bonusPlus.textContent='+'+count+(cause==='scatter'?' SCATTER!':' ЗА ВЫИГРЫШ');
-    bonusPlus.classList.remove('is-pop');
-    void bonusPlus.offsetWidth;
-    bonusPlus.classList.add('is-pop');
+    if(bonusPlus){
+      bonusPlus.textContent='+'+count+(cause==='scatter'?' SCATTER!':' ЗА ВЫИГРЫШ');
+      bonusPlus.classList.remove('is-pop');
+      void bonusPlus.offsetWidth;
+      bonusPlus.classList.add('is-pop');
+    }
     message.textContent=cause==='scatter'
       ?'SCATTER ×'+count+' — множитель увеличился на +'+count+'!'
       :'Выигрыш увеличил множитель на +'+count+'!';
     await delay(1250);
-    bonusPlus.classList.remove('is-pop');
+    if(bonusPlus)bonusPlus.classList.remove('is-pop');
   }
   const bonusIntro=document.getElementById('slot-bonus-intro');
   const bonusIntroCount=document.getElementById('slot-bonus-intro-count');
