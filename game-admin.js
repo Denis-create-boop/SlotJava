@@ -20,6 +20,7 @@ const assetTypes={
   win_sound:{label:'Звук выигрыша',kind:'audio'},
   big_win_sound:{label:'Звук крупного выигрыша',kind:'audio'},
   mega_win_sound:{label:'Звук очень крупного выигрыша',kind:'audio'},
+  bonus_sound:{label:'Фанфары запуска бонусной игры',kind:'audio'},
 };
 for(let i=1;i<=20;i++)assetTypes['cell_'+i]={label:'Фон ячейки №'+i+' (строка '+(Math.floor((i-1)/5)+1)+', столбец '+((i-1)%5+1)+')',kind:'image'};
 
@@ -96,7 +97,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
-    if(['music','spin_sound','win_sound','big_win_sound','mega_win_sound'].includes(key))return 'audio';
+    if(['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].includes(key))return 'audio';
     if(/^symbol_\d+$/.test(key))return 'symbols';
     return 'overview';
   }
@@ -254,8 +255,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">Оформление областей баланса, ставки и выигрыша.</p><div class="asset-settings-grid">'+
       rowsFor(['bet_panel','win_panel'])+'</div></section>';
     if(activeTab==='audio')panel=panelStart('Музыка и звуки')+
-      '<p class="hint">Загрузите музыку и отдельные звуки вращения, обычного, крупного и очень крупного выигрыша. Форматы MP3, OGG, WAV до 12 МБ. Звуки зависят от коэффициента итогового выигрыша.</p>'+
-      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound','big_win_sound','mega_win_sound'])+'</div></section>';
+      '<p class="hint">Загрузите музыку, звуки вращения, выигрыша и фанфары SCATTER. Для Первой игры музыка и фанфары также доступны по умолчанию без загрузки файлов. Форматы MP3, OGG, WAV до 12 МБ. Звуки зависят от коэффициента итогового выигрыша.</p>'+
+      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'])+'</div></section>';
     if(activeTab==='frequency')panel=panelStart('Частота и размеры выигрышей')+
       '<p class="hint">Целевой процент выигрышных вращений от 0 до 100. Это не RTP и не доля возвращаемых ставок. При отсутствии положительных коэффициентов выигрышей не будет.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings?tab=frequency">'+csrf+
@@ -279,10 +280,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         const reel=i+1,rule=ruleByReel.get(reel)||{chance_percent:0,max_symbols:0};
         return '<div class="scatter-rule"><strong>Барабан №'+reel+'</strong>'+
           '<label>Шанс выпадения, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
-          '<label>Максимум Scatter на барабане<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label></div>';
+          '<label>Максимум Scatter на барабане (не обязательно выпадут все)<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label></div>';
       }).join('');
       panel=panelStart('Настройки бонусной игры SCATTER')+
-        '<p class="hint">Для каждого барабана задаётся независимый шанс появления Scatter при платном вращении. Если шанс сработал, выпадет от 1 до указанного максимума Scatter на случайных местах этого барабана. 0% или максимум 0 отключают появление. Это не гарантия числа Scatter на каждом вращении.</p>'+
+        '<p class="hint">Для каждого барабана задаётся независимый шанс появления Scatter при платном вращении. Если шанс сработал, выпадет от 1 до указанного максимума Scatter (один чаще, чем два или три). Указанный максимум не означает обязательное количество. 0% или максимум 0 отключают появление. Это не гарантия числа Scatter на каждом вращении.</p>'+
         '<p class="hint">3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.</p>'+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
