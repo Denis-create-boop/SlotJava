@@ -124,24 +124,25 @@
   const classicSounds=root.classList.contains('slot-theme-classic')||root.dataset.scatterId!=='0';
   let audioContext=null;
   function playGeneratedSound(name){
-    if(!classicSounds||!soundEnabled||name==='music'||name==='spin_sound')return;
+    if(!classicSounds||!soundEnabled||name==='music')return;
     try{
       const AudioCtx=window.AudioContext||window.webkitAudioContext;
       if(!AudioCtx)return;
       audioContext??=new AudioCtx();
       if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
-      const notes=name==='mega_win_sound'?[523,659,784,1047,1318]
+      const notes=name==='spin_sound'?[220,247,262,294,330,294,262,247]
+        :name==='mega_win_sound'?[523,659,784,1047,1318]
         :name==='big_win_sound'?[440,554,659,880]
         :name==='win_sound'?[523,659,784]:[440];
       notes.forEach((hz,index)=>{
         const osc=audioContext.createOscillator(),gain=audioContext.createGain();
-        const t=audioContext.currentTime+index*.11;
+        const t=audioContext.currentTime+index*(name==='spin_sound'?.075:.11);
         osc.type='sine';osc.frequency.setValueAtTime(hz,t);
         gain.gain.setValueAtTime(.0001,t);
-        gain.gain.exponentialRampToValueAtTime(.065,t+.015);
-        gain.gain.exponentialRampToValueAtTime(.0001,t+.22);
+        gain.gain.exponentialRampToValueAtTime(name==='spin_sound'?.025:.065,t+.015);
+        gain.gain.exponentialRampToValueAtTime(.0001,t+(name==='spin_sound'?.095:.22));
         osc.connect(gain).connect(audioContext.destination);
-        osc.start(t);osc.stop(t+.24);
+        osc.start(t);osc.stop(t+(name==='spin_sound'?.11:.24));
       });
     }catch{}
   }
@@ -354,7 +355,10 @@
         root.querySelectorAll('.ribbon-tile.is-scatter').forEach(tile=>tile.classList.add('scatter-celebrate'));
         const increase=Number(step.scatterIncrease)||0;
         // Update the visible multiplier at the moment Scatter lands, not after payout.
-        for(let n=0;n<increase;n++)await animateMultiplierIncrease('scatter',1);
+        for(let n=0;n<increase;n++){
+          playGeneratedSound('win_sound');
+          await animateMultiplierIncrease('scatter',1);
+        }
         root.querySelectorAll('.ribbon-tile.scatter-celebrate').forEach(tile=>tile.classList.remove('scatter-celebrate'));
       }
       if(i<steps.length-1){
