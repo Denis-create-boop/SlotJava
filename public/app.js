@@ -80,6 +80,7 @@
   const settingsDialog=document.getElementById('slot-settings-dialog');
   const betForm=document.getElementById('slot-bet-form');
   const soundToggle=document.getElementById('slot-sound-toggle');
+  const uploadedMusicToggle=document.getElementById('slot-use-uploaded-music');
   const musicVolumeControl=document.getElementById('slot-music-volume');
   const musicVolumeValue=document.getElementById('slot-music-volume-value');
   let musicVolume=65;
@@ -99,7 +100,22 @@
     });
   }
   let soundEnabled=true;
-  try {soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';} catch {}
+  let useUploadedMusic=false;
+  try {
+    soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';
+    useUploadedMusic=window.localStorage.getItem('slotjava-use-uploaded-music')==='yes';
+  } catch {}
+  if(uploadedMusicToggle){
+    uploadedMusicToggle.checked=useUploadedMusic;
+    uploadedMusicToggle.addEventListener('change',()=>{
+      useUploadedMusic=uploadedMusicToggle.checked;
+      try {window.localStorage.setItem('slotjava-use-uploaded-music',useUploadedMusic?'yes':'no');} catch {}
+      if(music)music.pause();
+      if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}
+      updateMusicVolume();
+      try {startBackgroundMusic();} catch(error){console.warn('Music unavailable:',error);}
+    });
+  }
   soundToggle.checked=soundEnabled;
   soundToggle.addEventListener('change',()=>{
     soundEnabled=soundToggle.checked;
@@ -156,7 +172,7 @@
   function updateMusicVolume(){
     if(music)music.volume=Math.min(1,musicVolume/100);
     if(ambientGain&&audioContext){
-      ambientGain.gain.setTargetAtTime(soundEnabled?musicVolume/100:0,audioContext.currentTime,.12);
+      ambientGain.gain.setTargetAtTime(soundEnabled&&!useUploadedMusic?musicVolume/100:0,audioContext.currentTime,.12);
     }
   }
   function getAudioContext(){
@@ -242,12 +258,13 @@
   if(spinningAudio){spinningAudio.loop=true;spinningAudio.volume=.8;}
   function startBackgroundMusic(){
     if(!soundEnabled)return;
-    if(music){
+    if(music&&useUploadedMusic){
       if(music.paused)try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
       return;
     }
+    if(music&&!music.paused)music.pause();
     if(!classicSounds||ambientMusicTimer!==null)return;
-    // Original atmospheric loop: sustained cello-style bass and airy flute.
+    // Updated built-in soundtrack: dark minor-key bass, chords and guitar.
     // Audio starts after user interaction; sounds are synthesized, not borrowed.
     const ctx=getAudioContext();
     if(!ctx)return;
