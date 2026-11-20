@@ -278,12 +278,17 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
       const inputs=Array.from({length:layout.reels},(_,i)=>{
         const reel=i+1,rule=ruleByReel.get(reel)||{chance_percent:0,max_symbols:0};
+        const countWeights=Array.from({length:layout.rows},(_,index)=>{
+          const count=index+1;
+          return '<label>Ровно '+count+' Scatter — вес<input type="number" min="0" max="100" step="1" name="weight_'+reel+'_'+count+'" value="'+(rule['weight_'+count]??0)+'" required></label>';
+        }).join('');
         return '<div class="scatter-rule"><strong>Барабан №'+reel+'</strong>'+
-          '<label>Шанс выпадения, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
-          '<label>Максимум Scatter на барабане (не обязательно выпадут все)<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label></div>';
+          '<label>Шанс появления Scatter, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
+          '<label>Максимум Scatter на барабане<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label>'+
+          '<div class="scatter-count-weights">'+countWeights+'</div></div>';
       }).join('');
       panel=panelStart('Настройки бонусной игры SCATTER')+
-        '<p class="hint">Для каждого барабана задаётся независимый шанс появления Scatter при платном вращении. Если шанс сработал, выпадет от 1 до указанного максимума Scatter (один чаще, чем два или три). Указанный максимум не означает обязательное количество. 0% или максимум 0 отключают появление. Это не гарантия числа Scatter на каждом вращении.</p>'+
+        '<p class="hint">Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.</p>'+
         '<p class="hint">3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.</p>'+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
@@ -325,12 +330,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const changes=[];
     for(let reel=1;reel<=5;reel++){
       const chance=req.body?.['chance_'+reel],max=req.body?.['max_'+reel];
-      if(typeof chance!=='string'||!/^(?:100|[1-9]?\d)$/.test(chance)||
-         typeof max!=='string'||!/^[0-4]$/.test(max))
-        return show(req,res,'Для каждого барабана укажите шанс от 0 до 100% и максимум Scatter от 0 до 4.',true,'scatter');
-      changes.push([Number(chance),Number(max),id,reel]);
+      const weights=Array.from({length:4},(_,index)=>req.body?.['weight_'+reel+'_'+(index+1)]);
+      const validNumber=value=>typeof value==='string'&&/^(?:100|[1-9]?[0-9])$/.test(value);
+      if(!validNumber(chance)||typeof max!=='string'||!/^[0-4]$/.test(max)||
+         !weights.every(validNumber))
+        return show(req,res,'Укажите для каждого барабана шанс 0–100, максимум 0–4 и веса количества 0–100.',true,'scatter');
+      changes.push([Number(chance),Number(max),...weights.map(Number),id,reel]);
     }
-    const update=db.prepare('UPDATE game_scatter_reels SET chance_percent=?,max_symbols=? WHERE game_id=? AND reel_index=?');
+    const update=db.prepare(`UPDATE game_scatter_reels SET
+      chance_percent=?,max_symbols=?,weight_1=?,weight_2=?,weight_3=?,weight_4=?
+      WHERE game_id=? AND reel_index=?`);
     db.transaction(()=>{for(const row of changes)update.run(...row);})();
     res.redirect(sectionUrl(id,'scatter')+'&saved=1');
   });
