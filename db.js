@@ -135,6 +135,8 @@ if(/CHECK\s*\(\s*bet\s+IN\s*\(/i.test(currentWalletSchema)){
     `);
   })();
 }
+// Previously selected stakes of 1 or 2 are no longer available.
+db.prepare('UPDATE game_wallets SET bet=5 WHERE bet<5').run();
 db.exec(`
  CREATE TABLE IF NOT EXISTS user_balances (
    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
