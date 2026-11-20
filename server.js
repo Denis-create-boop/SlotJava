@@ -273,10 +273,11 @@ function firstGamePage(game,req){
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
-    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><span>БОНУСНАЯ ИГРА</span><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong><em id="slot-bonus-plus" aria-hidden="true"></em></div>':'')+
+    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><span>БОНУСНАЯ ИГРА</span><div class="slot-devil-hug" aria-hidden="true"><span class="devil-face">😈</span><span class="devil-arm devil-arm-left">╰</span><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong><span class="devil-arm devil-arm-right">╯</span></div><em id="slot-bonus-plus" aria-hidden="true"></em></div>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
+    '<div class="slot-insufficient-overlay" id="slot-insufficient-overlay" hidden role="alert"><strong>НЕДОСТАТОЧНО ДЕНЕЖНЫХ СРЕДСТВ</strong><span>Пополните баланс тестовых очков для продолжения игры</span></div>'+
     (scatter?'<div class="slot-bonus-intro" id="slot-bonus-intro" hidden aria-live="polite"><strong>SCATTER!</strong><span>БОНУСНАЯ ИГРА</span><b><em id="slot-bonus-intro-count">10</em> бесплатных вращений</b><small>Начальный множитель ×2</small></div>':'')+
     (scatter?'<div class="slot-bonus-math" id="slot-bonus-math" hidden aria-live="polite"><span id="slot-bonus-math-caption">Выигрыш за спин</span><strong id="slot-bonus-math-base">0</strong><div id="slot-bonus-math-multiply" hidden><em>×</em><b id="slot-bonus-math-factor">2</b></div><div id="slot-bonus-math-result" hidden><small>Итого за спин</small><strong id="slot-bonus-math-total">0</strong></div></div>':'')+
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
@@ -389,7 +390,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         nextMultiplier,remaining,completedBonus:completed
       };
     }
-    if(wallet.balance<wallet.bet)return {error:'Недостаточно тестовых очков для ставки.'};
+    if(wallet.balance<wallet.bet)return {error:'Недостаточно денежных средств для ставки.'};
     const spin=generateSpin(game.id,settings?.win_frequency ?? 25,wallet.bet,layout);
     if(spin.error)return spin;
     const payout=spin.total;
