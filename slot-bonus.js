@@ -13,7 +13,11 @@ function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Se
       .filter(row=>!locked.has(row*reels+col));
     const max=Math.max(0,Math.min(positions.length,Number(rule?.max_symbols)||0));
     if(!max||randomInt(100)>=chance)continue;
-    const number=1+randomInt(max);
+    // The setting is a CAP, not the number guaranteed to land.
+    // The first Scatter lands when the reel's chance succeeds; each additional
+    // Scatter has its own 35% chance, so one remains more common than the cap.
+    let number=1;
+    while(number<max && randomInt(100)<35)number++;
     for(let n=0;n<number;n++){
       const pick=n+randomInt(positions.length-n);
       [positions[n],positions[pick]]=[positions[pick],positions[n]];
