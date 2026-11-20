@@ -14,11 +14,20 @@ function scatterOnBoard(board,scatterId,rules,rows,reels,randomInt,locked=new Se
       .filter(row=>!locked.has(row*reels+col));
     const max=Math.max(0,Math.min(positions.length,Number(rule?.max_symbols)||0));
     if(!max||randomInt(100)>=chance)continue;
-    // The setting is a CAP, not the number guaranteed to land.
-    // The first Scatter lands when the reel's chance succeeds; each additional
-    // Scatter has its own 35% chance, so one remains more common than the cap.
-    let number=1;
-    while(number<max && randomInt(100)<35)number++;
+    // Relative weights determine the exact number of new Scatter symbols.
+    // A 30/20/70 configuration is weighted 30:20:70, not 120% probability.
+    const weights=Array.from({length:max},(_,i)=>{
+      const raw=Number(rule?.['weight_'+(i+1)]);
+      return Number.isFinite(raw)&&raw>=0?Math.floor(raw):0;
+    });
+    const totalWeight=weights.reduce((total,value)=>total+value,0);
+    if(totalWeight===0)continue;
+    const choice=randomInt(totalWeight);
+    let subtotal=0,number=1;
+    for(let i=0;i<weights.length;i++){
+      subtotal+=weights[i];
+      if(choice<subtotal){number=i+1;break;}
+    }
     for(let n=0;n<number;n++){
       const pick=n+randomInt(positions.length-n);
       [positions[n],positions[pick]]=[positions[pick],positions[n]];
