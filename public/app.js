@@ -121,11 +121,35 @@
   const symbols=new Map(definitions.map(item=>[item.id,item]));
   const regularDefinitions=definitions.filter(item=>item.id!==scatterId);
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
+  const classicSounds=root.classList.contains('slot-theme-classic')||root.dataset.scatterId!=='0';
+  let audioContext=null;
+  function playGeneratedSound(name){
+    if(!classicSounds||!soundEnabled||name==='music'||name==='spin_sound')return;
+    try{
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(!AudioCtx)return;
+      audioContext??=new AudioCtx();
+      if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
+      const notes=name==='mega_win_sound'?[523,659,784,1047,1318]
+        :name==='big_win_sound'?[440,554,659,880]
+        :name==='win_sound'?[523,659,784]:[440];
+      notes.forEach((hz,index)=>{
+        const osc=audioContext.createOscillator(),gain=audioContext.createGain();
+        const t=audioContext.currentTime+index*.11;
+        osc.type='sine';osc.frequency.setValueAtTime(hz,t);
+        gain.gain.setValueAtTime(.0001,t);
+        gain.gain.exponentialRampToValueAtTime(.065,t+.015);
+        gain.gain.exponentialRampToValueAtTime(.0001,t+.22);
+        osc.connect(gain).connect(audioContext.destination);
+        osc.start(t);osc.stop(t+.24);
+      });
+    }catch{}
+  }
 
   function play(name){
     if(!soundEnabled)return;
     const audio=sound(name);
-    if(!audio)return;
+    if(!audio){playGeneratedSound(name);return;}
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
   }
   const music=sound('music');
