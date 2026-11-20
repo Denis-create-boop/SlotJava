@@ -671,6 +671,7 @@
   }
   function scheduleAutoplay(){
     if(!autoRunning||spinning)return;
+    if(bonusActive){stopAutoplay('Автоигра остановлена: началась бонусная игра.');return;}
     if(!bonusActive&&autoRemaining<=0){stopAutoplay('Выбранные вращения завершены.');return;}
     if(!bonusActive&&Number(balance.textContent)<Number(betDisplay.textContent)){
       showInsufficientFunds();
@@ -688,6 +689,7 @@
   if(autoStart&&autoStop&&autoCount){
     autoStart.addEventListener('click',()=>{
       if(spinning||autoRunning||!definitions.length)return;
+      if(bonusActive){autoStatus.textContent='Во время бонусной игры автоигра недоступна.';return;}
       const count=Number(autoCount.value);
       if(!Number.isSafeInteger(count)||count<1||count>250)return;
       autoRemaining=count;
@@ -776,6 +778,8 @@
         :'Без выигрыша. Попробуйте ещё.';
       if(result.mode!=='bonus')showBigWin(tier);
       if(result.mode==='base'&&result.freeSpins>0){
+        // Bonus activation ends autoplay immediately; free spins are manual.
+        if(autoRunning)stopAutoplay('Автоигра завершена: выпала бонусная игра. Бесплатные вращения запускаются вручную.');
         await celebrateScatter(result.scatterCount,result.freeSpins);
         updateBonus(true,result.freeSpins,2,0);
         message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
