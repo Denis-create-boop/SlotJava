@@ -1126,3 +1126,39 @@ header nav .header-user-balance{
     top:-10px;
   }
 }
+
+/* Bonus composition alignment: expand the actual fire backdrop, not reels;
+   open the ornamental frame so all four symbol rows fit inside. */
+.slot-game.is-bonus-active > .slot-full-background{
+  left:-52px;
+  top:-13px;
+  width:calc(100% + 104px);
+  height:calc(100% + 26px);
+  max-width:none;
+  transform:none;
+  object-fit:cover;
+  object-position:center center;
+  border-radius:22px;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon > .slot-bonus-field-frame{
+  width:141%;
+  left:-20.5%;
+  height:177%;
+  top:-66%;
+}
+.slot-game.is-bonus-active .slot-bonus-top{
+  top:-46px;
+  right:2px;
+}
+@media(max-width:680px){
+  .slot-game.is-bonus-active > .slot-full-background{
+    left:-14px;top:-7px;
+    width:calc(100% + 28px);
+    height:calc(100% + 14px);
+  }
+  .slot-game.is-bonus-active .slot-reels-ribbon > .slot-bonus-field-frame{
+    width:135%;left:-17.5%;
+    height:163%;top:-55%;
+  }
+  .slot-game.is-bonus-active .slot-bonus-top{top:-23px}
+}
