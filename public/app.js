@@ -71,13 +71,31 @@
   const settingsDialog=document.getElementById('slot-settings-dialog');
   const betForm=document.getElementById('slot-bet-form');
   const soundToggle=document.getElementById('slot-sound-toggle');
+  const musicVolumeControl=document.getElementById('slot-music-volume');
+  const musicVolumeValue=document.getElementById('slot-music-volume-value');
+  let musicVolume=65;
+  try {
+    const savedVolume=Number(window.localStorage.getItem('slotjava-music-volume'));
+    if(window.localStorage.getItem('slotjava-music-volume')!==null&&Number.isFinite(savedVolume))
+      musicVolume=Math.max(0,Math.min(100,Math.round(savedVolume)));
+  } catch {}
+  if(musicVolumeControl){
+    musicVolumeControl.value=String(musicVolume);
+    if(musicVolumeValue)musicVolumeValue.textContent=musicVolume+'%';
+    musicVolumeControl.addEventListener('input',()=>{
+      musicVolume=Math.max(0,Math.min(100,Number(musicVolumeControl.value)||0));
+      if(musicVolumeValue)musicVolumeValue.textContent=musicVolume+'%';
+      try{window.localStorage.setItem('slotjava-music-volume',String(musicVolume));}catch{}
+      updateMusicVolume();
+    });
+  }
   let soundEnabled=true;
   try {soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';} catch {}
   soundToggle.checked=soundEnabled;
   soundToggle.addEventListener('change',()=>{
     soundEnabled=soundToggle.checked;
     try {window.localStorage.setItem('slotjava-sound',soundEnabled?'on':'off');} catch {}
-    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}}
+    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}updateMusicVolume();}
     else startBackgroundMusic();
   });
   function openSettings(){
@@ -125,6 +143,13 @@
   let audioContext=null;
   let ambientMusicTimer=null;
   let ambientStep=0;
+  let ambientGain=null;
+  function updateMusicVolume(){
+    if(music)music.volume=Math.min(1,musicVolume/100);
+    if(ambientGain&&audioContext){
+      ambientGain.gain.setTargetAtTime(soundEnabled?musicVolume/100:0,audioContext.currentTime,.12);
+    }
+  }
   function getAudioContext(){
     const AudioCtx=window.AudioContext||window.webkitAudioContext;
     if(!AudioCtx)return null;
@@ -181,7 +206,8 @@
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
   }
   const music=sound('music');
-  if(music){music.loop=true;music.volume=.22;}
+  if(music)music.loop=true;
+  updateMusicVolume();
   const spinningAudio=sound('spin_sound');
   if(spinningAudio){spinningAudio.loop=true;spinningAudio.volume=.8;}
   function startBackgroundMusic(){
@@ -191,19 +217,45 @@
       return;
     }
     if(!classicSounds||ambientMusicTimer!==null)return;
-    // Original, subtle background melody. Starts only on user interaction.
-    const chords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[174.61,220,293.66]];
+    // Original atmospheric loop: sustained cello-style bass and airy flute.
+    // Audio starts after user interaction; sounds are synthesized, not borrowed.
+    const ctx=getAudioContext();
+    if(!ctx)return;
+    if(!ambientGain){
+      ambientGain=ctx.createGain();
+      ambientGain.gain.value=0;
+      ambientGain.connect(ctx.destination);
+    }
+    updateMusicVolume();
+    const harmony=[
+      {bass:130.81,chord:[261.63,311.13,392],flute:[523.25,622.25,587.33,523.25]},
+      {bass:116.54,chord:[233.08,293.66,349.23],flute:[466.16,523.25,587.33,466.16]},
+      {bass:103.83,chord:[207.65,261.63,311.13],flute:[415.30,466.16,523.25,466.16]},
+      {bass:116.54,chord:[233.08,293.66,392],flute:[587.33,523.25,466.16,523.25]}
+    ];
+    const tone=(hz,at,duration,level,wave,cutoff,attack=.25)=>{
+      const osc=ctx.createOscillator(),envelope=ctx.createGain(),filter=ctx.createBiquadFilter();
+      osc.type=wave;osc.frequency.setValueAtTime(hz,at);
+      filter.type='lowpass';filter.frequency.value=cutoff;
+      envelope.gain.setValueAtTime(.0001,at);
+      envelope.gain.linearRampToValueAtTime(level,at+attack);
+      envelope.gain.setTargetAtTime(.0001,at+duration-.45,.23);
+      osc.connect(filter).connect(envelope).connect(ambientGain);
+      osc.start(at);osc.stop(at+duration+.1);
+    };
     const playMeasure=()=>{
-      if(!soundEnabled||!audioContext)return;
-      const ctx=getAudioContext();if(!ctx)return;
-      const chord=chords[ambientStep%chords.length];
-      const start=ctx.currentTime+.03;
-      chord.forEach((note,index)=>synthesizedNote(note,start+index*.06,2.9,.007,'sine'));
-      [0,1,2,1].forEach((i,index)=>synthesizedNote(chord[i]*2,start+.2+index*.65,.38,.012,'triangle'));
+      if(!soundEnabled)return;
+      const chord=harmony[ambientStep%harmony.length];
+      const start=ctx.currentTime+.05;
+      // Long bowed bass, very soft chord pad and spaced breathy flute melody.
+      tone(chord.bass,start,4.15,.13,'sawtooth',330,.8);
+      tone(chord.bass/2,start,4.15,.07,'sine',220,.8);
+      chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.052,'triangle',950,1.05));
+      chord.flute.forEach((hz,index)=>tone(hz,start+.4+index*.88,.92,.095,'sine',1450,.16));
       ambientStep++;
     };
-    getAudioContext();playMeasure();
-    ambientMusicTimer=window.setInterval(playMeasure,3100);
+    playMeasure();
+    ambientMusicTimer=window.setInterval(playMeasure,4150);
   }
   function stopSpinSound(){
     const reelSound=sound('spin_sound');
