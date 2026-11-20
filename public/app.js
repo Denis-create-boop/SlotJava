@@ -286,7 +286,8 @@
       osc.type='sawtooth';osc.frequency.setValueAtTime(hz,at);
       filter.type='lowpass';filter.frequency.value=1420;
       envelope.gain.setValueAtTime(.0001,at);
-      envelope.gain.exponentialRampToValueAtTime(.065,at+.013);
+      envelope.gain.linearRampToValueAtTime(.060,at+.11);
+      envelope.gain.setValueAtTime(.052,at+Math.max(.12,duration-.29));
       envelope.gain.exponentialRampToValueAtTime(.0001,at+duration);
       osc.connect(drive).connect(filter).connect(envelope).connect(ambientGain);
       osc.start(at);osc.stop(at+duration+.02);
@@ -296,18 +297,42 @@
       const chord=harmony[ambientStep%harmony.length];
       const start=ctx.currentTime+.05;
       // Long bowed bass, very soft chord pad and spaced breathy flute melody.
-      tone(chord.bass,start,4.15,.13,'sawtooth',330,.8);
-      tone(chord.bass/2,start,4.15,.07,'sine',220,.8);
-      chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.052,'triangle',950,1.05));
-      chord.flute.forEach((hz,index)=>tone(hz,start+.4+index*.88,.92,.095,'sine',1450,.16));
-      // A restrained heavy-rock hint: short palm-muted fifths, not a lead solo.
-      const riff=[0,.4,.8,1.25,1.65,2.08,2.5,2.95,3.37,3.77];
+      tone(chord.bass,start,4.15,.055,'sawtooth',285,.8);
+      tone(chord.bass/2,start,4.15,.035,'sine',220,.8);
+      chord.chord.forEach((hz,index)=>tone(hz,start+index*.08,4.12,.032,'triangle',850,1.05));
+      // Reduce the repeated breathy "woo" instrument to a few soft accents.
+      if(ambientStep%2===0){
+        [chord.flute[0],chord.flute[2]].forEach((hz,index)=>
+          tone(hz,start+1+index*1.9,1.12,.026,'sine',1250,.32));
+      }
+      // Longer connected guitar notes, overlapping rather than sharp staccato.
+      const riff=[0,1.06,2.13,3.15];
       riff.forEach((offset,index)=>{
-        const root=chord.bass*(index===3?2:1);
-        guitarPluck(root,start+offset,index===3?.54:.39);
-        guitarPluck(root*1.5,start+offset,index===3?.54:.39);
-        guitarPluck(root*2,start+offset,index===3?.4:.3);
+        const root=chord.bass*(index===2?2:1);
+        const duration=index===3?1.02:1.27;
+        guitarPluck(root,start+offset,duration);
+        guitarPluck(root*1.5,start+offset+.04,duration);
+        guitarPluck(root*2,start+offset+.09,duration*.9);
       });
+      // Rare, original synthesized devil-like howl during ordinary play only.
+      if(!bonusActive&&ambientStep>2&&Math.random()<.055){
+        const at=start+1.2;
+        const howl=ctx.createOscillator(),filter=ctx.createBiquadFilter(),
+          voiceGain=ctx.createGain();
+        howl.type='sawtooth';
+        howl.frequency.setValueAtTime(155,at);
+        howl.frequency.exponentialRampToValueAtTime(235,at+.62);
+        howl.frequency.exponentialRampToValueAtTime(110,at+1.55);
+        filter.type='lowpass';filter.frequency.setValueAtTime(540,at);
+        filter.frequency.linearRampToValueAtTime(1050,at+.55);
+        filter.frequency.linearRampToValueAtTime(400,at+1.55);
+        voiceGain.gain.setValueAtTime(.0001,at);
+        voiceGain.gain.linearRampToValueAtTime(.16,at+.28);
+        voiceGain.gain.setValueAtTime(.13,at+1);
+        voiceGain.gain.exponentialRampToValueAtTime(.0001,at+1.7);
+        howl.connect(filter).connect(voiceGain).connect(ambientGain);
+        howl.start(at);howl.stop(at+1.75);
+      }
       ambientStep++;
     };
     playMeasure();
