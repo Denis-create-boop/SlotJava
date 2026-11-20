@@ -651,6 +651,9 @@
   const autoStart=document.getElementById('slot-auto-start');
   const autoStop=document.getElementById('slot-auto-stop');
   const autoStatus=document.getElementById('slot-auto-status');
+  const autoTrigger=document.getElementById('slot-auto-trigger');
+  const autoDialog=document.getElementById('slot-auto-dialog');
+  const autoTriggerLabel=document.getElementById('slot-auto-trigger-label');
   let autoRunning=false;
   let autoRemaining=0;
   let autoTimer=null;
@@ -659,6 +662,8 @@
     if(!autoStart||!autoStop||!autoCount)return;
     autoStart.hidden=autoRunning;
     autoStop.hidden=!autoRunning;
+    if(autoTrigger)autoTrigger.classList.toggle('is-auto-running',autoRunning);
+    if(autoTriggerLabel)autoTriggerLabel.textContent=autoRunning?'СТОП':'АВТО';
     autoCount.disabled=autoRunning;
     if(autoRunning)autoStatus.textContent='Осталось платных вращений: '+autoRemaining+(bonusActive?' · бонусные вращения бесплатно':'');
   }
@@ -667,6 +672,7 @@
     if(autoTimer!==null){window.clearTimeout(autoTimer);autoTimer=null;}
     if(autoStatus)autoStatus.textContent=reason;
     paintAutoplay();
+    if(autoDialog?.open)autoDialog.close();
     if(!spinning){button.disabled=false;settingsButton.disabled=false;betButton.disabled=bonusActive;}
   }
   function scheduleAutoplay(){
@@ -686,6 +692,16 @@
       try{form.requestSubmit(button);}finally{autoDispatching=false;}
     },1000);
   }
+  if(autoTrigger&&autoDialog){
+    autoTrigger.addEventListener('click',()=>{
+      if(autoRunning){stopAutoplay('Автоигра остановлена пользователем.');return;}
+      if(spinning)return;
+      if(bonusActive){if(autoStatus)autoStatus.textContent='Автоигра недоступна во время бонуса.';return;}
+      if(typeof autoDialog.showModal==='function')autoDialog.showModal();
+      else autoDialog.setAttribute('open','');
+    });
+    autoDialog.addEventListener('click',event=>{if(event.target===autoDialog)autoDialog.close();});
+  }
   if(autoStart&&autoStop&&autoCount){
     autoStart.addEventListener('click',()=>{
       if(spinning||autoRunning||!definitions.length)return;
@@ -694,6 +710,7 @@
       if(!Number.isSafeInteger(count)||count<1||count>250)return;
       autoRemaining=count;
       autoRunning=true;
+      if(autoDialog?.open)autoDialog.close();
       if(bonusFinish)bonusFinish.hidden=true;
       paintAutoplay();
       scheduleAutoplay();
