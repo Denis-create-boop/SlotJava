@@ -967,3 +967,55 @@ header nav .header-user-balance{
  .slot-bonus-top .slot-devil-hug{width:auto;min-width:0;height:auto}
  .slot-bonus-top .slot-devil-hug #slot-bonus-multiplier{font-size:2.7rem;left:auto;top:auto;transform:none}
 }
+
+/* Bonus frame layout repair (2026-11): prevent uploaded demon artwork
+   from hiding the live X, the winning amount, or expanding the viewport. */
+.slot-game{max-width:100%;min-width:0;overflow-x:clip}
+.slot-game .slot-machine{width:100%;max-width:880px;min-width:0}
+.slot-game .slot-bonus-top{
+  position:relative;z-index:30;isolation:isolate;
+  overflow:visible;
+}
+.slot-game .slot-bonus-top>span,
+.slot-game .slot-bonus-top #slot-bonus-multiplier,
+.slot-game .slot-bonus-top #slot-bonus-plus{
+  position:relative;z-index:32;visibility:visible;
+}
+.slot-game .slot-bonus-top #slot-bonus-plus{position:absolute}
+.slot-game .slot-bonus-top .slot-devil-hug{
+  position:relative;z-index:32;min-width:0;width:auto;height:auto;
+  display:flex;align-items:center;justify-content:center;
+}
+.slot-game .slot-bonus-top #slot-bonus-multiplier{
+  position:relative;left:auto;top:auto;transform:none;display:block;
+  color:#fff3b8;font-size:clamp(2.4rem,5.5vw,4.5rem);line-height:1;
+  text-shadow:0 2px 2px #3d0702,0 0 13px #ffa52f,0 0 24px #ff6300;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon:has(> .slot-bonus-field-frame){
+  position:relative;z-index:1;min-width:0;overflow:visible;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+  position:absolute;z-index:3;display:block!important;
+  width:118%;height:130%;max-width:none;
+  left:-9%;top:-30%;object-fit:fill;
+  pointer-events:none;user-select:none;
+}
+.slot-game.is-bonus-active .slot-reels-ribbon>.reel-columns{position:relative;z-index:5}
+.slot-game .slot-bonus-stats,
+.slot-game .slot-bottom-bar,
+.slot-game .slot-autoplay,
+.slot-game .slot-message{position:relative;z-index:25}
+.slot-game .slot-bottom-bar #slot-win,
+.slot-game .slot-bonus-stats #slot-bonus-total{visibility:visible;opacity:1}
+.slot-game .slot-reels-ribbon .slot-big-win-overlay,
+.slot-game .slot-reels-ribbon .slot-bonus-math,
+.slot-game .slot-reels-ribbon .slot-bonus-intro,
+.slot-game .slot-reels-ribbon .slot-bonus-finish{z-index:30}
+@media(max-width:650px){
+  .slot-game .slot-bonus-top{min-height:75px;padding:8px;gap:8px}
+  .slot-game .slot-bonus-top .slot-devil-hug{width:auto;min-width:0;height:auto}
+  .slot-game .slot-bonus-top #slot-bonus-multiplier{font-size:clamp(1.8rem,8vw,3rem)}
+  .slot-game.is-bonus-active .slot-reels-ribbon>.slot-bonus-field-frame{
+    width:112%;left:-6%;height:120%;top:-20%;
+  }
+}
