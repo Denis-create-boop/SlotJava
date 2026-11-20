@@ -273,7 +273,7 @@ function firstGamePage(game,req){
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
-    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><span>БОНУСНАЯ ИГРА</span><div class="slot-devil-hug" aria-hidden="true"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-hidden="true"></em></div>':'')+
+    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     (scatter&&url('bonus_frame')?'<img class="slot-bonus-field-frame" src="'+h(url('bonus_frame'))+'" alt="" aria-hidden="true">':'')+
@@ -290,13 +290,16 @@ function firstGamePage(game,req){
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
     '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span>Выигрыш</span><strong id="slot-win">0</strong></div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
-    '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span id="slot-spin-label">'+(bonusVisible?'БЕСПЛАТНО':'ВРАЩАТЬ')+'</span></button></form></div>'+
-    '<div class="slot-autoplay" aria-label="Автоматические вращения">'+
-    '<label for="slot-auto-count">Автоигра</label><select id="slot-auto-count" aria-label="Количество платных автовращений">'+
+    '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span id="slot-spin-label">'+(bonusVisible?'БЕСПЛАТНО':'ВРАЩАТЬ')+'</span></button></form>'+
+    '<button type="button" id="slot-auto-trigger" class="spin-round slot-auto-trigger" aria-label="Автоигра: выбрать количество вращений" title="Автоигра"><span class="spin-round-icon" aria-hidden="true">⟳</span><span id="slot-auto-trigger-label">АВТО</span></button></div>'+
+    '<dialog id="slot-auto-dialog" class="slot-settings-dialog slot-auto-dialog" aria-labelledby="slot-auto-dialog-title">'+
+    '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть">×</button></form>'+
+    '<h2 id="slot-auto-dialog-title">Автоигра</h2><p>Выберите количество автоматических вращений. При запуске бонуса автоигра остановится.</p>'+
+    '<div class="slot-auto-dialog-options"><label for="slot-auto-count">Количество вращений</label><select id="slot-auto-count" aria-label="Количество платных автовращений">'+
     [5,10,25,50,100,250].map(n=>'<option value="'+n+'"'+(n===10?' selected':'')+'>'+n+' вращений</option>').join('')+'</select>'+
     '<button type="button" id="slot-auto-start" class="slot-auto-start">▶ Запустить</button>'+
-    '<button type="button" id="slot-auto-stop" class="slot-auto-stop" hidden>■ Остановить</button>'+
-    '<span id="slot-auto-status" class="slot-auto-status" role="status" aria-live="polite">Выберите количество вращений.</span></div>'+
+    '<button type="button" id="slot-auto-stop" class="slot-auto-stop" hidden>■ Остановить</button></div></dialog>'+
+    '<span id="slot-auto-status" class="slot-auto-status" role="status" aria-live="polite"></span>'+
     '<p class="slot-message" id="slot-result" role="status" aria-live="polite">Нажмите на круглую кнопку для вращения.</p></div>'+
     '<dialog class="slot-settings-dialog" id="slot-settings-dialog" aria-labelledby="slot-settings-heading">'+
     '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть настройки">×</button></form>'+
