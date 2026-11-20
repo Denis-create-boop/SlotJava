@@ -870,3 +870,23 @@ header nav .header-user-balance{
 @media(prefers-reduced-motion:reduce){
  .slot-game .bonus-mini-track{transition:none!important}
 }
+
+
+/* Compact grouped settings navigation */
+.game-admin-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.game-admin-menu-group{min-width:0;overflow:hidden;border:1px solid rgba(220,181,103,.26);border-radius:14px;background:linear-gradient(145deg,#34343d,#23242c);color:#f5f2ec}
+.game-admin-menu-group[open]{border-color:rgba(240,200,118,.65)}
+.game-admin-menu-group>summary{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:55px;padding:13px 16px;list-style:none;cursor:pointer;font-size:1rem;font-weight:700}
+.game-admin-menu-group>summary::-webkit-details-marker{display:none}
+.game-admin-menu-group>summary span{color:#f0ce8c;transition:transform .2s}
+.game-admin-menu-group[open]>summary span{transform:rotate(180deg)}
+.game-admin-submenu{display:grid;gap:5px;padding:0 12px 12px}
+.game-admin-submenu-link{display:flex;flex-direction:column;gap:3px;padding:10px 12px;min-width:0;border-radius:9px;text-decoration:none;color:#f6e7c7;background:rgba(0,0,0,.15);overflow-wrap:anywhere}
+.game-admin-submenu-link:hover{background:rgba(240,200,118,.12);color:#fff;text-decoration:none}
+.game-admin-submenu-link.is-active{background:rgba(240,200,118,.18);outline:1px solid rgba(240,200,118,.45)}
+.game-admin-submenu-link span{font-size:.94rem;font-weight:650;line-height:1.35}
+.game-admin-submenu-link small{font-size:.78rem;line-height:1.4;color:#bdb7c2}
+.game-admin-rename-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}
+.game-admin-rename-label{display:grid;gap:6px;min-width:0}
+.game-admin-rename-label input{width:100%;min-width:0}
+@media(max-width:720px){.game-admin-menu,.game-admin-rename-grid{grid-template-columns:1fr}}
