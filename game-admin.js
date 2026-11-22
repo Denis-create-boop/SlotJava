@@ -447,7 +447,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const minimum=Number(req.body?.min_reels);
     if(![2,3].includes(minimum))return show(req,res,'Укажите 2 или 3 барабана.',true,'symbols');
     const raw=req.body?.line_percent;
-    if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,4})(?:\\.\\d{1,2})?$/.test(raw)||Number(raw)>10000)
+    if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,2})?$/.test(raw)||Number(raw)>10000)
       return show(req,res,'Выплата за одну линию должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
     const linePercent=Math.round(Number(raw)*100);
     db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels,line_percent_hundredths) VALUES(?,?,?)
