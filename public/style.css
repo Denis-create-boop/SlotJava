@@ -2382,3 +2382,14 @@ body:has(.slot-game.slot-theme-space)>header{
 @media(max-width:700px){
   .slot-page-background{height:100dvh;}
 }
+
+/* Admin: make it obvious which image the running database assigns to each layer. */
+.space-background-diagnostics{margin:22px 0;padding:16px;border:1px solid #7e78a5;border-radius:14px;background:#15172add}
+.space-background-diagnostics h3{margin:0 0 8px}
+.space-background-diagnostic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.space-background-diagnostic{min-width:0;padding:12px;border-radius:10px;border:1px solid #565a88;background:#0b1025;display:flex;flex-direction:column;gap:9px}
+.space-background-diagnostic strong{font-size:.93rem}
+.space-background-diagnostic img{display:block;width:100%;height:170px;object-fit:contain;border-radius:8px;background:#020718}
+.space-background-diagnostic small{color:#c7d5fa;overflow-wrap:anywhere}
+.space-background-diagnostic button{width:100%}
+@media(max-width:600px){.space-background-diagnostic-grid{grid-template-columns:1fr}}
