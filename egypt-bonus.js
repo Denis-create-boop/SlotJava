@@ -102,13 +102,17 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},line
     const perLine=landedReels.length>=minimum&&linePrice>0&&milli>0
       ?Math.round(bet*linePrice*milli/10000000):0;
     const qualified=landedReels.length>=minimum&&perLine>0;
-    const prize=qualified?perLine*EGYPT_LINES.length:0;
+    // Each of the ten paylines earns its OWN award; never pay the symbol
+    // once and merely draw ten decorative paylines.
+    const lineWins=qualified?EGYPT_LINES.map((rows,i)=>({
+      line:i+1,rows,reels:landedReels,prize:perLine,symbolId
+    })):[];
+    const prize=lineWins.reduce((sum,line)=>sum+line.prize,0);
     total+=prize;
     if(!Number.isSafeInteger(total)||total<0)throw Error('Egypt bonus prize overflow.');
     symbolWins.push({symbolId,landedReels,expandedReels:qualified?landedReels:[],
       matchedReels:landedReels.length,minReels:minimum,
-      lineWins:qualified?EGYPT_LINES.map((rows,i)=>({line:i+1,rows,reels:landedReels})):[],
-      perLine,prize,linePercentHundredths:linePrice});
+      lineWins,perLine,prize,linePercentHundredths:linePrice});
   }
   return {total,symbolWins};
 }
