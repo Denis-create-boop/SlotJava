@@ -244,7 +244,10 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
           .map(symbol=>({symbol_id:symbol.id}))
       :payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
-      const rule=candidates[crypto.randomInt(candidates.length)];
+      const rule=egyptPrices
+        ?{symbol_id:egyptWeightedPicker(
+          candidates.map(candidate=>({id:candidate.symbol_id})),weighted,n=>crypto.randomInt(n))()}
+        :candidates[crypto.randomInt(candidates.length)];
       const others=availableSymbols.filter(item=>item.id!==rule.symbol_id);
       if(!others.length)continue;
       const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
@@ -462,7 +465,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       }
       const selected=chain.symbols.filter(id=>regular.some(symbol=>symbol.id===id));
       if(!selected.length){
-        const chosen=regular[crypto.randomInt(regular.length)].id;
+        const chosen=choose();
         selected.push(chosen);
         db.prepare('UPDATE egypt_bonus_chains SET symbols_json=? WHERE user_id=? AND game_id=?')
           .run(JSON.stringify(selected),req.user.id,game.id);
@@ -504,7 +507,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const queue=db.prepare(`SELECT queue_order,free_spins,scatter_count FROM egypt_bonus_pending
         WHERE user_id=? AND game_id=? ORDER BY queue_order`).all(req.user.id,game.id);
       const nextState=nextEgyptBonusSeries({remaining,queue,selectedIds:selected,
-        symbols:regular,randomInt:n=>crypto.randomInt(n)});
+        symbols:enabled,randomInt:n=>crypto.randomInt(n)});
       if(nextState.kind==='transition'){
         // First series ends silently; all winnings stay pending. Next series
         // starts with one extra never-used symbol, if any are left to choose.
@@ -639,8 +642,10 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     if(freeSpins){
       if(game.slug==='golden-seven'){
         const options=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
-        if(!options.length)return {error:'Нет символов для бонусной игры Египта.'};
-        selectedEgypt=options[crypto.randomInt(options.length)].id;
+        const weights=egyptSymbolWeights(game.id);
+        const eligible=options.filter(symbol=>(weights[symbol.id]??100)>0);
+        if(!eligible.length)return {error:'Нет символов Египта с положительным весом.'};
+        selectedEgypt=egyptWeightedPicker(eligible,weights,n=>crypto.randomInt(n))();
         db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet,selected_symbol_id)
           VALUES(?,?,?,2,0,?,?)`).run(req.user.id,game.id,freeSpins,wallet.bet,selectedEgypt);
         db.prepare(`INSERT INTO egypt_bonus_chains(user_id,game_id,symbols_json,current_total)
