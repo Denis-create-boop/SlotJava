@@ -218,7 +218,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
         (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
-        '<label>Бонус Египта: выбранный символ играет от <select name="min_reels">'+
+        '<label>Минимум совпадений (обычная игра и бонус) <select name="min_reels">'+
         '<option value="2"'+(egyptBonusRules.get(symbol.id)?.min_reels===2?' selected':'')+'>2 барабанов</option>'+
         '<option value="3"'+(egyptBonusRules.get(symbol.id)?.min_reels!==2?' selected':'')+'>3 барабанов</option>'+
         '</select></label>'+
