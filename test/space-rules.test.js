@@ -161,7 +161,8 @@ test('cascade: a winning first-reel Wild can activate the fourth and then fifth 
   assert.equal(result.expansion.cells[4],9);
   assert.equal(result.expansion.cells[9],9);
   assert.equal(result.scored.wins.length,3);
-  assert.equal(result.scored.total,1200);
+  // Every one of the three configured lines now reaches five reels (×5).
+  assert.equal(result.scored.total,1500);
 });
 test('cascade does not expand a Wild outside winning paylines',()=>{
   const cells=Array(15).fill(2);
