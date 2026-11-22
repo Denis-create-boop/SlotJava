@@ -848,8 +848,9 @@
     if(!spinning||quickStopRequested)return;
     quickStopRequested=true;
     reelMotionActive=false;
-    button.textContent='ОСТАНОВКА…';
-    button.setAttribute('aria-label','Остановка барабанов');
+    if(spinLabel)spinLabel.textContent='СТОП';
+    button.disabled=true;
+    button.setAttribute('aria-label','Барабаны останавливаются');
     stopSpinSound();
     for(const finish of Array.from(finishReelAnimations))finish();
   }
@@ -1094,13 +1095,23 @@
     void track.offsetHeight;
     return new Promise(resolve=>{
       const duration=1420+stagger*135;
-      window.setTimeout(()=>{
+      let startTimer=null,endTimer=null,completed=false;
+      const finish=()=>{
+        if(completed)return;
+        completed=true;
+        if(startTimer!==null)window.clearTimeout(startTimer);
+        if(endTimer!==null)window.clearTimeout(endTimer);
+        finishReelAnimations.delete(finish);
+        tile.replaceWith(makeTile(target));
+        resolve();
+      };
+      finishReelAnimations.add(finish);
+      if(quickStopRequested){finish();return;}
+      startTimer=window.setTimeout(()=>{
+        if(quickStopRequested){finish();return;}
         track.style.transition='transform '+duration+'ms cubic-bezier(.19,.65,.12,1)';
         track.style.transform='translate3d(0,0,0)';
-        window.setTimeout(()=>{
-          tile.replaceWith(makeTile(target));
-          resolve();
-        },duration+50);
+        endTimer=window.setTimeout(finish,duration+50);
       },stagger*80);
     });
   }
@@ -1152,7 +1163,7 @@
         stopSpinSound();
         message.textContent='Респин! Выигравшие ячейки замерли, остальные вращаются.';
         play('spin_sound');
-        await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:320));
+        if(!quickStopRequested)await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:320));
       }
     }
   }
@@ -1541,9 +1552,19 @@
   }
   let spinning=false;
   updateBetSteps();
+  // Click again during motion: settle the same server-determined spin.
+  button.addEventListener('click',event=>{
+    if(!spinning||quickStopRequested)return;
+    event.preventDefault();
+    quickStopReels();
+  });
   form.addEventListener('submit',async event=>{
     event.preventDefault();
-    if(spinning||!definitions.length)return;
+    if(spinning){
+      if(!quickStopRequested&&!autoDispatching)quickStopReels();
+      return;
+    }
+    if(!definitions.length)return;
     if(autoRunning&&!autoDispatching)return;
     if(!bonusActive&&Number(balance.textContent)<Number(betDisplay.textContent)){
       showInsufficientFunds();
@@ -1552,6 +1573,7 @@
       return;
     }
     spinning=true;
+    quickStopRequested=false;
     updateBetSteps();
     if(isEgypt){
       egyptPlayedSymbolIds.clear(); // new spin: every bonus symbol starts bright
@@ -1567,7 +1589,7 @@
       if(egyptRoundPrize)egyptRoundPrize.hidden=true;
     }
     hideBigWin();
-    button.disabled=true;
+    setSpinButton(true);
     settingsButton.disabled=true;
     betButton.disabled=true;
     message.textContent='Барабаны вращаются…';
@@ -1635,6 +1657,10 @@
         }
       }
       stopSpinSound();
+      // The reels are settled; reward/bonus presentation must not be
+      // interpreted as another stop or a second paid spin.
+      button.disabled=true;
+      button.classList.remove('is-spin-stoppable');
       if(result.mode!=='egypt-bonus'){
         highlightWinningSymbols(result.mode==='bonus'
           ?(Array.isArray(result.wins)?result.wins.filter(win=>win.prize>0):[])
@@ -1765,8 +1791,9 @@
     }finally{
       try {stopSpinSound();} catch(error) {console.warn('Spin audio stop failed:',error);}
       spinning=false;
+      quickStopRequested=false;
       updateBetSteps();
-      button.disabled=false;
+      setSpinButton(false);
       settingsButton.disabled=false;
       betButton.disabled=bonusActive;
       if(autoRunning)scheduleAutoplay();
