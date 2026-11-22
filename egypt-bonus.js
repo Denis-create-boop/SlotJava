@@ -50,4 +50,7 @@ function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
   return {total,lineWins,expandedReels,matchedReels,perLine,
     percentHundredths:price,multiplierMilli:milli};
 }
-module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus};
+function egyptFreeSpinsFor(scatterCount){
+  return scatterCount>=6?25:scatterCount===5?20:scatterCount===4?15:scatterCount===3?10:0;
+}
+module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor};
