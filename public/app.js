@@ -97,6 +97,10 @@
     if(spinLabel)spinLabel.textContent=active?'БЕСПЛАТНО':'ВРАЩАТЬ';
     const select=document.getElementById('slot-bet-select');
     if(select)select.disabled=active;
+    for(const id of ['slot-bet-minus','slot-bet-plus']){
+      const step=document.getElementById(id);
+      if(step)step.disabled=active;
+    }
     const saveBet=document.querySelector('#slot-bet-form button[type="submit"]');
     if(saveBet)saveBet.disabled=active;
     if(audioReady&&bonusMusicChanged)startBackgroundMusic();
@@ -176,25 +180,69 @@
   settingsDialog.addEventListener('click',event=>{
     if(event.target===settingsDialog)settingsDialog.close();
   });
-  betForm.addEventListener('submit',async event=>{
-    event.preventDefault();
-    if(spinning||bonusActive){message.textContent='Во время бонусной игры ставка фиксирована.';return;}
+  const betMinus=document.getElementById('slot-bet-minus');
+  const betPlus=document.getElementById('slot-bet-plus');
+  const betSelect=document.getElementById('slot-bet-select');
+  let savingBet=false;
+  function updateBetSteps(){
+    const options=Array.from(betSelect?.options||[]).map(option=>Number(option.value));
+    const index=options.indexOf(Number(betDisplay.textContent));
+    const locked=savingBet||spinning||bonusActive||autoRunning;
+    if(betMinus)betMinus.disabled=locked||index<=0;
+    if(betPlus)betPlus.disabled=locked||index<0||index>=options.length-1;
+  }
+  async function saveBet(nextBet,closeDialog=false){
+    if(savingBet||spinning||bonusActive||autoRunning){
+      if(bonusActive)message.textContent='Во время бонусной игры ставка фиксирована.';
+      return;
+    }
+    const options=Array.from(betSelect.options).map(option=>Number(option.value));
+    if(!options.includes(nextBet))return;
+    savingBet=true;
     const submit=betForm.querySelector('button[type="submit"]');
-    submit.disabled=true;
+    if(submit)submit.disabled=true;
+    updateBetSteps();
     try{
+      const token=betForm.querySelector('input[name="_csrf"]')||
+        betForm.querySelector('input[name="csrf_token"]');
+      // Reuse the existing form data including the CSRF token, but explicitly
+      // send the target bet even when changing it with the side buttons.
+      const body=new URLSearchParams(new FormData(betForm));
+      body.set('bet',String(nextBet));
       const response=await fetch(betForm.action,{
         method:'POST',credentials:'same-origin',
         headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
-        body:new URLSearchParams(new FormData(betForm))
+        body
       });
       const result=await response.json();
-      if(!response.ok||!Number.isSafeInteger(result.bet))throw new Error(result.error||'Ошибка изменения ставки');
+      if(!response.ok||!Number.isSafeInteger(result.bet))
+        throw new Error(result.error||'Ошибка изменения ставки');
       betDisplay.textContent=String(result.bet);
-      settingsDialog.close();
+      betSelect.value=String(result.bet);
+      if(closeDialog&&settingsDialog.open)settingsDialog.close();
       message.textContent='Ставка изменена: '+result.bet+' тестовых очков.';
-    }catch(error){message.textContent=error.message;}
-    finally{submit.disabled=false;}
+    }catch(error){
+      betSelect.value=betDisplay.textContent;
+      message.textContent=error.message;
+    }finally{
+      savingBet=false;
+      if(submit)submit.disabled=bonusActive;
+      updateBetSteps();
+    }
+  }
+  betForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    saveBet(Number(betSelect.value),true);
   });
+  for(const [button,delta] of [[betMinus,-1],[betPlus,1]]){
+    button?.addEventListener('click',()=>{
+      const options=Array.from(betSelect.options).map(option=>Number(option.value));
+      const index=options.indexOf(Number(betDisplay.textContent));
+      const next=options[index+delta];
+      if(next!==undefined)saveBet(next);
+    });
+  }
+  updateBetSteps();
 
   const columns=Array.from(root.querySelectorAll('.reel-column'));
   const reelCount=columns.length;
@@ -1458,6 +1506,7 @@
       return;
     }
     spinning=true;
+    updateBetSteps();
     if(isEgypt){
       egyptPlayedSymbolIds.clear(); // new spin: every bonus symbol starts bright
       // makeTile builds the animated ribbon as well as the final cells.
@@ -1670,6 +1719,7 @@
     }finally{
       try {stopSpinSound();} catch(error) {console.warn('Spin audio stop failed:',error);}
       spinning=false;
+      updateBetSteps();
       button.disabled=false;
       settingsButton.disabled=false;
       betButton.disabled=bonusActive;
