@@ -200,6 +200,10 @@ function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null){
   }
   return {total,wins};
 }
+function egyptPaylines(gameId){
+  return db.prepare('SELECT rows_json FROM egypt_paylines WHERE game_id=? ORDER BY position,id')
+    .all(gameId).map(row=>JSON.parse(row.rows_json));
+}
 function egyptSymbolWeights(gameId){
   return Object.fromEntries(db.prepare(`SELECT w.symbol_id,w.weight
     FROM egypt_symbol_weights w JOIN game_symbols s ON s.id=w.symbol_id
@@ -219,9 +223,10 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
         FROM egypt_line_prices p JOIN game_symbols s ON s.id=p.symbol_id
         WHERE s.game_id=?`).all(gameId)
         .map(rule=>[rule.symbol_id+':'+rule.matches,rule.percent_millionths])):null;
+  const lines=egyptPrices?egyptPaylines(gameId):null;
   const evaluate=board=>egyptPrices
     ?scoreEgyptBaseLines({cells:board,symbols,bet,payouts,
-        minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices})
+        minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices,lines})
     :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
@@ -262,8 +267,8 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
         ?egyptWeightedPicker(others,weighted,n=>crypto.randomInt(n))
         :()=>others[crypto.randomInt(others.length)].id;
       const arranged=Array.from({length:rows*reelCount},otherChoose);
-      const line=egyptPrices?crypto.randomInt(10):null;
-      const egyptPath=line===null?null:EGYPT_LINES[line];
+      const line=egyptPrices?crypto.randomInt(lines.length):null;
+      const egyptPath=line===null?null:lines[line];
       for(let col=0;col<activeReels;col++)
         arranged[(egyptPath?egyptPath[col]:crypto.randomInt(rows))*reelCount+col]=rule.symbol_id;
       const scored=evaluate(arranged);
@@ -343,11 +348,12 @@ function firstGamePage(game,req){
   const egyptChain=game.slug==='golden-seven'&&bonus?getEgyptBonusChain(req.user.id,game.id):null;
   const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
   const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
+  const egyptLinesCount=game.slug==='golden-seven'?egyptPaylines(game.id).length:0;
   const egyptScatterOdds=game.slug==='golden-seven'&&scatter
     ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
-  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" aria-busy="true">'+
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
     '<div class="slot-loading-screen" id="slot-loading-screen" role="status" aria-live="polite">'+
       '<div class="slot-loading-panel"><span class="slot-loading-glyph" aria-hidden="true">✦</span>'+
       '<strong>ЗАГРУЗКА</strong>'+
@@ -484,7 +490,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         .map(row=>[row.symbol_id+':'+row.matches,row.percent_millionths]));
       const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
         selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),
-        minReelsById:minimum,linePricesById:linePrices});
+        minReelsById:minimum,linePricesById:linePrices,lines:egyptPaylines(game.id)});
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
