@@ -332,7 +332,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           .all(id).map(row=>({id:row.id,rows:JSON.parse(row.rows_json)})):[];
     const linePreview=(rows,index)=>'<div class="egypt-line-card"><strong>Линия '+(index+1)+'</strong>'+
       '<svg viewBox="0 0 360 185" role="img" aria-label="Линия '+(index+1)+'">'+
-      Array.from({length:layout.reels},(_,col)=>'<line x1="'+(30+col*(300/(layout.reels-1)))+'" y1="8" x2="'+(30+col*60)+'" y2="172" stroke="#8d7450" stroke-width="1"/>').join('')+
+      Array.from({length:layout.reels},(_,col)=>'<line x1="'+(30+col*(300/(layout.reels-1)))+'" y1="8" x2="'+(30+col*(300/(layout.reels-1)))+'" y2="172" stroke="#8d7450" stroke-width="1"/>').join('')+
       '<polyline points="'+rows.map((row,col)=>(30+col*(300/(layout.reels-1)))+','+(25+row*(layout.rows===3?66:45))).join(' ')+
         '" fill="none" stroke="#ffd775" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'+
       rows.map((row,col)=>'<circle cx="'+(30+col*(300/(layout.reels-1)))+'" cy="'+(25+row*(layout.rows===3?66:45))+'" r="6" fill="#fff2ad"/>').join('')+
@@ -357,7 +357,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<button type="submit" class="danger-action">Удалить линию</button></form>':'')+
         '</div>').join('');
       panel=panelStart(game.slug==='lucky-stars'?'Линии выигрыша Космоса':'Линии выигрыша Египта')+
-        '<p class="hint">Линия проходит через одну ячейку каждого барабана. Выбери строку (от 1 — верхняя до 4 — нижняя) для каждого барабана. Эти линии действуют в обычной и бонусной игре. Выплата начисляется за каждую сыгравшую линию отдельно. Допускается от 1 до 50 различных линий.</p>'+
+        '<p class="hint">Линия проходит через одну ячейку каждого барабана. Выбери строку от 1 до '+layout.rows+' для каждого барабана. Эти линии действуют в обычной и бонусной игре. Выплата начисляется за каждую сыгравшую линию отдельно. Допускается от 1 до 50 различных линий.</p>'+
         '<div class="egypt-line-editors">'+editor+'</div>'+
         '<h3>Добавить линию</h3>'+
         '<form method="post" action="/admin/games/'+id+'/egypt-lines/add">'+csrf+
@@ -387,7 +387,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)
           ?'Задайте шанс SCATTER отдельно для каждого барабана. На одном барабане может быть только один SCATTER.'
           :'Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.')+'</p>'+
-        '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'3 SCATTER — 10 вращений, 4 — 15, 5 — 20, 6 — 25. Максимум один SCATTER на барабан. Перед бонусом случайно выбирается символ. Он расширяется на весь барабан, где выпал, и выигрывает на всех настроенных линиях при наличии на 2 или 3 любых барабанах (по настройке символа). Множителя первой игры здесь нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
+        '<p class="hint">'+(game.slug==='lucky-stars'?'Космос: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20. В бонусе WILD расширяется до одной высокой картинки на весь барабан (3 ячейки); каждый выигрыш считается по редактируемым линиям. SCATTER никогда не заменяется WILD. Повторные SCATTER запускают дополнительные серии.' :game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20, 6 — 25. Перед бонусом случайно выбирается символ, который расширяется на барабан при выпадении. Нет множителя первой игры.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
         (['golden-seven','lucky-stars'].includes(game.slug)?'<h3>Линии бонусной игры ('+egyptLineEntries.length+')</h3>'+egyptLinePreview+
           '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому каждая из настроенных линий учитывает все такие барабаны, даже несоседние.</p>':'')+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
