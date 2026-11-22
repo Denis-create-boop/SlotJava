@@ -748,6 +748,14 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
   db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
 }
 
+// Preserve bonus retriggers as a FIFO queue, without exceeding the session cap.
+db.exec(`CREATE TABLE IF NOT EXISTS space_bonus_pending (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  seq INTEGER NOT NULL,
+  spins INTEGER NOT NULL CHECK(spins BETWEEN 10 AND 25),
+  PRIMARY KEY(user_id,game_id,seq)
+)`);
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
