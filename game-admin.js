@@ -180,8 +180,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         (assignedBackgrounds.get(key)?.library_image_id===image.id?' ✓':'')+'</button></form>';
       return '<div class="library-image-card"><img src="'+h(src)+'" alt="'+h(image.name)+'" loading="lazy">'+
         '<strong>'+h(image.name)+'</strong>'+
+        '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/rename" class="library-rename-form">'+csrf+
+          '<label>Название картинки<input type="text" name="name" minlength="1" maxlength="80" value="'+h(image.name)+'" required></label>'+
+          '<button type="submit">Переименовать</button></form>'+
         '<div class="library-quick-actions">'+
         quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
+        (game.slug==='lucky-stars'?quickAssign(['space_expanding_wild','На весь барабан WILD']):'')+
         '</div>'+
         '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/replace" enctype="multipart/form-data">'+csrf+
           '<label class="asset-upload-label">Заменить картинку<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
@@ -401,7 +405,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
       '<div class="symbol-admin-list">'+symbolItems+'</div>'+
-      (game.slug==='lucky-stars'?'<h3>Расширяющийся WILD: одна картинка на 3 ячейки</h3><p class="hint">Загрузите отдельную вертикальную картинку. Если не выбрано, используется обычный WILD.</p><div class="asset-settings-grid">'+rowsFor(['space_expanding_wild'])+'</div>':'')+'</section>';
+      (game.slug==='lucky-stars'?'<h3>Расширяющийся WILD: одна картинка на 3 ячейки</h3><p class="hint">Для выбора из папки используйте кнопку «На весь барабан WILD» в разделе изображений. Можно также загрузить отдельный вертикальный файл ниже.</p><div class="asset-settings-grid">'+rowsFor(['space_expanding_wild'])+'</div>':'')+'</section>';
     const notice=message?'<p class="'+(error?'error':'success-note')+'" role="status">'+h(message)+'</p>':'';
     sendPage(res,'Настройки: '+game.title,
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
@@ -586,6 +590,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       db.prepare('INSERT INTO game_image_library(game_id,name,file_name) VALUES(?,?,?)').run(id,name,fileName);
     }catch(e){fs.unlinkSync(fullPath);throw e;}
     res.redirect(sectionUrl(id,'library'));
+  });
+  app.post('/admin/games/:id/library/:imageId/rename',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),imageId=Number(req.params.imageId);
+    if(!id||!gameById(id)||!Number.isSafeInteger(imageId)||imageId<=0||!ownedLibraryImage(id,imageId))
+      return res.sendStatus(404);
+    const name=typeof req.body?.name==='string'?req.body.name.trim():'';
+    if(!name||name.length>80)return show(req,res,'Название изображения: от 1 до 80 символов.',true,'library');
+    db.prepare('UPDATE game_image_library SET name=? WHERE game_id=? AND id=?')
+      .run(name,id,imageId);
+    res.redirect(sectionUrl(id,'library')+'&renamed=1');
   });
   app.post('/admin/games/:id/library/:imageId/replace',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
     const id=gameId(req),imageId=Number(req.params.imageId);
