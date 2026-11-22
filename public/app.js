@@ -202,55 +202,91 @@
     osc.connect(gain).connect(ctx.destination);
     osc.start(at);osc.stop(at+duration+.02);
   }
+  // Original rock stingers for the classic slot; do not affect uploaded sound assets.
   function playGeneratedSound(name){
     if(!classicSounds||!soundEnabled||name==='music')return;
     try{
       const ctx=getAudioContext();
       if(!ctx)return;
+      const t0=ctx.currentTime+.015;
+      function guitar(frequency,offset,duration=.25,level=.065){
+        const at=t0+offset;
+        // Fifth + octave: a compact power chord, with soft-clipped harmonics.
+        const tone=ctx.createGain(),filter=ctx.createBiquadFilter(),drive=ctx.createWaveShaper();
+        filter.type='lowpass';filter.frequency.value=2200;filter.Q.value=.6;
+        const curve=new Float32Array(1024);
+        for(let i=0;i<curve.length;i++){
+          const x=(i/(curve.length-1))*2-1;
+          curve[i]=Math.tanh(x*3.4)/Math.tanh(3.4);
+        }
+        drive.curve=curve;drive.oversample='2x';
+        tone.gain.setValueAtTime(.0001,at);
+        tone.gain.exponentialRampToValueAtTime(level,at+.012);
+        tone.gain.exponentialRampToValueAtTime(Math.max(.0002,level*.24),at+duration*.55);
+        tone.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        drive.connect(filter).connect(tone).connect(ctx.destination);
+        for(const [ratio,amount] of [[1,.23],[1.5,.16],[2,.10]]){
+          const osc=ctx.createOscillator(),mix=ctx.createGain();
+          osc.type='sawtooth';osc.frequency.setValueAtTime(frequency*ratio,at);
+          mix.gain.value=amount;
+          osc.connect(mix).connect(drive);
+          osc.start(at);osc.stop(at+duration+.025);
+        }
+      }
+      function kick(offset,level=.13){
+        const at=t0+offset,osc=ctx.createOscillator(),amp=ctx.createGain();
+        osc.type='sine';
+        osc.frequency.setValueAtTime(145,at);
+        osc.frequency.exponentialRampToValueAtTime(48,at+.13);
+        amp.gain.setValueAtTime(.0001,at);
+        amp.gain.exponentialRampToValueAtTime(level,at+.009);
+        amp.gain.exponentialRampToValueAtTime(.0001,at+.19);
+        osc.connect(amp).connect(ctx.destination);
+        osc.start(at);osc.stop(at+.2);
+      }
+      function snare(offset,level=.065){
+        const at=t0+offset,duration=.13;
+        const sampleCount=Math.floor(ctx.sampleRate*duration);
+        const buffer=ctx.createBuffer(1,sampleCount,ctx.sampleRate);
+        const samples=buffer.getChannelData(0);
+        for(let i=0;i<sampleCount;i++)samples[i]=Math.random()*2-1;
+        const noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),amp=ctx.createGain();
+        noise.buffer=buffer;
+        filter.type='highpass';filter.frequency.value=950;
+        amp.gain.setValueAtTime(level,at);
+        amp.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        noise.connect(filter).connect(amp).connect(ctx.destination);
+        noise.start(at);noise.stop(at+duration);
+      }
       if(name==='bonus_sound'){
-        // Original short arcade fanfare, distinct from the ordinary win sound.
-        const notes=[392,523.25,659.25,783.99,1046.5,1318.5];
-        notes.forEach((hz,index)=>synthesizedNote(hz,ctx.currentTime+index*.16,index===5?.85:.33,.10,index===5?'triangle':'sawtooth'));
-        synthesizedNote(261.63,ctx.currentTime+.67,1,.042,'triangle');
-        synthesizedNote(523.25,ctx.currentTime+.67,1,.06,'triangle');
+        // Urgent two-bar rock fill before free spins begin.
+        [0,.18,.36,.54,.72,.90].forEach((offset,i)=>{
+          if(i%2===0)kick(offset,.13);
+          else snare(offset,.075);
+        });
+        guitar(82.41,0,.32,.060);     // low E power chord
+        guitar(98,.36,.32,.065);      // G
+        guitar(110,.72,.65,.082);     // A, sustained resolution
+        kick(.72,.16);snare(.90,.09);
         return;
       }
       if(name==='win_sound'||name==='big_win_sound'||name==='mega_win_sound'){
-        // A gentle, original victory chime with a bright metallic shimmer;
-        // it evokes a reward without imitating literal falling coins.
-        const isMega=name==='mega_win_sound',isBig=name==='big_win_sound';
-        const notes=isMega?[659.25,830.61,987.77,1318.51,1567.98,1975.53]:
-          isBig?[587.33,739.99,880,1174.66,1479.98]:
-          [659.25,830.61,987.77,1318.51];
-        const start=ctx.currentTime+.015;
-        notes.forEach((hz,index)=>{
-          const at=start+index*(isMega?.115:.135);
-          const duration=(index===notes.length-1?(isMega?1.15:.78):.48);
-          for(const [ratio,level] of [[1,.046],[2.01,.013],[3.92,.005]]){
-            const oscillator=ctx.createOscillator(),gain=ctx.createGain();
-            oscillator.type='sine';
-            oscillator.frequency.setValueAtTime(hz*ratio,at);
-            gain.gain.setValueAtTime(.0001,at);
-            gain.gain.exponentialRampToValueAtTime(level*(isMega?1.2:isBig?1.1:1),at+.012);
-            gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
-            oscillator.connect(gain).connect(ctx.destination);
-            oscillator.start(at);oscillator.stop(at+duration+.02);
-          }
-        });
+        const big=name!=='win_sound',mega=name==='mega_win_sound';
+        const notes=mega?[110,130.81,146.83,164.81,220]:
+          big?[110,130.81,146.83,164.81]:
+          [110,146.83,164.81];
+        const step=mega?.135:.16;
+        notes.forEach((hz,i)=>guitar(hz,i*step,i===notes.length-1?(mega?.9:big?.7:.46):.24,mega?.078:big?.071:.055));
+        kick(0,big?.115:.08);
+        if(big)snare(step*2,.07);
+        if(mega){kick(step*4,.13);snare(step*3,.08);}
         return;
       }
-      const notes=[220,247,262,294,330,294,262,247];
-      notes.forEach((hz,index)=>{
-        const osc=ctx.createOscillator(),gain=ctx.createGain();
-        const t=ctx.currentTime+index*.075;
-        osc.type='sine';osc.frequency.setValueAtTime(hz,t);
-        gain.gain.setValueAtTime(.0001,t);
-        gain.gain.exponentialRampToValueAtTime(.055,t+.015);
-        gain.gain.exponentialRampToValueAtTime(.0001,t+.095);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(t);osc.stop(t+.11);
-      });
-    }catch{}
+      // For other generated events retain a modest low chime.
+      synthesizedNote(220,t0,.18,.024,'triangle');
+    }catch(error){
+      console.warn('Rock sound unavailable:',error);
+    }
   }
 
   function play(name){
