@@ -1206,3 +1206,40 @@ header nav .header-user-balance{
     top:-23px;
   }
 }
+
+
+/* Ancient Egypt: restrained cinematic temple materials and embossed reel framing. */
+.slot-theme-egypt .slot-machine{
+  background:linear-gradient(145deg,#382312 0%,#110e12 50%,#39220c 100%);
+  border:2px solid #b68c3d;
+  box-shadow:inset 0 0 0 2px #513715,inset 0 0 26px #09070c,0 12px 40px #0009;
+}
+.slot-theme-egypt .slot-reels-ribbon{
+  border:7px ridge #a77a2e;
+  border-radius:15px;
+  background:radial-gradient(ellipse at 50% 20%,#534019 0%,#181519 72%,#08080d 100%);
+  box-shadow:inset 0 0 0 2px #dec178,inset 0 0 25px #000b,0 0 22px #e7a63c30;
+}
+.slot-theme-egypt .reel-column{
+  border:2px solid #b99550;
+  border-radius:9px;
+  background:linear-gradient(90deg,#141115,#41311f 50%,#121015);
+  box-shadow:inset 0 0 0 1px #edd18875,inset 0 0 18px #000b,0 0 7px #0008;
+}
+.slot-theme-egypt .reel-cell-bg{
+  background:radial-gradient(circle at 50% 35%,#46381f88,#121017ed 80%);
+  border-bottom:1px solid #c7a56959;
+}
+.slot-theme-egypt .slot-meter{
+  border:2px solid #ad873c;
+  background:linear-gradient(125deg,#382816,#141118 62%,#41301a);
+  box-shadow:inset 0 0 13px #0009,0 2px 13px #0008;
+}
+.slot-theme-egypt .slot-spin-button{
+  border-color:#dfba68;
+  box-shadow:inset 0 0 0 2px #4f351a,0 0 18px #e3a94b55;
+}
+@media(max-width:720px){
+  .slot-theme-egypt .slot-reels-ribbon{border-width:4px;border-radius:9px}
+  .slot-theme-egypt .reel-column{border-width:1px}
+}
