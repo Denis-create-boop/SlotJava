@@ -215,8 +215,11 @@
       const active=presenting&&egyptPlayingIds.has(tileId);
       tile.classList.toggle('is-egypt-bonus-symbol',active);
       tile.classList.toggle('is-egypt-focus',active&&tileId===id);
-      tile.classList.toggle('is-egypt-inactive',active&&egyptPlayedSymbolIds.has(tileId)&&tileId!==id);
-      tile.classList.toggle('is-egypt-landed',active&&!egyptPlayedSymbolIds.has(tileId)&&tileId!==id);
+      // While ONE symbol pays, all other selected symbols step into the
+      // background. Between payouts, only completed symbols stay muted.
+      const muted=active&&(id>0?tileId!==id:egyptPlayedSymbolIds.has(tileId));
+      tile.classList.toggle('is-egypt-inactive',muted);
+      tile.classList.toggle('is-egypt-landed',active&&!muted&&tileId!==id);
     }
   }
   const egyptStarterArt=new Set([
@@ -745,11 +748,15 @@
   function makeTile(id){
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
+    const egyptSelected=isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id);
+    const egyptFocused=egyptSelected&&egyptFocusedSymbolId===id;
+    const egyptMuted=egyptSelected&&!egyptFocused&&
+      (egyptFocusedSymbolId>0||egyptPlayedSymbolIds.has(id));
     tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
-      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
-      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
-      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayedSymbolIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'')+
-      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id)&&!egyptPlayedSymbolIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-landed':'');
+      (egyptSelected?' is-egypt-bonus-symbol':'')+
+      (egyptFocused?' is-egypt-focus':'')+
+      (egyptMuted?' is-egypt-inactive':'')+
+      (egyptSelected&&!egyptMuted&&!egyptFocused?' is-egypt-landed':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -881,12 +888,9 @@
         // As soon as an individual reel stops, illuminate every selected
         // bonus symbol on THAT reel. Other reels may still be spinning.
         if(isEgypt&&bonusActive){
-          for(const tile of col.querySelectorAll('.reel-track .ribbon-tile')){
-            if(egyptPlayingIds.has(Number(tile.dataset.symbolId))){
-              tile.classList.add('is-egypt-bonus-symbol','is-egypt-landed');
-              tile.classList.remove('is-egypt-inactive','is-egypt-focus');
-            }
-          }
+          // The ribbon tiles are already illuminated by makeTile. Preserve
+          // that appearance on the final static cells as the reel stops.
+          setEgyptFocus(0);
         }
         if(overlays.has(index))await stopSuspense(index);
       }));
@@ -1446,8 +1450,10 @@
     }
     spinning=true;
     if(isEgypt){
-      egyptPlayedSymbolIds.clear(); // every new bonus spin resets which symbols have played
-      egyptReelsHighlightReady=false; // regular, full-color symbols during spinning
+      egyptPlayedSymbolIds.clear(); // new spin: every bonus symbol starts bright
+      // makeTile builds the animated ribbon as well as the final cells.
+      // Highlight selected symbols IN the moving ribbon, not after landing.
+      egyptReelsHighlightReady=bonusActive;
       setEgyptFocus(0);
     }
     clearWinningGlow();
