@@ -72,3 +72,26 @@ test('one expanded reel never wins',()=>{
   assert.equal(score.total,0);
   assert.deepEqual(score.lineWins,[]);
 });
+
+test('selected bonus symbol stays unexpanded when fewer than three reels match',()=>{
+  let i=0;
+  const board=egyptBonusBoard({
+    symbols:[{id:8},{id:7}],selectedId:8,minReels:3,
+    randomInt:()=>[0,2].includes((i++)%6)?0:1
+  });
+  assert.deepEqual(board.landedReels,[0,2]);
+  assert.deepEqual(board.expandedReels,[]);
+  assert.deepEqual(board.cells,board.initialCells);
+});
+test('the same two nonadjacent reels expand when configured to pay from two',()=>{
+  let i=0;
+  const board=egyptBonusBoard({
+    symbols:[{id:8},{id:7}],selectedId:8,minReels:2,
+    randomInt:()=>[0,2].includes((i++)%6)?0:1
+  });
+  assert.deepEqual(board.expandedReels,[0,2]);
+  for(let row=0;row<4;row++){
+    assert.equal(board.cells[row*6],8);
+    assert.equal(board.cells[row*6+2],8);
+  }
+});
