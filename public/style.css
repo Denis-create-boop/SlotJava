@@ -2192,3 +2192,23 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
   .slot-bet-control{grid-template-columns:22px minmax(0,1fr) 22px;gap:2px}
   .slot-bet-step{border-radius:6px;font-size:1.2rem}
 }
+
+
+/* Reuse the main round button to stop the reel animation on the second tap.
+   The spin's server-settled outcome and credits are never recalculated. */
+#slot-spin-button.is-spin-stoppable{
+  cursor:pointer;
+  background:radial-gradient(circle at 35% 28%,#f1ad54,#9e3f42 72%,#492338);
+  border-color:#ffdf91;
+  box-shadow:0 0 0 2px #ffdf9266,0 0 21px #f3a04d88,inset 0 2px 7px #ffe5b84b;
+}
+#slot-spin-button.is-spin-stoppable .spin-round-icon{
+  animation:none!important;
+}
+#slot-spin-button.is-spin-stoppable #slot-spin-label{
+  color:#fff5cf;
+  font-weight:1000;
+}
+#slot-spin-button.is-spin-stoppable:hover:not(:disabled){
+  filter:brightness(1.13);
+}
