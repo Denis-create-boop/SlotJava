@@ -5,7 +5,8 @@ module.exports = function installEgyptSymbols(db) {
   const game=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
   if(!game)return;
   const id=game.id, flag='egypt_symbols_2026_v1';
-  const flagged=db.prepare('SELECT 1 FROM app_metadata WHERE key=?').get(flag);
+  db.exec('CREATE TABLE IF NOT EXISTS egypt_setup_flags(key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  const flagged=db.prepare('SELECT 1 FROM egypt_setup_flags WHERE key=?').get(flag);
   if(flagged)return;
   const old=db.prepare('SELECT id,name FROM game_symbols WHERE game_id=? ORDER BY position,id').all(id);
   const defaults=new Set(['Фараон','Клеопатра','Анубис','Глаз Гора','Скарабей','Анкх',
@@ -43,6 +44,6 @@ module.exports = function installEgyptSymbols(db) {
     db.prepare('INSERT INTO game_scatter_symbols(game_id,symbol_id) VALUES(?,?) ON CONFLICT(game_id) DO UPDATE SET symbol_id=excluded.symbol_id').run(id,scatterId);
     const rule=db.prepare('INSERT OR IGNORE INTO game_scatter_reels(game_id,reel_index,chance_percent,max_symbols) VALUES(?,?,?,?)');
     for(let reel=1;reel<=6;reel++)rule.run(id,reel,8,1);
-    db.prepare('INSERT INTO app_metadata(key,value) VALUES(?,?)').run(flag,'1');
+    db.prepare('INSERT INTO egypt_setup_flags(key,value) VALUES(?,?)').run(flag,'1');
   })();
 };
