@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus}=require('../egypt-bonus');
+const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor}=require('../egypt-bonus');
 const {scatterOnBoard,freeSpinsFor}=require('../slot-bonus');
 
 test('Egypt uses ten distinct six-reel paylines over four rows',()=>{
@@ -19,6 +19,15 @@ test('3, 4, >=5 SCATTER award 10, 15, 20 spins',()=>{
   assert.equal(freeSpinsFor(4),15);
   assert.equal(freeSpinsFor(5),20);
   assert.equal(freeSpinsFor(6),20);
+});
+test('Egypt gives 25 spins for six Scatter without changing classic',()=>{
+  assert.equal(egyptFreeSpinsFor(0),0);
+  assert.equal(egyptFreeSpinsFor(2),0);
+  assert.equal(egyptFreeSpinsFor(3),10);
+  assert.equal(egyptFreeSpinsFor(4),15);
+  assert.equal(egyptFreeSpinsFor(5),20);
+  assert.equal(egyptFreeSpinsFor(6),25);
+  assert.equal(freeSpinsFor(6),20); // classic stays unchanged
 });
 test('one SCATTER at most per Egypt reel',()=>{
   const normal=Array(24).fill(2);
