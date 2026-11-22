@@ -207,13 +207,13 @@
   let egyptFocusedSymbolId=0;
   function setEgyptFocus(id=0){
     egyptFocusedSymbolId=id;
-    const dimOthers=id>0;
+    const presenting=bonusActive&&id>0;
     for(const tile of root.querySelectorAll('.reel-window .ribbon-tile')){
       const tileId=Number(tile.dataset.symbolId);
-      const active=bonusActive&&egyptPlayingIds.has(tileId);
+      const active=presenting&&egyptPlayingIds.has(tileId);
       tile.classList.toggle('is-egypt-bonus-symbol',active);
       tile.classList.toggle('is-egypt-focus',active&&tileId===id);
-      tile.classList.toggle('is-egypt-inactive',active&&dimOthers&&tileId!==id);
+      tile.classList.toggle('is-egypt-inactive',active&&tileId!==id);
     }
   }
   const egyptStarterArt=new Set([
@@ -676,7 +676,7 @@
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
     tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
-      (isEgypt&&bonusActive&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
+      (isEgypt&&bonusActive&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
       (isEgypt&&bonusActive&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
       (isEgypt&&bonusActive&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'');
     tile.dataset.symbolId=String(id);
@@ -1362,6 +1362,7 @@
       return;
     }
     spinning=true;
+    if(isEgypt)setEgyptFocus(0); // all reel symbols retain their original appearance while spinning
     clearWinningGlow();
     clearBonusLocks();
     if(isEgypt){
