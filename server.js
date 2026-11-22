@@ -166,7 +166,7 @@ app.get('/',(req,res)=>{
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
-function scoreBoard(cells,symbols,payouts,bet=10,rows=4){
+function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null){
   // Payout = stake * (symbol price % / 100) * matching occurrences
   //        * multiplier for the last consecutive reel. First 3 mandatory.
   const reelCount=Math.floor(cells.length/rows);
@@ -185,7 +185,8 @@ function scoreBoard(cells,symbols,payouts,bet=10,rows=4){
       reels++;
       count+=found;
     }
-    if(reels<3)continue;
+    const minimum=egyptMinimums?.get(symbol.id)===2?2:3;
+    if(reels<minimum)continue;
     const percentHundredths=priceMap.get(symbol.id)||0;
     const multiplierMilli=reelMultipliers.get(symbol.id+':'+reels)??1000;
     const prize=percentHundredths>0&&multiplierMilli>0
@@ -203,13 +204,18 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const scatter=getScatterSettings(gameId);
   const symbols=getSymbols(gameId).filter(symbol=>symbol.id!==scatter?.symbolId);
   const payouts=getPayouts(gameId);
+  const game=gameById(gameId);
+  const egyptMinimums=game?.slug==='golden-seven'
+    ?new Map(db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
+        WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(gameId)
+        .map(rule=>[rule.symbol_id,rule.min_reels])):null;
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
   const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
-  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
+  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
-    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
+    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
@@ -217,12 +223,13 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
-      const activeReels=3+crypto.randomInt(reelCount-2);
+      const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
+      const activeReels=minReels+crypto.randomInt(reelCount-minReels+1);
       if((reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
       const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
       for(let col=0;col<activeReels;col++)
         arranged[crypto.randomInt(rows)*reelCount+col]=rule.symbol_id;
-      const scored=scoreBoard(arranged,symbols,payouts,bet,rows);
+      const scored=scoreBoard(arranged,symbols,payouts,bet,rows,egyptMinimums);
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
@@ -232,7 +239,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   if(scatter&&layout.rows===4&&(layout.reels===5||layout.reels===6)){
     const placed=scatterOnBoard(cells,scatter.symbolId,scatter.rules,rows,reelCount,n=>crypto.randomInt(n));
     cells=placed.cells;scatterCount=placed.count;
-    evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
+    evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
   }
   return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0,scatterCount};
 }
