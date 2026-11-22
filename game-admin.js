@@ -242,8 +242,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '</select></label>'+
         '<p class="hint">Для обычной игры и бонуса действует одна таблица выплат ниже. Различается только правило совпадений: подряд слева направо в обычной игре и на любых барабанах с расширением в бонусе. Все 10 выигрышных линий оплачиваются отдельно.</p>'+
         '<button class="primary" type="submit">Сохранить минимум совпадений</button></form>':'')+
-        (isWild?'<p class="hint"><strong>WILD</strong> заменяет обычные символы, но не SCATTER.</p>':'')+
-        (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
+        (isWild?'<p class="hint"><strong>WILD</strong> не имеет собственной цены. Заменяет любой обычный символ, кроме SCATTER, и получает цену заменяемого символа. Например: Солнце — WILD — Солнце = три Солнца.</p>':'')+
+        (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':isWild?'':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: одна таблица выплат для обычной и бонусной игры. Задайте самостоятельную цену за 2, 3, 4, 5 и 6 совпавших барабанов. В обычной игре совпадения подряд слева направо на одной из 10 линий. В бонусе выбранный символ расширяется и совпавшие барабаны могут быть несоседними. Каждая выигрышная линия оплачивается отдельно.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
         (game.slug==='golden-seven'?'':'<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>')+
         '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все настроенные линии — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
@@ -704,7 +704,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const id=gameId(req),symbolId=Number(req.params.symbolId);
     const game=gameById(id);
     if(!game||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
-    if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
+    if(getScatterSettings(id)?.symbolId===symbolId||db.prepare('SELECT 1 FROM game_wild_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId))return res.sendStatus(403);
     if(game.slug==='golden-seven'){
       const entries=[];
       for(let count=2;count<=6;count++){
