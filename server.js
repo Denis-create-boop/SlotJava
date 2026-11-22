@@ -209,14 +209,14 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
     ?new Map(db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(gameId)
         .map(rule=>[rule.symbol_id,rule.min_reels])):null;
-  const egyptMultipliers=game?.slug==='golden-seven'
-    ?Object.fromEntries(db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
-        FROM egypt_line_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+  const egyptPrices=game?.slug==='golden-seven'
+    ?Object.fromEntries(db.prepare(`SELECT p.symbol_id,p.matches,p.percent_millionths
+        FROM egypt_line_prices p JOIN game_symbols s ON s.id=p.symbol_id
         WHERE s.game_id=?`).all(gameId)
-        .map(rule=>[rule.symbol_id+':'+rule.matches,rule.multiplier_milli])):null;
-  const evaluate=board=>egyptMultipliers
+        .map(rule=>[rule.symbol_id+':'+rule.matches,rule.percent_millionths])):null;
+  const evaluate=board=>egyptPrices
     ?scoreEgyptBaseLines({cells:board,symbols,bet,payouts,
-        minReelsById:Object.fromEntries(egyptMinimums),lineMultipliersById:egyptMultipliers})
+        minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices})
     :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
@@ -234,9 +234,10 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
       const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
       const activeReels=minReels+crypto.randomInt(reelCount-minReels+1);
-      if((egyptMultipliers?.[rule.symbol_id+':'+activeReels]??reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
+      if(egyptPrices&&((egyptPrices[rule.symbol_id+':'+activeReels]??0)<=0))continue;
+      if(!egyptPrices&&(reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
       const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
-      const line=egyptMultipliers?crypto.randomInt(10):null;
+      const line=egyptPrices?crypto.randomInt(10):null;
       const egyptPath=line===null?null:EGYPT_LINES[line];
       for(let col=0;col<activeReels;col++)
         arranged[(egyptPath?egyptPath[col]:crypto.randomInt(rows))*reelCount+col]=rule.symbol_id;
@@ -448,13 +449,13 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const minRows=db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(game.id);
       const minimum=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.min_reels]));
-      const lineMultipliers=Object.fromEntries(db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
-        FROM egypt_line_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+      const linePrices=Object.fromEntries(db.prepare(`SELECT p.symbol_id,p.matches,p.percent_millionths
+        FROM egypt_line_prices p JOIN game_symbols s ON s.id=p.symbol_id
         WHERE s.game_id=?`).all(game.id)
-        .map(row=>[row.symbol_id+':'+row.matches,row.multiplier_milli]));
+        .map(row=>[row.symbol_id+':'+row.matches,row.percent_millionths]));
       const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
         selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),
-        minReelsById:minimum,lineMultipliersById:lineMultipliers});
+        minReelsById:minimum,linePricesById:linePrices});
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
