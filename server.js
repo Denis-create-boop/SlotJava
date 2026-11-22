@@ -213,6 +213,14 @@ function egyptSymbolWeights(gameId){
 }
 function wildSymbol(gameId){return db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(gameId)?.symbol_id||0;}
 function spacePaylines(gameId){return db.prepare('SELECT rows_json FROM space_paylines WHERE game_id=? ORDER BY position,id').all(gameId).map(row=>JSON.parse(row.rows_json));}
+function spaceRules(gameId){
+  const minimums=db.prepare(`SELECT r.symbol_id,r.min_reels FROM space_symbol_rules r
+    JOIN game_symbols s ON s.id=r.symbol_id WHERE s.game_id=?`).all(gameId);
+  const multipliers=db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
+    FROM space_symbol_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+    WHERE s.game_id=?`).all(gameId);
+  return {minimums,multipliers};
+}
 function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const scatter=getScatterSettings(gameId);
   const wildId=wildSymbol(gameId);
@@ -232,7 +240,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const evaluate=board=>egyptPrices
     ?scoreEgyptBaseLines({cells:board,symbols,bet,payouts,
         minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices,lines,wildId})
-    :game?.slug==='lucky-stars'?scoreSpaceLines({cells:board,symbols,bet,payouts,lines:spacePaylines(gameId),wildId,scatterId:scatter?.symbolId||0})
+    :game?.slug==='lucky-stars'?scoreSpaceLines({cells:board,symbols,bet,payouts,lines:spacePaylines(gameId),wildId,scatterId:scatter?.symbolId||0,rules:spaceRules(gameId)})
     :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums,wildId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
@@ -249,11 +257,19 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
+    const cosmic=game?.slug==='lucky-stars';
+    const cosmicRules=cosmic?spaceRules(gameId):null;
+    const cosmicMin=new Map((cosmicRules?.minimums||[]).map(row=>[row.symbol_id,row.min_reels]));
+    const cosmicPrices=new Map((cosmicRules?.multipliers||[]).map(row=>[row.symbol_id+':'+row.matches,row.multiplier_milli]));
     const candidates=egyptPrices
       ?availableSymbols.filter(symbol=>symbol.id!==wildId&&Array.from({length:5},(_,i)=>i+2)
           .some(count=>(egyptPrices[symbol.id+':'+count]??0)>0))
           .map(symbol=>({symbol_id:symbol.id}))
-      :payouts.prices.filter(p=>p.symbol_id!==wildId&&p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
+      :cosmic
+      ?availableSymbols.filter(symbol=>symbol.id!==wildId&&Array.from({length:6-(cosmicMin.get(symbol.id)===2?2:3)},(_,i)=>i+(cosmicMin.get(symbol.id)===2?2:3))
+          .some(count=>(cosmicPrices.get(symbol.id+':'+count)||0)>0))
+          .map(symbol=>({symbol_id:symbol.id}))
+      :payouts.prices.filter(p=>p.symbol_id!==wildId&&p.percent_hundredths>0&&symbols.some(sym=>sym.id===p.symbol_id));
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=egyptPrices
         ?{symbol_id:egyptWeightedPicker(
@@ -261,14 +277,15 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
         :candidates[crypto.randomInt(candidates.length)];
       const others=availableSymbols.filter(item=>item.id!==rule.symbol_id);
       if(!others.length)continue;
-      const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
+      const minReels=cosmicMin?.get(rule.symbol_id)===2||egyptMinimums?.get(rule.symbol_id)===2?2:3;
       const available=egyptPrices?Array.from({length:reelCount-minReels+1},(_,i)=>i+minReels)
-        .filter(count=>(egyptPrices[rule.symbol_id+':'+count]??0)>0):null;
+        .filter(count=>(egyptPrices[rule.symbol_id+':'+count]??0)>0):cosmic?Array.from({length:reelCount-minReels+1},(_,i)=>i+minReels)
+        .filter(count=>(cosmicPrices.get(rule.symbol_id+':'+count)||0)>0):null;
       if(available&&!available.length)continue;
       const activeReels=available
         ?available[crypto.randomInt(available.length)]
         :minReels+crypto.randomInt(reelCount-minReels+1);
-      if(!egyptPrices&&(reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
+      if(!egyptPrices&&!cosmic&&(reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
       const otherChoose=egyptPrices
         ?egyptWeightedPicker(others,weighted,n=>crypto.randomInt(n))
         :()=>others[crypto.randomInt(others.length)].id;
@@ -473,7 +490,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId);
       const symbols=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
       const scored=scoreSpaceLines({cells:expansion.cells,symbols,bet:active.bet,
-        payouts:getPayouts(game.id),lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId});
+        payouts:getPayouts(game.id),lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId,rules:spaceRules(game.id)});
       const accumulated=active.bonus_win+scored.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен размер бонусного выигрыша.'};
