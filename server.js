@@ -228,7 +228,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   // Scatter positions are placed only after normal board generation; this
   // decouples the free-spin trigger from regular winning-chain frequency.
   let scatterCount=0;
-  if(scatter&&layout.reels===5&&layout.rows===4){
+  if(scatter&&layout.rows===4&&(layout.reels===5||layout.reels===6)){
     const placed=scatterOnBoard(cells,scatter.symbolId,scatter.rules,rows,reelCount,n=>crypto.randomInt(n));
     cells=placed.cells;scatterCount=placed.count;
     evaluation=scoreBoard(cells,symbols,payouts,bet,rows);
@@ -266,7 +266,7 @@ function firstGamePage(game,req){
   }).join('');
   const audio=['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
-  const scatter=game.slug==='slot-classic'?getScatterSettings(game.id):null;
+  const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
   return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'">'+
@@ -341,7 +341,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const wallet=getWallet(req.user.id,game.id);
     const settings=getGameSettings(game.id);
     const layout=gameLayout(game);
-    const scatter=game.slug==='slot-classic'?getScatterSettings(game.id):null;
+    const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
     const active=scatter?getBonusSession(req.user.id,game.id):null;
     if(active){
       // Free spins are transacted atomically and have a separate pending
@@ -415,13 +415,14 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const winTier=payout>0&&payout*1000>=wallet.bet*megaThreshold?'mega'
       :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
       :payout>0?'normal':'none';
-    const freeSpins=scatter?freeSpinsFor(spin.scatterCount):0;
+    const egyptTrigger=game.slug==='golden-seven'&&spin.scatterCount>=3;
+    const freeSpins=game.slug==='slot-classic'&&scatter?freeSpinsFor(spin.scatterCount):0;
     if(freeSpins){
       db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
         VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
     }
     return {...spin,mode:'base',total:payout,balance:updatedBalance,bet:wallet.bet,
-      winTier,freeSpins,bonusMultiplier:freeSpins?2:null,
+      winTier,freeSpins,egyptTrigger,bonusMultiplier:freeSpins?2:null,
       bonusWin:freeSpins?0:null,remaining:freeSpins};
   })();
   res.set('Cache-Control','no-store');
