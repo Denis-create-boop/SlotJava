@@ -84,7 +84,17 @@ function chooseNewEgyptSymbol(symbols,selectedIds,randomInt){
   const available=symbols.filter(item=>!used.has(item.id));
   return available.length?available[randomInt(available.length)].id:null;
 }
+// Decide how a completed free-spin series continues. A retrigger is always
+// a new queued series, never an immediate addition to current remaining spins.
+function nextEgyptBonusSeries({remaining,queue,selectedIds,symbols,randomInt}){
+  if(remaining>0)return {kind:'continue'};
+  if(!queue.length)return {kind:'complete'};
+  const next=queue[0];
+  const newSymbolId=chooseNewEgyptSymbol(symbols,selectedIds,randomInt);
+  return {kind:'transition',next,newSymbolId,
+    selectedIds:newSymbolId===null?selectedIds.slice():[...selectedIds,newSymbolId]};
+}
 function egyptFreeSpinsFor(scatterCount){
   return scatterCount>=6?25:scatterCount===5?20:scatterCount===4?15:scatterCount===3?10:0;
 }
-module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol};
+module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries};
