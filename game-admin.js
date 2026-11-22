@@ -303,13 +303,37 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<form method="post" class="game-title-form" action="/admin/games/'+id+'/title">'+csrf+
       '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
+    const spaceBackgroundDiagnostics=game.slug==='lucky-stars'?(()=>{
+      const keys=[
+        ['background','Общий фон всей страницы'],
+        ['reels_background','Фон игрового поля (5 барабанов)'],
+        ['cells_background','Фон внутри ячеек'],
+        ['space_bonus_background','Фон бонусной игры']
+      ];
+      return '<section class="space-background-diagnostics"><h3>Проверка назначенных фонов</h3>'+
+        '<p class="hint">Это реальные назначения в базе данных. Каждый фон независим от остальных.</p>'+
+        '<div class="space-background-diagnostic-grid">'+keys.map(([key,title])=>{
+          const entry=assignedBackgrounds.get(key),upload=assets.get(key);
+          const src=entry?(entry.builtin_path||'/game-library/'+id+'/'+entry.library_image_id)
+            :upload?'/game-assets/'+id+'/'+key:'';
+          const info=entry?'Из папки: '+entry.name:upload?'Загруженный файл':'Не установлен';
+          return '<div class="space-background-diagnostic"><strong>'+title+'</strong>'+
+            (src?'<img src="'+h(src)+'" alt="'+h(title)+'" loading="lazy">':
+              '<span class="asset-empty">Не установлен</span>')+
+            '<small>'+h(info)+'</small>'+
+            (key==='background'&&src?
+              '<form method="post" action="/admin/games/'+id+'/clear-overall-background">'+csrf+
+              '<button type="submit" class="danger-action">Убрать только общий фон</button></form>':'')+
+            '</div>';
+        }).join('')+'</div></section>';
+    })():'';
     const spaceMoveBackground=game.slug==='lucky-stars'&&(assignedBackgrounds.has('background')||assets.has('background'))?
       '<form method="post" action="/admin/games/'+id+'/move-background-to-reels">'+csrf+
       '<p class="hint">Если рамка с пятью барабанами появилась на весь экран, перенеси её в фон игрового поля. Общий фон после переноса можно установить отдельно.</p>'+
       '<button class="primary" type="submit">Перенести общий фон в фон игрового поля</button></form>':'';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
       '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
-      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div>'+spaceMoveBackground+'</section>';
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div>'+spaceBackgroundDiagnostics+spaceMoveBackground+'</section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div>'+spaceMoveBackground+'</section>';
@@ -736,6 +760,19 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     res.redirect(sectionUrl(id,'symbols'));
   });
   // Move artwork accidentally selected as wallpaper to the reel-frame slot.
+  // Explicit non-destructive reset for a wrongly assigned full-page image.
+  // The 5x3 field image and the bonus art are intentionally untouched.
+  app.post('/admin/games/:id/clear-overall-background',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(game?.slug!=='lucky-stars')return res.sendStatus(404);
+    const old=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'background');
+    db.transaction(()=>{
+      db.prepare('DELETE FROM game_background_images WHERE game_id=? AND asset_key=?').run(id,'background');
+      db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'background');
+    })();
+    if(old)try{fs.unlinkSync(path.join(uploadsDir,old.file_name));}catch(e){console.warn('Background cleanup:',e.code);}
+    res.redirect(sectionUrl(id,'background')+'&cleared=1');
+  });
   app.post('/admin/games/:id/move-background-to-reels',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
     if(game?.slug!=='lucky-stars')return res.sendStatus(404);
