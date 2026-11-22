@@ -748,6 +748,41 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
   db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
 }
 
+// Built-in Cosmic Odyssey art is registered once and remains editable in the image library.
+// Re-running migrations never overwrites an administrator-selected symbol picture.
+{
+  const game=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
+  if(game){
+    const art=[
+      ['WILD — обычный','/static/images/space/cosmic-wild.svg','wild'],
+      ['WILD — на весь барабан','/static/images/space/wild-expanded.svg','expanded'],
+      ['SCATTER — бонус','/static/images/space/scatter-premium.svg','scatter']
+    ];
+    const add=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+    for(const [name,file] of art)add.run(game.id,name,file);
+    const locate=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+    const used=db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?');
+    const apply=db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
+    for(const [name,file,kind] of art){
+      const image=locate.get(game.id,file);
+      if(!image)continue;
+      if(kind==='wild'||kind==='scatter'){
+        const symbol=kind==='wild'
+          ?db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(game.id)
+          :db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(game.id);
+        if(symbol&&!used.get(symbol.symbol_id)){
+          const oldUpload=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?')
+            .get(game.id,'symbol_'+symbol.symbol_id);
+          if(!oldUpload)apply.run(symbol.symbol_id,image.id);
+        }
+      }
+      if(kind==='expanded'){
+        db.prepare('INSERT OR IGNORE INTO game_background_images(game_id,asset_key,library_image_id) VALUES(?,?,?)')
+          .run(game.id,'space_expanding_wild',image.id);
+      }
+    }
+  }
+}
 // Preserve bonus retriggers as a FIFO queue, without exceeding the session cap.
 db.exec(`CREATE TABLE IF NOT EXISTS space_bonus_pending (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
