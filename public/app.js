@@ -1368,9 +1368,10 @@
       tile.className='space-expanded-wild';
       tile.setAttribute('role','img');
       tile.setAttribute('aria-label','Wild на весь барабан');
-      if(wild.image){
+      const tallImage=root.dataset.spaceExpandingWild||wild.image;
+      if(tallImage){
         const img=document.createElement('img');
-        img.src=wild.image;img.alt='';img.draggable=false;
+        img.src=tallImage;img.alt='';img.draggable=false;
         tile.append(img);
       }else tile.textContent='WILD';
       window.append(tile);
