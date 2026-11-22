@@ -628,6 +628,21 @@ if(!db.pragma('table_info(egypt_symbol_bonus_rules)').some(col=>col.name==='line
   // sets the new Egyptian payout for EACH of the ten winning lines.
   db.exec('ALTER TABLE egypt_symbol_bonus_rules ADD COLUMN line_percent_hundredths INTEGER CHECK(line_percent_hundredths BETWEEN 0 AND 1000000)');
 }
+// Egypt paytable, independent from classic reels. Each coefficient applies to
+// exactly N matching reels on one of ten paylines (2..6). Existing Egypt
+// games inherit their previous reel coefficients until edited in admin.
+db.exec(`CREATE TABLE IF NOT EXISTS egypt_line_multipliers (
+  symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 6),
+  multiplier_milli INTEGER NOT NULL CHECK(multiplier_milli BETWEEN 0 AND 1000000),
+  PRIMARY KEY(symbol_id,matches)
+)`);
+db.prepare(`INSERT OR IGNORE INTO egypt_line_multipliers(symbol_id,matches,multiplier_milli)
+  SELECT m.symbol_id,m.reel_count,m.multiplier_milli
+  FROM symbol_reel_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+  JOIN games g ON g.id=s.game_id
+  WHERE g.slug='golden-seven' AND m.reel_count BETWEEN 3 AND 6`).run();
+
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
