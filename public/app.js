@@ -950,10 +950,24 @@
       ?columns.map((_,i)=>i).filter(i=>i>secondScatter&&eligible[i]):[];
     const anticipation=waitingReels.length>0&&!reducedMotion;
     const overlays=new Map();
-    const plans=columns.map((_,index)=>({
-      delay:index*220,
-      duration:1750+index*230+(anticipation&&index>secondScatter?1350:0)
-    }));
+    // After the second landed SCATTER all eligible reels accelerate together.
+    // Each reel begins braking only AFTER the previous reel has finished.
+    const baseDelay=index=>index*220;
+    const baseDuration=index=>1750+index*230;
+    const secondStop=anticipation
+      ?baseDelay(secondScatter)+baseDuration(secondScatter)+50:0;
+    const accelerateAt=secondStop+70;
+    const brakeDuration=950;
+    const firstBrakeAt=accelerateAt+1250;
+    const plans=columns.map((_,index)=>{
+      const delay=baseDelay(index);
+      if(!anticipation||!waitingReels.includes(index))
+        return {delay,duration:baseDuration(index)};
+      const turn=waitingReels.indexOf(index);
+      const brakeAt=firstBrakeAt+turn*(brakeDuration+160);
+      return {delay,duration:brakeAt-delay+brakeDuration,
+        suspense:{accelerateAt,brakeAt}};
+    });
     const startSuspense=()=>{
       if(quickStopRequested)return;
       for(const index of waitingReels){
@@ -977,10 +991,9 @@
     };
     let triggerTimer=null;
     if(anticipation){
-      // Turn on the glow BEFORE the second Scatter reel has fully stopped,
-      // while the remaining reels still have at least ~1.5s of spin left.
-      const triggerAt=Math.max(0,plans[secondScatter].delay+plans[secondScatter].duration-850);
-      triggerTimer=window.setTimeout(startSuspense,triggerAt);
+      // The second Scatter must be visibly settled before all remaining
+      // reels glow and accelerate at exactly the same moment.
+      triggerTimer=window.setTimeout(startSuspense,secondStop+60);
     }
     const stopSuspense=async(index)=>{
       const veil=overlays.get(index);
@@ -1423,8 +1436,9 @@
     [1,0,1,2,3,2],[2,3,2,1,0,1]
   ];
   let egyptActiveIds=(root.dataset.egyptSymbols||'').split(',')
-    .map(Number).filter(id=>id>0&&symbols.has(id));
+    .map(Number).filter(id=>id>0&&id!==wildId&&symbols.has(id));
   let egyptChosenId=Number(root.dataset.egyptSelected)||0;
+  if(egyptChosenId===wildId)egyptChosenId=0;
   if(egyptChosenId&&!egyptActiveIds.includes(egyptChosenId))egyptActiveIds.push(egyptChosenId);
   function setEgyptCounters(state){
     if(egyptGamesCount){
@@ -1450,7 +1464,7 @@
     setEgyptFocus(focusId);
     if(egyptSymbolStrip)egyptSymbolStrip.hidden=!bonusActive;
     if(egyptSymbolStripItems){
-      const tiles=regularDefinitions.map(symbol=>{
+      const tiles=regularDefinitions.filter(symbol=>symbol.id!==wildId).map(symbol=>{
         const card=document.createElement('div');
         card.className='egypt-symbol-strip-item';
         const selected=egyptActiveIds.includes(symbol.id);
@@ -1483,7 +1497,7 @@
   paintEgyptSelection();
   async function animateEgyptSelection(id){
     if(!id||!egyptPicker||!egyptPickerPortrait)return;
-    const pool=regularDefinitions.filter(item=>!egyptActiveIds.includes(item.id));
+    const pool=regularDefinitions.filter(item=>item.id!==wildId&&!egyptActiveIds.includes(item.id));
     if(!pool.length)return;
     egyptPicker.hidden=false;
     const render=item=>{
@@ -1577,8 +1591,13 @@
         const col=columns[reel];
         if(!col)continue;
         col.classList.remove('egypt-expanding-reel');
-        // Full-height expansion replaces SCATTER visually as well.
-        showStatic(col,Array(rowCount).fill(item.symbolId));
+        // A landed Wild can substitute the currently winning bonus symbol.
+        // Grow the WILD artwork itself on such reels instead of erasing it
+        // behind the chosen symbol's picture. This does NOT select Wild as
+        // a separate bonus symbol or grant it an independent prize.
+        const hasWild=wildId&&Array.from({length:rowCount},(_,row)=>
+          result.cells[row*reelCount+reel]).includes(wildId);
+        showStatic(col,Array(rowCount).fill(hasWild?wildId:item.symbolId));
         void col.offsetWidth;
         col.classList.add('egypt-expanding-reel');
         play('win_sound');
