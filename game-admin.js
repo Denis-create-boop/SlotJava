@@ -10,6 +10,7 @@ fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
 
 const assetTypes={
   background:{label:'Фон игрового окна',kind:'image'},
+  egypt_bonus_background:{label:'Фон бонусной игры «Египет»',kind:'image'},
   field_background:{label:'Общий фон поля с барабанами',kind:'image'},
   cells_background:{label:'Общий фон всех ячеек с символами',kind:'image'},
   logo:{label:'Логотип игры',kind:'image'},
@@ -107,7 +108,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       .get(gameId,imageId);
   }
   function assetTab(key){
-    if(key==='background'||key==='logo'||key==='bonus_frame')return 'background';
+    if(key==='background'||key==='logo'||key==='bonus_frame'||key==='egypt_bonus_background')return 'background';
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
@@ -187,6 +188,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<button type="submit" class="danger-action" title="Удаление снимет картинку с '+linkedCount+' назначений">Удалить</button></form>'+
         '</div>';
     }).join('');
+    const egyptWeights=game.slug==='golden-seven'
+      ?new Map(db.prepare(`SELECT w.symbol_id,w.weight FROM egypt_symbol_weights w
+        JOIN game_symbols s ON s.id=w.symbol_id WHERE s.game_id=?`).all(id)
+          .map(row=>[row.symbol_id,row.weight])):new Map();
     const egyptBonusRules=new Map(game.slug==='golden-seven'
       ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels
         FROM game_symbols s LEFT JOIN egypt_symbol_bonus_rules r ON r.symbol_id=s.id
@@ -216,6 +221,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
+        (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-weight">'+csrf+
+        '<label>Частота появления символа (вес 0–10000)'+
+        '<input type="number" name="weight" min="0" max="10000" step="1" value="'+(egyptWeights.get(symbol.id)??100)+'" required></label>'+
+        '<p class="hint">Вес действует на всех 6 барабанах, в обычных и бесплатных вращениях. 100 — обычная частота, 200 — вдвое чаще относительно символа с весом 100, 0 — не выпадает случайно. SCATTER настраивается отдельно.</p>'+
+        '<button class="primary" type="submit">Сохранить частоту символа</button></form>':'')+
         (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
         '<label>Минимум совпадений (обычная игра и бонус) <select name="min_reels">'+
         '<option value="2"'+(egyptBonusRules.get(symbol.id)?.min_reels===2?' selected':'')+'>2 барабанов</option>'+
@@ -283,8 +293,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
-      '<p class="hint">Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.</p><div class="asset-settings-grid">'+
-      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:['background','logo'])+'</div></section>';
+      '<p class="hint">'+(game.slug==='golden-seven'?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:['background','logo'])+'</div></section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
@@ -447,6 +457,24 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(id).n;
     db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
     res.redirect(sectionUrl(id,'symbols'));
+  });
+  app.post('/admin/games/:id/symbols/:symbolId/egypt-weight',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId),game=id?gameById(id):null;
+    if(!game||game.slug!=='golden-seven'||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
+    const raw=req.body?.weight;
+    if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,4})$/.test(raw)||Number(raw)>10000)
+      return show(req,res,'Вес должен быть целым числом от 0 до 10000.',true,'symbols');
+    const weight=Number(raw);
+    const current=db.prepare(`SELECT COUNT(*) AS n FROM game_symbols s
+      LEFT JOIN egypt_symbol_weights w ON w.symbol_id=s.id
+      WHERE s.game_id=? AND s.id!=? AND s.id!=? AND COALESCE(w.weight,100)>0`)
+      .get(id,symbolId,getScatterSettings(id)?.symbolId||0).n;
+    if(weight===0&&current===0)
+      return show(req,res,'Хотя бы у одного обычного символа вес должен быть больше нуля.',true,'symbols');
+    db.prepare(`INSERT INTO egypt_symbol_weights(symbol_id,weight) VALUES(?,?)
+      ON CONFLICT(symbol_id) DO UPDATE SET weight=excluded.weight`).run(symbolId,weight);
+    res.redirect(sectionUrl(id,'symbols')+'&saved=1');
   });
   app.post('/admin/games/:id/symbols/:symbolId/egypt-min-reels',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId),game=id?gameById(id):null;
