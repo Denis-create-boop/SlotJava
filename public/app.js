@@ -47,6 +47,18 @@
   const winCaption=document.getElementById('slot-win-caption');
   const egyptAccumulated=document.getElementById('egypt-bonus-accumulated');
   const egyptAccumulatedTotal=document.getElementById('egypt-bonus-accumulated-total');
+  const egyptRoundPrize=document.getElementById('egypt-round-prize');
+  const egyptRoundPrizeValue=document.getElementById('egypt-round-prize-value');
+  const egyptRoundPrizeCumulative=document.getElementById('egypt-round-prize-cumulative');
+  function showEgyptRoundPrize(amount,total){
+    if(!egyptRoundPrize)return;
+    if(egyptRoundPrizeValue)egyptRoundPrizeValue.textContent=amount>0?'+'+amount:'—';
+    if(egyptRoundPrizeCumulative)egyptRoundPrizeCumulative.textContent=String(total);
+    egyptRoundPrize.hidden=false;
+    egyptRoundPrize.classList.remove('is-revealing');
+    void egyptRoundPrize.offsetWidth;
+    egyptRoundPrize.classList.add('is-revealing');
+  }
   const bonusPlus=document.getElementById('slot-bonus-plus');
   const bonusFinish=document.getElementById('slot-bonus-finish');
   const bonusFinishTotal=document.getElementById('slot-bonus-finish-total');
@@ -62,6 +74,7 @@
     if(bonusStats)bonusStats.hidden=!active;
     if(egyptGamesBadge)egyptGamesBadge.hidden=!active;
     if(root.classList.contains('slot-theme-egypt')){
+      if(!active&&egyptRoundPrize)egyptRoundPrize.hidden=true;
       if(winCaption)winCaption.textContent=active?'За вращение':'Выигрыш';
       if(egyptAccumulated)egyptAccumulated.hidden=!active;
       if(egyptAccumulatedTotal)egyptAccumulatedTotal.textContent=String(total);
@@ -1115,7 +1128,7 @@
         await delay(250);
       }
       await paintEgyptLines(item);
-      await delay(650);
+      await delay(500);
       clearEgyptLines();
       columns.forEach((col,index)=>showStatic(col,
         Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index])));
@@ -1124,44 +1137,63 @@
   }
   async function paintEgyptLines(result){
     clearEgyptLines();
-    if(!Array.isArray(result.expandedReels)||!result.lineWins?.length||!egyptLinesOverlay)return;
+    if(!egyptLinesOverlay||!result.lineWins?.length||!result.expandedReels?.length)return;
+    const field=root.querySelector('.reel-columns');
+    if(!field)return;
+    // A fixed top-layer SVG uses viewport coordinates and cannot be hidden
+    // behind a cabinet background, reel stacking context, or clipping.
+    if(egyptLinesOverlay.parentElement!==document.body)
+      document.body.append(egyptLinesOverlay);
+    const winRects=columns.map(col=>col.querySelector('.reel-window').getBoundingClientRect());
+    const ns='http://www.w3.org/2000/svg';
+    const viewportWidth=document.documentElement.clientWidth;
+    const viewportHeight=document.documentElement.clientHeight;
+    egyptLinesOverlay.setAttribute('viewBox','0 0 '+viewportWidth+' '+viewportHeight);
     for(const reel of result.expandedReels){
-      if(Number.isInteger(reel)&&reel>=0&&reel<reelCount)
+      if(Number.isInteger(reel)&&reel>=0&&reel<columns.length)
         columns[reel].classList.add('egypt-expanded-reel');
     }
-    // Mount the overlay directly onto the reels instead of the larger
-    // cabinet/frame: every point is based on the rendered cell dimensions.
-    const reelGrid=root.querySelector('.reel-columns');
-    if(!reelGrid)return;
-    if(egyptLinesOverlay.parentElement!==reelGrid)reelGrid.append(egyptLinesOverlay);
-    const bounds=reelGrid.getBoundingClientRect();
-    const width=bounds.width,height=bounds.height;
-    if(!width||!height)return;
-    egyptLinesOverlay.setAttribute('viewBox','0 0 '+width+' '+height);
-    egyptLinesOverlay.hidden=false;
-    const reelCenters=columns.map(col=>{
-      const windowRect=col.querySelector('.reel-window').getBoundingClientRect();
-      return {
-        x:windowRect.left-bounds.left+windowRect.width/2,
-        y:row=>windowRect.top-bounds.top+(row+.5)*(windowRect.height/rowCount)
-      };
-    });
-    const ns='http://www.w3.org/2000/svg';
-    for(const line of result.lineWins){
-      const rows=egyptPaths[line.line-1];
+    const center=(row,col)=>{
+      const rect=winRects[col];
+      return [rect.left+rect.width/2,rect.top+(row+.5)*rect.height/rowCount];
+    };
+    const makeLine=(pts,width,color)=>{
+      const poly=document.createElementNS(ns,'polyline');
+      poly.setAttribute('points',pts);
+      poly.setAttribute('stroke',color);
+      poly.setAttribute('stroke-width',String(width));
+      poly.setAttribute('stroke-linejoin','round');
+      poly.setAttribute('stroke-linecap','round');
+      poly.setAttribute('fill','none');
+      poly.setAttribute('vector-effect','non-scaling-stroke');
+      return poly;
+    };
+    // Ten separate line reveals, one at a time. A strong dark outline makes
+    // each golden path legible on the light Egyptian reel illustrations.
+    for(const win of result.lineWins){
+      const rows=egyptPaths[win.line-1];
       if(!rows)continue;
-      const path=document.createElementNS(ns,'polyline');
-      path.setAttribute('points',rows.map((row,col)=>
-        reelCenters[col].x+','+reelCenters[col].y(row)).join(' '));
-      path.setAttribute('class','egypt-payline egypt-payline-'+line.line+' is-drawing');
-      path.setAttribute('stroke','#ffe78e');
-      path.setAttribute('stroke-width','4');
-      path.setAttribute('fill','none');
-      egyptLinesOverlay.append(path);
-      message.textContent=(symbols.get(result.symbolId)?.name||'Символ')+
-        ': линия '+line.line+' из 10 · '+result.perLine+' очков за линию';
-      await delay(reducedMotion?70:300);
+      const points=rows.map((row,col)=>center(row,col).join(',')).join(' ');
+      egyptLinesOverlay.replaceChildren(
+        makeLine(points,12,'#24111c'),
+        makeLine(points,7,win.line%2?'#ffe25b':'#78f2ff')
+      );
+      egyptLinesOverlay.hidden=false;
+      egyptLinesOverlay.classList.add('is-presenting');
+      const count=document.createElementNS(ns,'text');
+      const [labelX,labelY]=center(rows[0],0);
+      count.setAttribute('x',String(labelX+12));
+      count.setAttribute('y',String(Math.max(24,labelY-18)));
+      count.setAttribute('class','egypt-payline-count');
+      count.textContent='ЛИНИЯ '+win.line+' / 10';
+      egyptLinesOverlay.append(count);
+      message.textContent='Бонус: линия '+win.line+' из 10 · +'+result.perLine+
+        ' очков за линию';
+      await delay(reducedMotion?120:460);
+      egyptLinesOverlay.hidden=true;
+      await delay(reducedMotion?0:90);
     }
+    clearEgyptLines();
   }
   // Autoplay always uses the existing server-validated spin endpoint.
   // Counts paid spins only; bonus/free spins do not consume the selected quota.
@@ -1249,7 +1281,10 @@
     spinning=true;
     clearWinningGlow();
     clearBonusLocks();
-    if(isEgypt)clearEgyptLines();
+    if(isEgypt){
+      clearEgyptLines();
+      if(egyptRoundPrize)egyptRoundPrize.hidden=true;
+    }
     hideBigWin();
     button.disabled=true;
     settingsButton.disabled=true;
@@ -1361,6 +1396,7 @@
         // updateBonus only updates the cumulative prize; the main win meter
         // always displays the current spin award, including zero as a dash.
         winDisplay.textContent=result.total>0?'+'+result.total:'—';
+        showEgyptRoundPrize(result.total,result.bonusWin);
         setEgyptCounters(result);
         paintEgyptSelection();
         if(result.retriggerSpins)await announceEgyptRetrigger(result);
