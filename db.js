@@ -623,6 +623,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS egypt_symbol_bonus_rules (
   symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
   min_reels INTEGER NOT NULL DEFAULT 3 CHECK(min_reels IN (2,3))
 )`);
+if(!db.pragma('table_info(egypt_symbol_bonus_rules)').some(col=>col.name==='line_percent_hundredths')){
+  // Null keeps existing payout behavior until the administrator explicitly
+  // sets the new Egyptian payout for EACH of the ten winning lines.
+  db.exec('ALTER TABLE egypt_symbol_bonus_rules ADD COLUMN line_percent_hundredths INTEGER CHECK(line_percent_hundredths BETWEEN 0 AND 1000000)');
+}
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
