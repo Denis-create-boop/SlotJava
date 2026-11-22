@@ -53,6 +53,14 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     label TEXT NOT NULL,
     PRIMARY KEY(game_id,tab_key)
   )`);
+  // Built-in images cannot be removed from the Git repository at runtime.
+  // Remember which ones an administrator deleted/replaced so seeders cannot show them again.
+  db.exec(`CREATE TABLE IF NOT EXISTS game_hidden_builtin_images (
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    builtin_path TEXT NOT NULL,
+    PRIMARY KEY(game_id,builtin_path)
+  )`);
+  const hideBuiltIn=db.prepare('INSERT OR IGNORE INTO game_hidden_builtin_images(game_id,builtin_path) VALUES(?,?)');
   const menuGroups=[
     {key:'appearance',label:'Управление фонами',items:['background','reels','cells','panels','library']},
     {key:'sounds',label:'Управление звуками',items:['audio']},
@@ -91,7 +99,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     return image.builtin_path||'/game-library/'+gameId+'/'+image.id;
   }
   function ownedLibraryImage(gameId,imageId){
-    return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? AND id=?')
+    return db.prepare(`SELECT l.id,l.name,l.builtin_path,l.file_name FROM game_image_library l
+      WHERE l.game_id=? AND l.id=? AND NOT EXISTS (
+        SELECT 1 FROM game_hidden_builtin_images h
+        WHERE h.game_id=l.game_id AND h.builtin_path=l.builtin_path)`)
       .get(gameId,imageId);
   }
   function assetTab(key){
@@ -162,9 +173,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<div class="library-quick-actions">'+
         quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
         '</div>'+
-        (image.file_name?'<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
-          '<button type="submit"'+(linkedCount?' disabled title="Сначала уберите назначение картинки из символов и фонов"':'')+'>Удалить</button></form>':
-          '<small>Стандартная иллюстрация</small>')+'</div>';
+        '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/replace" enctype="multipart/form-data">'+csrf+
+          '<label class="asset-upload-label">Заменить картинку<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
+          '<button type="submit">Заменить</button></form>'+
+        '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/delete">'+csrf+
+          '<button type="submit" class="danger-action" title="Удаление снимет картинку с '+linkedCount+' назначений">Удалить</button></form>'+
+        '</div>';
     }).join('');
     const symbolItems=symbols.map(symbol=>{
       const isScatter=scatter&&symbol.id===scatter.symbolId;
@@ -401,24 +415,51 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     }catch(e){fs.unlinkSync(fullPath);throw e;}
     res.redirect(sectionUrl(id,'library'));
   });
+  app.post('/admin/games/:id/library/:imageId/replace',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
+    const id=gameId(req),imageId=Number(req.params.imageId);
+    if(!id||!gameById(id)||!Number.isSafeInteger(imageId)||imageId<=0)return res.sendStatus(404);
+    const row=ownedLibraryImage(id,imageId);
+    if(!row)return res.sendStatus(404);
+    if(!req.file?.buffer?.length)return show(req,res,'Выберите изображение для замены.',true,'library');
+    const type=fileType(req.file.buffer);
+    if(!type||type.kind!=='image'||req.file.size>5*1024*1024)
+      return show(req,res,'Допустимы только PNG, JPG, WEBP и GIF до 5 МБ.',true,'library');
+    const name=crypto.randomBytes(24).toString('hex')+'.'+type.ext;
+    fs.writeFileSync(path.join(uploadsDir,name),req.file.buffer,{flag:'wx',mode:0o600});
+    try{
+      db.transaction(()=>{
+        if(row.builtin_path)hideBuiltIn.run(id,row.builtin_path);
+        db.prepare('UPDATE game_image_library SET builtin_path=NULL,file_name=? WHERE id=? AND game_id=?')
+          .run(name,imageId,id);
+      })();
+    }catch(e){try{fs.unlinkSync(path.join(uploadsDir,name));}catch{}throw e;}
+    if(row.file_name)try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Replaced library image cleanup:',e.code);}
+    res.redirect(sectionUrl(id,'library')+'&replaced=1');
+  });
   app.post('/admin/games/:id/library/:imageId/delete',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),imageId=Number(req.params.imageId);
-    if(!id||!gameById(id)||!Number.isSafeInteger(imageId))return res.sendStatus(404);
+    if(!id||!gameById(id)||!Number.isSafeInteger(imageId)||imageId<=0)return res.sendStatus(404);
     const row=ownedLibraryImage(id,imageId);
-    if(!row||!row.file_name)return res.sendStatus(404);
-    const inUse=db.prepare('SELECT 1 FROM game_symbol_images WHERE library_image_id=?').get(imageId);
-    if(inUse)return show(req,res,'Изображение используется символом. Сначала выберите для него другую картинку.',true,'library');
-    const inBackground=db.prepare('SELECT 1 FROM game_background_images WHERE game_id=? AND library_image_id=?').get(id,imageId);
-    if(inBackground)return show(req,res,'Изображение применяется как фон. Сначала выберите для фона другую картинку или уберите его.',true,'library');
-    db.prepare('DELETE FROM game_image_library WHERE game_id=? AND id=?').run(id,imageId);
-    try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Library image cleanup:',e.code);}
-    res.redirect(sectionUrl(id,'library'));
+    if(!row)return res.sendStatus(404);
+    db.transaction(()=>{
+      if(row.builtin_path)hideBuiltIn.run(id,row.builtin_path);
+      db.prepare('DELETE FROM game_symbol_images WHERE library_image_id=?').run(imageId);
+      db.prepare('DELETE FROM game_background_images WHERE game_id=? AND library_image_id=?').run(id,imageId);
+      db.prepare('DELETE FROM game_image_library WHERE game_id=? AND id=?').run(id,imageId);
+    })();
+    if(row.file_name)try{fs.unlinkSync(path.join(uploadsDir,row.file_name));}catch(e){console.warn('Library image cleanup:',e.code);}
+    res.redirect(sectionUrl(id,'library')+'&deleted=1');
   });
   app.post('/admin/games/:id/symbols/:symbolId/image',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId),imageId=Number(req.body.image_id);
     if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId)||!Number.isSafeInteger(imageId)||!ownedLibraryImage(id,imageId))
       return res.sendStatus(404);
-    db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?) ON CONFLICT(symbol_id) DO UPDATE SET library_image_id=excluded.library_image_id').run(symbolId,imageId);
+    const previous=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+symbolId);
+    db.transaction(()=>{
+      db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?) ON CONFLICT(symbol_id) DO UPDATE SET library_image_id=excluded.library_image_id').run(symbolId,imageId);
+      db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'symbol_'+symbolId);
+    })();
+    if(previous)try{fs.unlinkSync(path.join(uploadsDir,previous.file_name));}catch(e){console.warn('Old symbol art cleanup:',e.code);}
     res.redirect(sectionUrl(id,'symbols'));
   });
   app.get('/game-library/:id/:imageId',guarded,(req,res)=>{

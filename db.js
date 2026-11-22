@@ -517,7 +517,10 @@ function getBonusSession(userId,gameId){
   return db.prepare('SELECT remaining,multiplier,bonus_win,bet FROM game_bonus_sessions WHERE user_id=? AND game_id=?').get(userId,gameId)||null;
 }
 function getLibraryImages(gameId){
-  return db.prepare('SELECT id,name,builtin_path,file_name FROM game_image_library WHERE game_id=? ORDER BY id').all(gameId);
+  return db.prepare(`SELECT l.id,l.name,l.builtin_path,l.file_name FROM game_image_library l
+    WHERE l.game_id=? AND NOT EXISTS (SELECT 1 FROM game_hidden_builtin_images h
+      WHERE h.game_id=l.game_id AND h.builtin_path=l.builtin_path)
+    ORDER BY l.id`).all(gameId);
 }
 function getGameBackgroundImages(gameId){
   return db.prepare(`SELECT b.asset_key,b.library_image_id,l.name,l.builtin_path,l.file_name
@@ -529,7 +532,8 @@ function getSymbolImageLinks(gameId){
   return db.prepare(`SELECT s.id AS symbol_id,l.id AS image_id,l.name,l.builtin_path,l.file_name
     FROM game_symbol_images x JOIN game_symbols s ON s.id=x.symbol_id
     JOIN game_image_library l ON l.id=x.library_image_id AND l.game_id=s.game_id
-    WHERE s.game_id=?`).all(gameId);
+    WHERE s.game_id=? AND NOT EXISTS (SELECT 1 FROM game_hidden_builtin_images h
+      WHERE h.game_id=s.game_id AND h.builtin_path=l.builtin_path)`).all(gameId);
 }
 function getWallet(userId,gameId) {
   db.prepare('INSERT OR IGNORE INTO game_wallets(user_id,game_id,balance) VALUES(?,?,1000)').run(userId,gameId);
