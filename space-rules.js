@@ -41,8 +41,11 @@ function expandSpaceWild(cells,wildId,scatterId){
   const expanded=cells.slice();
   for(let col=0;col<5;col++){
     if(![0,1,2].some(row=>cells[row*5+col]===wildId))continue;
+    // A full-reel image would conceal a Scatter. Leave such columns
+    // unexpanded: Scatter must never be substituted, even visually.
+    if(scatterId&&[0,1,2].some(row=>cells[row*5+col]===scatterId))continue;
     reels.push(col);
-    for(let row=0;row<3;row++)if(cells[row*5+col]!==scatterId)expanded[row*5+col]=wildId;
+    for(let row=0;row<3;row++)expanded[row*5+col]=wildId;
   }
   return {cells:expanded,expandedReels:reels};
 }
