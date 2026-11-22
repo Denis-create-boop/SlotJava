@@ -1103,12 +1103,9 @@
         const col=columns[reel];
         if(!col)continue;
         col.classList.remove('egypt-expanding-reel');
-        // Retigger SCATTER remains visible in its original cell.
-        const reelIds=Array.from({length:rowCount},(_,row)=>{
-          const index=row*reelCount+reel;
-          return result.cells[index]===scatterId?scatterId:item.symbolId;
-        });
-        showStatic(col,reelIds);
+        // The expanding symbol covers ALL four cells, including SCATTER.
+        // This is visual only: the server already counted any SCATTER retrigger.
+        showStatic(col,Array(rowCount).fill(item.symbolId));
         void col.offsetWidth;
         col.classList.add('egypt-expanding-reel');
         play('win_sound');
@@ -1124,22 +1121,39 @@
   }
   async function paintEgyptLines(result){
     clearEgyptLines();
-    if(!Array.isArray(result.expandedReels)||!result.lineWins?.length)return;
+    if(!Array.isArray(result.expandedReels)||!result.lineWins?.length||!egyptLinesOverlay)return;
     for(const reel of result.expandedReels){
       if(Number.isInteger(reel)&&reel>=0&&reel<reelCount)
         columns[reel].classList.add('egypt-expanded-reel');
     }
-    if(!egyptLinesOverlay)return;
+    // Mount the overlay directly onto the reels instead of the larger
+    // cabinet/frame: every point is based on the rendered cell dimensions.
+    const reelGrid=root.querySelector('.reel-columns');
+    if(!reelGrid)return;
+    if(egyptLinesOverlay.parentElement!==reelGrid)reelGrid.append(egyptLinesOverlay);
+    const bounds=reelGrid.getBoundingClientRect();
+    const width=bounds.width,height=bounds.height;
+    if(!width||!height)return;
+    egyptLinesOverlay.setAttribute('viewBox','0 0 '+width+' '+height);
     egyptLinesOverlay.hidden=false;
-    // Reveal all ten paylines separately. Keep previous lines on screen,
-    // with an interval of ~300 ms so the player can follow each one.
+    const reelCenters=columns.map(col=>{
+      const windowRect=col.querySelector('.reel-window').getBoundingClientRect();
+      return {
+        x:windowRect.left-bounds.left+windowRect.width/2,
+        y:row=>windowRect.top-bounds.top+(row+.5)*(windowRect.height/rowCount)
+      };
+    });
+    const ns='http://www.w3.org/2000/svg';
     for(const line of result.lineWins){
       const rows=egyptPaths[line.line-1];
       if(!rows)continue;
-      const path=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+      const path=document.createElementNS(ns,'polyline');
       path.setAttribute('points',rows.map((row,col)=>
-        (50+col*100)+','+(50+row*100)).join(' '));
+        reelCenters[col].x+','+reelCenters[col].y(row)).join(' '));
       path.setAttribute('class','egypt-payline egypt-payline-'+line.line+' is-drawing');
+      path.setAttribute('stroke','#ffe78e');
+      path.setAttribute('stroke-width','4');
+      path.setAttribute('fill','none');
       egyptLinesOverlay.append(path);
       message.textContent=(symbols.get(result.symbolId)?.name||'Символ')+
         ': линия '+line.line+' из 10 · '+result.perLine+' очков за линию';
