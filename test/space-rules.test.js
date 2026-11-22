@@ -39,12 +39,26 @@ test('wild fills all three positions of exactly one reel',()=>{
   assert.deepEqual(result.expandedReels,[2]);
   assert.deepEqual([result.cells[2],result.cells[7],result.cells[12]],[9,9,9]);
 });
-test('scatter on a wild reel prevents visual replacement',()=>{
+test('wild expands even with Scatter on the reel, but Scatter is never replaced',()=>{
   const cells=Array(15).fill(2);
   cells[2]=9;cells[7]=10;
   const result=expandSpaceWild(cells,9,10);
-  assert.deepEqual(result.expandedReels,[]);
+  assert.deepEqual(result.expandedReels,[2]);
+  assert.equal(result.cells[2],9);
   assert.equal(result.cells[7],10);
+  assert.equal(result.cells[12],9);
+  assert.deepEqual(cells.slice(0,3),[2,2,9]); // input is unchanged
+});
+test('scatter blocks a winning line even beside an expanded reel Wild',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=1;cells[2]=9;cells[7]=10;
+  const expanded=expandSpaceWild(cells,9,10);
+  const rules={minimums:[{symbol_id:1,min_reels:2}],multipliers:[
+    {symbol_id:1,matches:3,multiplier_milli:5000}
+  ]};
+  const normal=scoreSpaceLines({cells:expanded.cells,symbols,bet:100,payouts,
+    lines:[[0,0,1,0,0]],wildId:9,scatterId:10,rules});
+  assert.equal(normal.total,0);
 });
 
 test('Sun — WILD — Sun pays using the Sun price, not a Wild price',()=>{
