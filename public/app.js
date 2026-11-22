@@ -872,6 +872,8 @@
   const egyptCounterPlayed=document.getElementById('egypt-bonus-played');
   const egyptCounterSeriesTotal=document.getElementById('egypt-bonus-series-total');
   const egyptCounterSeries=document.getElementById('egypt-bonus-series');
+  const egyptCounterPlayedTotal=document.getElementById('egypt-bonus-played-total');
+  const egyptCounterRemainingTotal=document.getElementById('egypt-bonus-remaining-total');
   const egyptCounterRetriggers=document.getElementById('egypt-bonus-retriggers');
   const egyptCounterQueue=document.getElementById('egypt-bonus-queue');
   const egyptPaths=[
@@ -886,6 +888,8 @@
   function setEgyptCounters(state){
     const fields=[
       [egyptCounterPlayed,state.played],
+      [egyptCounterPlayedTotal,state.playedTotal],
+      [egyptCounterRemainingTotal,state.remainingTotal],
       [egyptCounterSeriesTotal,state.currentTotal],
       [egyptCounterSeries,state.seriesNumber],
       [egyptCounterRetriggers,state.retriggerCount],
@@ -1171,7 +1175,8 @@
         if(isEgypt){
           await animateEgyptSelection(Number(result.selectedSymbolId));
           updateBonus(true,result.freeSpins,1,0);
-          setEgyptCounters({played:0,currentTotal:result.freeSpins,seriesNumber:1,
+          setEgyptCounters({played:0,playedTotal:0,remainingTotal:result.freeSpins,
+            currentTotal:result.freeSpins,seriesNumber:1,
             retriggerCount:0,pendingBonuses:0});
           paintEgyptSelection();
           message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
