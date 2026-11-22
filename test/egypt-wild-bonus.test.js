@@ -27,8 +27,8 @@ test('Egyptian Wild is eligible on reels but excluded from bonus-symbol selectio
   const weights={1:100,2:100,9:100};
   const reelPool=[...regular,wild];
   const selectionPool=reelPool.filter(symbol=>symbol.id!==wild.id);
-  assert.equal(egyptWeightedPicker(reelPool,weights,()=>200),9);
-  assert.equal(egyptWeightedPicker(selectionPool,weights,()=>0),1);
+  assert.equal(egyptWeightedPicker(reelPool,weights,()=>200)(),9);
+  assert.equal(egyptWeightedPicker(selectionPool,weights,()=>0)(),1);
   assert.equal(chooseNewEgyptSymbol(selectionPool,[1],()=>0),2);
   assert.equal(chooseNewEgyptSymbol(selectionPool,[1,2],()=>0),null);
 });
