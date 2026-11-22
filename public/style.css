@@ -2003,3 +2003,27 @@ body>.egypt-line-award{
 .slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-focus img{
   filter:drop-shadow(0 1px 4px #66340b) drop-shadow(0 0 9px #fff8d4) brightness(1.24)!important;
 }
+
+
+/* Egypt: selected symbols remain recognizable but are only mildly marked
+   until they actually make a paying line in the current bonus spin. */
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol:not(.is-egypt-focus){
+  opacity:.83!important;
+  filter:brightness(.85) saturate(.8)!important;
+  border:1px solid rgba(224,180,103,.62)!important;
+  background:linear-gradient(140deg,rgba(95,67,38,.23),rgba(35,26,36,.34))!important;
+  box-shadow:inset 0 0 5px rgba(255,209,124,.15)!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol:not(.is-egypt-focus) img{
+  filter:drop-shadow(0 2px 4px #0008) brightness(.91)!important;
+}
+.slot-theme-egypt .egypt-symbol-strip-item.is-selected{
+  opacity:.78;
+  filter:saturate(.77) brightness(.91);
+  border-color:#ab8651;
+  background:linear-gradient(145deg,#483624,#29202a);
+  box-shadow:inset 0 0 7px rgba(221,173,80,.2);
+}
+.slot-theme-egypt .egypt-symbol-strip-item.is-selected img{
+  filter:brightness(.9) saturate(.85);
+}
