@@ -32,33 +32,54 @@ test('scatter blocks a wild payline',()=>{
   const result=scoreSpaceLines({cells,symbols,bet:100,payouts,lines:[[0,0,0,0,0]],wildId:9,scatterId:10});
   assert.equal(result.total,0);
 });
-test('wild fills all three positions of exactly one reel',()=>{
+test('losing Wild stays small when it does not play on a paid line',()=>{
   const cells=Array(15).fill(2);
   cells[2]=9;
-  const result=expandSpaceWild(cells,9,10);
-  assert.deepEqual(result.expandedReels,[2]);
-  assert.deepEqual([result.cells[2],result.cells[7],result.cells[12]],[9,9,9]);
-});
-test('wild expands even with Scatter on the reel, but Scatter is never replaced',()=>{
-  const cells=Array(15).fill(2);
-  cells[2]=9;cells[7]=10;
-  const result=expandSpaceWild(cells,9,10);
-  assert.deepEqual(result.expandedReels,[2]);
+  const result=expandSpaceWild(cells,9,10,[]);
+  assert.deepEqual(result.expandedReels,[]);
   assert.equal(result.cells[2],9);
-  assert.equal(result.cells[7],10);
-  assert.equal(result.cells[12],9);
-  assert.deepEqual(cells.slice(0,3),[2,2,9]); // input is unchanged
+  assert.equal(result.cells[7],2);
+  assert.equal(result.cells[12],2);
 });
-test('scatter blocks a winning line even beside an expanded reel Wild',()=>{
+test('winning Wild expands full reel, preserving the Scatter on it',()=>{
   const cells=Array(15).fill(2);
   cells[0]=1;cells[1]=1;cells[2]=9;cells[7]=10;
-  const expanded=expandSpaceWild(cells,9,10);
-  const rules={minimums:[{symbol_id:1,min_reels:2}],multipliers:[
-    {symbol_id:1,matches:3,multiplier_milli:5000}
-  ]};
-  const normal=scoreSpaceLines({cells:expanded.cells,symbols,bet:100,payouts,
+  const rules={minimums:[{symbol_id:1,min_reels:3}],multipliers:[
+    {symbol_id:1,matches:3,multiplier_milli:5000}]};
+  const score=scoreSpaceLines({cells,symbols,bet:100,payouts,
+    lines:[[0,0,0,0,0]],wildId:9,scatterId:10,rules});
+  assert.equal(score.total,500);
+  const expanded=expandSpaceWild(cells,9,10,score.wins);
+  assert.deepEqual(expanded.expandedReels,[2]);
+  assert.equal(expanded.cells[2],9);
+  assert.equal(expanded.cells[7],10);
+  assert.equal(expanded.cells[12],9);
+  assert.equal(cells[12],2); // do not mutate pre-expansion cells
+});
+test('Wild on another row does not expand even if a different line wins',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=1;cells[2]=1;cells[7]=9;
+  const rules={minimums:[{symbol_id:1,min_reels:3}],multipliers:[
+    {symbol_id:1,matches:3,multiplier_milli:3000}]};
+  const score=scoreSpaceLines({cells,symbols,bet:100,payouts,
+    lines:[[0,0,0,0,0]],wildId:9,scatterId:10,rules});
+  assert.equal(score.total,300);
+  const expanded=expandSpaceWild(cells,9,10,score.wins);
+  assert.deepEqual(expanded.expandedReels,[]);
+  assert.equal(expanded.cells[7],9);
+  assert.equal(expanded.cells[2],1);
+});
+test('Scatter remains a blocker even on the expanded Wild reel',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=1;cells[2]=9;cells[7]=10;
+  const rules={minimums:[{symbol_id:1,min_reels:3}],multipliers:[
+    {symbol_id:1,matches:3,multiplier_milli:5000}]};
+  const initial=scoreSpaceLines({cells,symbols,bet:100,payouts,
+    lines:[[0,0,0,0,0]],wildId:9,scatterId:10,rules});
+  const expanded=expandSpaceWild(cells,9,10,initial.wins);
+  const blocked=scoreSpaceLines({cells:expanded.cells,symbols,bet:100,payouts,
     lines:[[0,0,1,0,0]],wildId:9,scatterId:10,rules});
-  assert.equal(normal.total,0);
+  assert.equal(blocked.total,0);
 });
 
 test('Sun — WILD — Sun pays using the Sun price, not a Wild price',()=>{
