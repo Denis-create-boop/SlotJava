@@ -303,6 +303,10 @@ function firstGamePage(game,req){
   ]));
   const url=key=>libraryBackgrounds.get(key)||assetUrl(assets,key,game.id);
   const backgroundImage=(key,cls)=>url(key)?'<img class="'+cls+'" src="'+h(url(key))+'" alt="" aria-hidden="true">':'';
+  // A reel-field image must not also become the full-screen wallpaper when
+  // an administrator selected the same library image for both positions.
+  const spacePageImage=game.slug==='lucky-stars'&&url('background')&&url('background')!==url('reels_background')
+    ?backgroundImage('background','slot-page-background'):'';
 
   const {reels:reelCount,rows:rowCount,theme}=gameLayout(game);
   const reels=Array.from({length:reelCount},(_,col)=>{
@@ -360,7 +364,7 @@ function firstGamePage(game,req){
     ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
-  return (game.slug==='lucky-stars'?backgroundImage('background','slot-page-background'):'')+
+  return spacePageImage+
     '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-wild-id="'+wildSymbol(game.id)+'" data-space-expanding-wild="'+h(url('space_expanding_wild')||'')+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
     '<div class="slot-loading-screen" id="slot-loading-screen" role="status" aria-live="polite">'+
       '<div class="slot-loading-panel"><span class="slot-loading-glyph" aria-hidden="true">✦</span>'+
