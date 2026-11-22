@@ -506,10 +506,15 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const generated=generateSpin(game.id,settings?.win_frequency??25,active.bet,layout);
       if(generated.error)return generated;
       const preExpansionCells=generated.cells.slice();
-      const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId);
       const symbols=cosmicVisibleSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
-      const scored=scoreSpaceLines({cells:expansion.cells,symbols,bet:active.bet,
-        payouts:getPayouts(game.id),lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId,rules:spaceRules(game.id)});
+      const scoring={symbols,bet:active.bet,payouts:getPayouts(game.id),
+        lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId,rules:spaceRules(game.id)};
+      // Identify winning Wild cells BEFORE expansion. A Wild that isn't on a
+      // paid line must remain a normal small symbol, not trigger reel expansion.
+      const originalScore=scoreSpaceLines({cells:preExpansionCells,...scoring});
+      const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId,originalScore.wins);
+      const scored=expansion.expandedReels.length
+        ?scoreSpaceLines({cells:expansion.cells,...scoring}):originalScore;
       // Apply the current X to this spin, then increment it by one.
       const currentMultiplier=cosmicBonusMultiplier(req.user.id,game.id);
       const nextMultiplier=Math.min(1000000,currentMultiplier+1);
