@@ -328,7 +328,7 @@ function firstGamePage(game,req){
     '<div class="slot-big-win-overlay" id="slot-big-win-overlay" hidden aria-hidden="true"><strong id="slot-big-win-label"></strong></div>'+
     (game.slug==='golden-seven'?'<div class="egypt-retrigger-announcement" id="egypt-retrigger-announcement" hidden role="status" aria-live="assertive">'+
       '<div class="egypt-retrigger-inner"><span class="egypt-retrigger-stars">✦ ✦ ✦</span>'+
-      '<strong>РЕТРИГГЕР!</strong><b id="egypt-retrigger-award">+10</b>'+
+      '<strong>ВЫ ВЫИГРАЛИ БОНУСНУЮ ИГРУ!</strong><b id="egypt-retrigger-award">+10</b>'+
       '<span>БЕСПЛАТНЫХ ВРАЩЕНИЙ</span>'+
       '<small id="egypt-retrigger-details"></small></div></div>':'')+
     '<div class="slot-insufficient-overlay" id="slot-insufficient-overlay" hidden role="alert"><strong>НЕДОСТАТОЧНО ДЕНЕЖНЫХ СРЕДСТВ</strong><span>Пополните баланс тестовых очков для продолжения игры</span></div>'+
@@ -349,7 +349,7 @@ function firstGamePage(game,req){
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
-    '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span id="slot-win-caption">'+(game.slug==='golden-seven'&&bonusVisible?'Выигрыш бонуса':'Выигрыш')+'</span><strong id="slot-win">'+(game.slug==='golden-seven'&&bonusVisible?(bonus?.bonus_win||0):0)+'</strong></div></div>'+
+    '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span id="slot-win-caption">'+(game.slug==='golden-seven'&&bonusVisible?'За вращение':'Выигрыш')+'</span><strong id="slot-win">0</strong>'+(game.slug==='golden-seven'?'<small class="egypt-bonus-accumulated" id="egypt-bonus-accumulated"'+(bonusVisible?'':' hidden')+'>Всего за бонус: <b id="egypt-bonus-accumulated-total">'+(bonus?.bonus_win||0)+'</b></small>':'')+'</div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span id="slot-spin-label">'+(bonusVisible?'БЕСПЛАТНО':'ВРАЩАТЬ')+'</span></button></form>'+
     '<button type="button" id="slot-auto-trigger" class="spin-round slot-auto-trigger" aria-label="Автоигра: выбрать количество вращений" title="Автоигра"><span class="spin-round-icon" aria-hidden="true">⟳</span><span id="slot-auto-trigger-label">АВТО</span></button></div>'+
