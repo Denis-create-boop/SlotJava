@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries}=require('../egypt-bonus');
+const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,chooseNewEgyptSymbol,nextEgyptBonusSeries}=require('../egypt-bonus');
 const {scatterOnBoard,freeSpinsFor}=require('../slot-bonus');
 
 test('Egypt uses ten distinct six-reel paylines over four rows',()=>{
@@ -196,4 +196,75 @@ test('Unset bonus line payout defaults to existing ordinary symbol price',()=>{
   });
   assert.equal(result.symbolWins[0].perLine,10);
   assert.equal(result.total,100);
+});
+
+test('Egypt base pays only on one of ten lines, not anywhere on a reel',()=>{
+  const cells=Array(24).fill(7);
+  // The same symbol occurs on 3 consecutive reels, but on alternating
+  // rows that do not form any single eligible three-reel payline.
+  cells[0*6+0]=8;cells[3*6+1]=8;cells[0*6+2]=8;
+  const result=scoreEgyptBaseLines({
+    cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3}
+  });
+  assert.equal(result.total,0);
+  assert.deepEqual(result.wins,[]);
+});
+test('Egypt base pays separately for exactly one three-reel line',()=>{
+  const cells=Array(24).fill(7);
+  cells[0]=8;cells[1]=8;cells[2]=8;
+  const result=scoreEgyptBaseLines({
+    cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3},lineMultipliersById:{'8:3':2000}
+  });
+  assert.equal(result.total,20);
+  assert.equal(result.wins.length,1);
+  assert.equal(result.wins[0].line,1);
+  assert.equal(result.wins[0].prize,20);
+});
+test('Egypt base supports two-reel lines with an independent x2 coefficient',()=>{
+  const cells=Array(24).fill(7);
+  cells[0]=8;cells[1]=8;
+  const payouts={prices:[{symbol_id:8,percent_hundredths:2000}],multipliers:[]};
+  const base={cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],
+    bet:100,payouts,lineMultipliersById:{'8:2':1500}};
+  assert.equal(scoreEgyptBaseLines({...base,minReelsById:{8:3}}).total,0);
+  const eligible=scoreEgyptBaseLines({...base,minReelsById:{8:2}});
+  assert.equal(eligible.total,30);
+  assert.equal(eligible.wins[0].reels,2);
+});
+test('Egypt base caps payouts to ten line paths and uses exact match count',()=>{
+  const cells=Array(24).fill(8);
+  const scored=scoreEgyptBaseLines({
+    cells,symbols:[{id:8,name:'Ankh'}],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    lineMultipliersById:{'8:6':3000}
+  });
+  assert.equal(scored.wins.length,10);
+  assert.ok(scored.wins.every(win=>win.reels===6&&win.prize===30));
+  assert.equal(scored.total,300);
+});
+test('Egypt bonus uses configured 2–6 line coefficients for each chosen symbol',()=>{
+  const cells=Array(24).fill(7);
+  for(const col of [0,2,4])cells[col]=8;
+  const scored=scoreEgyptSymbolSet({
+    cells,selectedIds:[8],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3},linePercentById:{8:1000},
+    lineMultipliersById:{'8:3':2500}
+  });
+  assert.equal(scored.symbolWins[0].perLine,25);
+  assert.equal(scored.symbolWins[0].lineWins.length,10);
+  assert.equal(scored.total,250);
+});
+test('Egypt Scatter positions never create paying symbol lines',()=>{
+  const cells=Array(24).fill(7);
+  cells[0]=99;cells[1]=99;cells[2]=99;cells[3]=99;
+  const scored=scoreEgyptBaseLines({
+    cells,symbols:[{id:7,name:'Other'}],bet:100,
+    payouts:{prices:[{symbol_id:99,percent_hundredths:100000}],multipliers:[]}
+  });
+  assert.equal(scored.total,0);
 });
