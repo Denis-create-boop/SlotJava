@@ -1223,6 +1223,34 @@
     bonusMultiplier.classList.remove('space-multiplier-level-up');
     if(bonusPlus)bonusPlus.classList.remove('is-pop');
   }
+  async function announceSpaceRetrigger(result){
+    const extra=Number(result.retriggerSpins)||0;
+    if(!extra)return;
+    const panel=document.getElementById('space-retrigger-announcement');
+    const count=document.getElementById('space-retrigger-award');
+    const detail=document.getElementById('space-retrigger-details');
+    const scatterTiles=Array.from(root.querySelectorAll('.reel-track .ribbon-tile'))
+      .filter(tile=>Number(tile.dataset.symbolId)===scatterId);
+    scatterTiles.forEach(tile=>tile.classList.add('scatter-celebrate'));
+    if(panel){
+      if(count)count.textContent='+'+extra;
+      if(detail)detail.textContent=result.scatterCount+' SCATTER · Всего доступно: '+
+        (result.remainingTotal??result.remaining)+' бесплатных вращений';
+      panel.hidden=false;
+      panel.classList.remove('is-showing');
+      void panel.offsetWidth;
+      panel.classList.add('is-showing');
+    }
+    message.textContent=result.scatterCount+' SCATTER! +'+extra+
+      ' дополнительных бесплатных вращений!';
+    play('bonus_sound');
+    await delay(reducedMotion?450:2250);
+    if(panel){
+      panel.hidden=true;
+      panel.classList.remove('is-showing');
+    }
+    scatterTiles.forEach(tile=>tile.classList.remove('scatter-celebrate'));
+  }
   const egyptRetriggerOverlay=document.getElementById('egypt-retrigger-announcement');
   const egyptRetriggerAward=document.getElementById('egypt-retrigger-award');
   const egyptRetriggerDetails=document.getElementById('egypt-retrigger-details');
@@ -1390,6 +1418,20 @@
         img.src=tallImage;img.alt='';img.draggable=false;
         tile.append(img);
       }else tile.textContent='WILD';
+      // Scatter is never substituted. Keep the original scatter cell
+      // fully visible above the tall Wild image, at its actual row.
+      const landed=Array.from(column.querySelector('.reel-track')?.children||[])
+        .slice(0,rowCount);
+      landed.forEach((cell,row)=>{
+        if(Number(cell.dataset.symbolId)!==scatterId)return;
+        const overlay=document.createElement('div');
+        overlay.className='space-wild-scatter-overlay';
+        overlay.style.top=(row*100/rowCount)+'%';
+        overlay.style.height=(100/rowCount)+'%';
+        overlay.setAttribute('aria-hidden','true');
+        overlay.append(makeTile(scatterId));
+        tile.append(overlay);
+      });
       window.append(tile);
       column.classList.add('space-wild-reel');
       await delay(reducedMotion?30:220);
@@ -1765,16 +1807,13 @@
         const xAfter=Number(result.nextMultiplier)||xBefore+1;
         // The finished spin pays with X-before. Show the new multiplier only
         // AFTER the reel stopped, and visibly announce +1 even on zero wins.
-        updateBonus(true,result.remaining||0,xBefore,result.bonusWin||0);
+        updateBonus(true,result.remainingTotal??result.remaining??0,xBefore,result.bonusWin||0);
         winDisplay.textContent=result.total>0?'+'+result.total:'';
         message.textContent=result.total>0
           ?'Выигрыш: '+result.baseWin+' × '+xBefore+' = '+result.bonusRoundWin+'.'
           :'Вращение завершено. Множитель повышается на +1!';
         await animateCosmicMultiplierAdvance(xBefore,xAfter);
-        if(result.retriggerSpins){
-          message.textContent='SCATTER! Новая бонусная серия: +'+result.retriggerSpins+' вращений.';
-          await delay(reducedMotion?200:1100);
-        }
+        if(result.retriggerSpins)await announceSpaceRetrigger(result);
         if(result.completedBonus){
           updateBonus(false,0,xAfter,result.bonusWin||0);
           if(bonusFinish){
@@ -1783,10 +1822,10 @@
           }
           message.textContent='Космический бонус завершён. Всего выиграно '+result.bonusWin+' очков.';
         }else{
-          updateBonus(true,result.remaining||0,xAfter,result.bonusWin||0);
+          updateBonus(true,result.remainingTotal??result.remaining??0,xAfter,result.bonusWin||0);
           message.textContent=result.total>0
-            ?'Бонус: +'+result.total+' очков. Всего: '+result.bonusWin+'. Осталось: '+result.remaining+'.'
-            :'Осталось бесплатных вращений: '+result.remaining+'.';
+            ?'Бонус: +'+result.total+' очков. Всего: '+result.bonusWin+'. Осталось: '+(result.remainingTotal??result.remaining)+'.'
+            :'Осталось бесплатных вращений: '+(result.remainingTotal??result.remaining)+'.';
         }
       }else if(result.mode==='egypt-bonus'){
         if(tier==='big'||tier==='mega'){
