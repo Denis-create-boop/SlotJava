@@ -112,7 +112,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!game)return sendPage(res,'Не найдено','<section class="panel"><h1>Игра не найдена</h1><a href="/admin">Вернуться</a></section>',req,404);
     const layout=gameLayout(game);
     const settings=getGameSettings(id)||{win_frequency:25};
-    const scatter=game.slug==='slot-classic'?getScatterSettings(id):null;
+    const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(id):null;
     const assets=new Map(getGameAssets(id).map(asset=>[asset.asset_key,asset]));
     const assignedBackgrounds=new Map(getGameBackgroundImages(id).map(item=>[item.asset_key,item]));
     const libraryImages=getLibraryImages(id);
@@ -291,7 +291,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       }).join('');
       panel=panelStart('Настройки бонусной игры SCATTER')+
         '<p class="hint">Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.</p>'+
-        '<p class="hint">3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'В Египте три и более скарабеев включают заставку бонуса. Механика бесплатных вращений будет настроена позже; пока начислений за бонус нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
@@ -328,9 +328,9 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
   app.post('/admin/games/:id/scatter',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
-    if(!game||game.slug!=='slot-classic'||!getScatterSettings(id))return res.sendStatus(404);
+    if(!game||!['slot-classic','golden-seven'].includes(game.slug)||!getScatterSettings(id))return res.sendStatus(404);
     const changes=[];
-    for(let reel=1;reel<=5;reel++){
+    for(let reel=1;reel<=gameLayout(game).reels;reel++){
       const chance=req.body?.['chance_'+reel],max=req.body?.['max_'+reel];
       const weights=Array.from({length:4},(_,index)=>req.body?.['weight_'+reel+'_'+(index+1)]);
       const validNumber=value=>typeof value==='string'&&/^(?:100|[1-9]?[0-9])$/.test(value);
