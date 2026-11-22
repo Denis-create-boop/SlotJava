@@ -14,7 +14,14 @@ module.exports = function installEgyptSymbols(db) {
   // A user may already have customised the list. Skip rather than delete their work.
   const unchanged=old.length>0&&old.every(s=>defaults.has(s.name)||/^(Фараон|Клеопатра|Анубис|Глаз Гора|Скарабей|Анкх|Пирамида|Кобра|Сфинкс|Солнце Ра|Священная кошка) [2-9]$/.test(s.name));
   const uploaded=old.some(s=>db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+s.id));
-  if(!unchanged||uploaded)return;
+  const customLinkedArt=db.prepare(`SELECT 1 FROM game_symbol_images x
+    JOIN game_symbols s ON s.id=x.symbol_id
+    JOIN game_image_library l ON l.id=x.library_image_id
+    WHERE s.game_id=? AND (
+      l.builtin_path IS NULL OR l.builtin_path NOT LIKE '/static/images/egypt/symbols.svg#%'
+    ) LIMIT 1`).get(id);
+  // Preserve user-chosen artwork. Only the original SVG placeholders are migrated.
+  if(!unchanged||uploaded||customLinkedArt)return;
   const requested=[
     ['Фараон','pharaoh',1900],['Анкх','ankh',1600],
     ['Клеопатра','cleopatra',1700],['Анубис','anubis',1800],
