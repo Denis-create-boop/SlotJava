@@ -53,15 +53,24 @@ function scoreSpaceLines({cells,symbols,bet,payouts,lines=SPACE_LINES,wildId=0,s
   }
   return {total,wins};
 }
-function expandSpaceWild(cells,wildId,scatterId){
-  const reels=[];
+// Only a WILD taking part in an already paid line may expand.
+// A WILD on an unrelated row or on a losing line stays its original size.
+// Scatter on the same reel is preserved both in the score and on screen.
+function expandSpaceWild(cells,wildId,scatterId,wins=[]){
   const expanded=cells.slice();
-  for(let col=0;col<5;col++){
-    if(![0,1,2].some(row=>cells[row*5+col]===wildId))continue;
-    // The Wild expands to the reel while SCATTER stays unchanged.
-    // A Scatter retains its trigger value, blocks substituted paylines
-    // through its cell and is drawn above the tall Wild artwork.
-    reels.push(col);
+  const eligible=new Set();
+  if(!wildId||!Array.isArray(wins))return {cells:expanded,expandedReels:[]};
+  for(const win of wins){
+    if(!win||win.prize<=0||!Array.isArray(win.rows))continue;
+    const count=Math.min(5,Number(win.reels)||0,win.rows.length);
+    for(let col=0;col<count;col++){
+      const row=win.rows[col];
+      if(!Number.isInteger(row)||row<0||row>=3)continue;
+      if(cells[row*5+col]===wildId)eligible.add(col);
+    }
+  }
+  const reels=[...eligible].sort((a,b)=>a-b);
+  for(const col of reels){
     for(let row=0;row<3;row++){
       const pos=row*5+col;
       if(cells[pos]!==scatterId)expanded[pos]=wildId;
