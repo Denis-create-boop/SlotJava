@@ -8,7 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
-const { egyptBonusBoard,scoreEgyptBonus } = require('./egypt-bonus');
+const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -495,7 +495,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
       :payout>0?'normal':'none';
     const egyptTrigger=game.slug==='golden-seven'&&spin.scatterCount>=3;
-    const freeSpins=scatter?freeSpinsFor(spin.scatterCount):0;
+    const freeSpins=scatter?(game.slug==='golden-seven'?egyptFreeSpinsFor(spin.scatterCount):freeSpinsFor(spin.scatterCount)):0;
     let selectedEgypt=0;
     if(freeSpins){
       if(game.slug==='golden-seven'){
