@@ -340,7 +340,7 @@ function firstGamePage(game,req){
       '<span>ВЫИГРЫШ ЗА ВРАЩЕНИЕ</span><strong id="egypt-round-prize-value">—</strong>'+
       '<small>Всего за бонус: <b id="egypt-round-prize-cumulative">'+(bonus?.bonus_win||0)+'</b></small></div>':'')+    '</div>'+
 
-    (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
+    (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><small>Выбор символа для 10 линий</small></div>'+
     '':'')+
 
     (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'>'+
