@@ -345,12 +345,19 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '</svg></div>';
     const egyptLinePreview='<div class="egypt-lines-gallery">'+
       egyptLineEntries.map((item,index)=>linePreview(item.rows,index)).join('')+'</div>';
-    const lineFields=(rows)=>'<div class="payout-grid">'+Array.from({length:layout.reels},(_,index)=>
+    const lineFields=(rows)=>'<div class="payline-drawing" data-line-editor data-reels="'+layout.reels+'" data-rows="'+layout.rows+'">'+
+      '<div class="payline-draw-board" role="group" aria-label="Нарисовать линию выплат">'+
+      '<svg class="payline-draw-overlay" viewBox="0 0 '+(layout.reels*100)+' '+(layout.rows*100)+'" preserveAspectRatio="none" aria-hidden="true"><polyline class="payline-draw-path" fill="none" stroke="#ffdf77" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+      Array.from({length:layout.rows},(_,row)=>Array.from({length:layout.reels},(_,col)=>
+        '<button type="button" class="payline-cell'+(rows[col]===row?' is-selected':'')+'" data-col="'+col+'" data-row="'+row+'" aria-label="Барабан '+(col+1)+', строка '+(row+1)+'" aria-pressed="'+(rows[col]===row)+'">'+
+        '<span class="payline-cell-symbol">'+(rows[col]===row?'●':'·')+'</span></button>').join('')).join('')+
+      '</div><p class="hint">Нажимай на клетки: по одной на каждом барабане. Линия рисуется сразу, затем нажми «Сохранить».</p>'+
+      '<div class="payout-grid">'+Array.from({length:layout.reels},(_,index)=>
       '<label>Барабан '+(index+1)+
       '<select name="row_'+(index+1)+'" required>'+
       Array.from({length:layout.rows},(_,row)=>
         '<option value="'+(row+1)+'"'+(rows[index]===row?' selected':'')+'>Строка '+(row+1)+'</option>').join('')+
-      '</select></label>').join('')+'</div>';
+      '</select></label>').join('')+'</div></div>';
     if(activeTab==='lines'&&['golden-seven','lucky-stars'].includes(game.slug)){
       const editor=egyptLineEntries.map((item,index)=>
         '<div class="egypt-line-editor"><h3>Линия '+(index+1)+'</h3>'+
@@ -368,7 +375,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<h3>Добавить линию</h3>'+
         '<form method="post" action="/admin/games/'+id+'/egypt-lines/add">'+csrf+
         lineFields(Array(layout.reels).fill(0))+
-        '<button class="primary" type="submit">Добавить линию</button></form></section>';
+        '<button class="primary" type="submit">Добавить линию</button></form></section>'+
+        '<script src="/static/admin-lines.js?v=2" defer></script>';
     }
     if(activeTab==='scatter'&&scatter){
       const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
@@ -404,6 +412,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
+      (game.slug==='lucky-stars'?'<p><a class="primary" href="/admin/games/'+id+'?tab=lines">Редактировать 10 линий выигрыша →</a></p>':'')+
       '<div class="symbol-admin-list">'+symbolItems+'</div>'+
       (game.slug==='lucky-stars'?'<h3>Расширяющийся WILD: одна картинка на 3 ячейки</h3><p class="hint">Для выбора из папки используйте кнопку «На весь барабан WILD» в разделе изображений. Можно также загрузить отдельный вертикальный файл ниже.</p><div class="asset-settings-grid">'+rowsFor(['space_expanding_wild'])+'</div>':'')+'</section>';
     const notice=message?'<p class="'+(error?'error':'success-note')+'" role="status">'+h(message)+'</p>':'';
@@ -412,7 +421,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<h1>Настройки: '+h(game.title)+'</h1>'+notice+
       '<nav class="game-admin-menu" aria-label="Разделы настроек игры">'+tabButtons+'</nav>'+
       (panel || '<section class="panel game-admin-intro"><h2>Управление игрой</h2>'+
-      '<p class="hint">Выберите нужный раздел кнопкой выше. Настройки, файлы и коэффициенты сохраняются отдельно для каждой игры.</p></section>')+
+      '<p class="hint">Выберите нужный раздел кнопкой выше. Настройки, файлы и коэффициенты сохраняются отдельно для каждой игры.</p>'+
+      (game.slug==='lucky-stars'?'<p><a class="primary" href="/admin/games/'+id+'?tab=lines">Рисовать и изменять линии выигрыша (Космос)</a></p>':'')+'</section>')+
       '</div>',req,error?400:200);
   }
   app.post('/admin/games/:id/menu-labels',adminOnly,postGuard,(req,res)=>{
