@@ -43,14 +43,14 @@ function freeSpinsFor(count){return count>=5?20:count===4?15:count===3?10:0;}
 function randomBoard(symbols,reels,rows,randomInt){
   return Array.from({length:reels*rows},()=>symbols[randomInt(symbols.length)].id);
 }
-function winningCells(board,wins,reels,rows){
+function winningCells(board,wins,reels,rows,wildId=0){
   const indices=new Set();
   for(const win of wins){
     if(win.reels<3)continue; // Matches freeze even if their configured price is zero.
     for(let col=0;col<Math.min(reels,win.reels);col++)
       for(let row=0;row<rows;row++){
         const pos=row*reels+col;
-        if(board[pos]===win.symbolId)indices.add(pos);
+        if(board[pos]===win.symbolId||(wildId&&board[pos]===wildId))indices.add(pos);
       }
   }
   return indices;
@@ -58,7 +58,7 @@ function winningCells(board,wins,reels,rows){
 // A bonus round spends exactly ONE free spin, regardless of respin count.
 // Lock winning CELLS, not entire columns. Every other cell on every reel
 // rolls again, even if another cell on that same reel is already locked.
-function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16,scatterId=0,scatterRules=[]}){
+function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16,scatterId=0,scatterRules=[],wildId=0}){
   if(!symbols.length)throw Error('Нет игровых символов');
   const frozenCells=new Set(),steps=[];
   const applyScatter=board=>scatterId
@@ -71,7 +71,7 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
   while(true){
     scatterCount+=landed.count;
     const evaluated=scoreBoard(board,symbols,payouts,bet,rows);
-    const active=winningCells(board,evaluated.wins,reels,rows);
+    const active=winningCells(board,evaluated.wins,reels,rows,wildId);
     const newCells=[];
     for(const pos of active){
       if(!frozenCells.has(pos)){frozenCells.add(pos);newCells.push(pos);}
