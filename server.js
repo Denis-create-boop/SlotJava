@@ -122,7 +122,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=quick-stop-reels-v1"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=quick-stop-reels-v1" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=admin-music-auto-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -415,7 +415,7 @@ function firstGamePage(game,req){
     '<form method="dialog"><button type="submit" class="settings-close" aria-label="Закрыть настройки">×</button></form>'+
     '<h2 id="slot-settings-heading">Настройки игры</h2>'+
     '<label class="sound-toggle"><input type="checkbox" id="slot-sound-toggle" checked> Включить звук</label>'+
-    (url('music')?'<label class="sound-toggle"><input type="checkbox" id="slot-use-uploaded-music"> Использовать музыку из админки (включается автоматически после загрузки)</label>':'')+
+
     '<label class="music-volume-control" for="slot-music-volume">Громкость фоновой музыки <output id="slot-music-volume-value">65%</output></label>'+
     '<input type="range" id="slot-music-volume" min="0" max="100" step="1" value="65" aria-label="Громкость фоновой музыки">'+
     '<form method="post" id="slot-bet-form" action="/games/'+h(game.slug)+'/bet">'+csrfInput(req.session.csrf_token)+
