@@ -859,7 +859,9 @@
     bonusIntro.classList.remove('is-showing');
     scatterTiles.forEach(tile=>tile.classList.remove('scatter-celebrate'));
   }
-  // Egypt's bonus uses one persistent chosen symbol and ten fixed paylines.
+  // All Egyptian bonus symbols remain active across queued retriggers.
+  const egyptSymbolStrip=document.getElementById('egypt-symbol-strip');
+  const egyptSymbolStripItems=document.getElementById('egypt-symbol-strip-items');
   const egyptSelectedLabel=document.getElementById('egypt-selected-label');
   const egyptSelectedPortrait=document.getElementById('egypt-selected-portrait');
   const egyptSelectedName=document.getElementById('egypt-selected-name');
@@ -867,15 +869,53 @@
   const egyptPickerPortrait=document.getElementById('egypt-bonus-picker-portrait');
   const egyptPickerName=document.getElementById('egypt-bonus-picker-name');
   const egyptLinesOverlay=document.getElementById('egypt-payline-overlay');
+  const egyptCounterPlayed=document.getElementById('egypt-bonus-played');
+  const egyptCounterSeriesTotal=document.getElementById('egypt-bonus-series-total');
+  const egyptCounterSeries=document.getElementById('egypt-bonus-series');
+  const egyptCounterRetriggers=document.getElementById('egypt-bonus-retriggers');
+  const egyptCounterQueue=document.getElementById('egypt-bonus-queue');
   const egyptPaths=[
     [0,0,0,0,0,0],[1,1,1,1,1,1],[2,2,2,2,2,2],[3,3,3,3,3,3],
     [0,1,2,3,2,1],[3,2,1,0,1,2],[0,0,1,1,2,2],[3,3,2,2,1,1],
     [1,0,1,2,3,2],[2,3,2,1,0,1]
   ];
+  let egyptActiveIds=(root.dataset.egyptSymbols||'').split(',')
+    .map(Number).filter(id=>id>0&&symbols.has(id));
   let egyptChosenId=Number(root.dataset.egyptSelected)||0;
-  function paintEgyptSelection(){
+  if(egyptChosenId&&!egyptActiveIds.includes(egyptChosenId))egyptActiveIds.push(egyptChosenId);
+  function setEgyptCounters(state){
+    const fields=[
+      [egyptCounterPlayed,state.played],
+      [egyptCounterSeriesTotal,state.currentTotal],
+      [egyptCounterSeries,state.seriesNumber],
+      [egyptCounterRetriggers,state.retriggerCount],
+      [egyptCounterQueue,state.pendingBonuses]
+    ];
+    for(const [element,value] of fields)
+      if(element&&Number.isSafeInteger(value))element.textContent=String(value);
+  }
+  function paintEgyptSelection(focusId=0){
+    if(!isEgypt)return;
+    if(egyptSymbolStrip)egyptSymbolStrip.hidden=!bonusActive;
+    if(egyptSymbolStripItems){
+      const tiles=regularDefinitions.map(symbol=>{
+        const card=document.createElement('div');
+        card.className='egypt-symbol-strip-item';
+        const selected=egyptActiveIds.includes(symbol.id);
+        const bright=selected&&(!focusId||focusId===symbol.id);
+        card.classList.toggle('is-active',bright);
+        card.classList.toggle('is-dimmed',!bright);
+        card.setAttribute('aria-label',symbol.name+(selected?' — играет':' — не выбран'));
+        card.append(makeTile(symbol.id));
+        const title=document.createElement('small');
+        title.textContent=symbol.name;
+        card.append(title);
+        return card;
+      });
+      egyptSymbolStripItems.replaceChildren(...tiles);
+    }
     if(!egyptSelectedLabel)return;
-    const item=symbols.get(egyptChosenId);
+    const item=symbols.get(focusId||egyptChosenId);
     egyptSelectedLabel.hidden=!bonusActive||!item;
     if(item){
       if(egyptSelectedName)egyptSelectedName.textContent=item.name;
@@ -887,15 +927,16 @@
   }
   paintEgyptSelection();
   async function animateEgyptSelection(id){
-    if(!egyptPicker||!egyptPickerPortrait||!egyptPickerName)return;
-    const pool=regularDefinitions;
+    if(!id||!egyptPicker||!egyptPickerPortrait||!egyptPickerName)return;
+    const pool=regularDefinitions.filter(item=>!egyptActiveIds.includes(item.id));
     if(!pool.length)return;
     egyptPicker.hidden=false;
     const render=item=>{
       egyptPickerPortrait.replaceChildren(makeTile(item.id));
       egyptPickerName.textContent=item.name;
     };
-    // Fast but readable changes: ~90 ms, then slow into the chosen symbol.
+    // Cycle ONLY through unselected symbols; the old bonus symbols cannot be
+    // picked again. The server has already selected a random available ID.
     for(let frame=0;frame<27&&!reducedMotion;frame++){
       render(pool[frame%pool.length]);
       await delay(frame<19?90:120+(frame-19)*17);
@@ -904,6 +945,7 @@
     await delay(1100);
     egyptPicker.hidden=true;
     egyptChosenId=id;
+    if(!egyptActiveIds.includes(id))egyptActiveIds.push(id);
     paintEgyptSelection();
   }
   function clearEgyptLines(){
@@ -911,20 +953,37 @@
     columns.forEach(col=>col.classList.remove('egypt-expanded-reel'));
   }
   async function animateEgyptExpansion(result){
-    // The server sends expandedReels only for winning, positive-value lines.
-    if(!Array.isArray(result.expandedReels)||!result.expandedReels.length||
-      !Array.isArray(result.lineWins)||!result.lineWins.length||result.total<=0)return;
-    for(const col of result.expandedReels){
-      if(!Number.isInteger(col)||col<0||col>=reelCount)continue;
-      const column=columns[col];
-      column.classList.remove('egypt-expanding-reel');
-      showStatic(column,Array(rowCount).fill(result.selectedSymbolId));
-      void column.offsetWidth;
-      column.classList.add('egypt-expanding-reel');
-      play('win_sound');
-      await delay(330);
+    const wins=Array.isArray(result.symbolWins)?result.symbolWins:[];
+    if(!wins.length)return;
+    for(const item of wins){
+      if(item.prize<=0||!item.expandedReels?.length)continue;
+      // Expand one awarded symbol at a time so several active symbols can
+      // each receive their ten lines without visually overwriting each other.
+      paintEgyptSelection(item.symbolId);
+      message.textContent=(symbols.get(item.symbolId)?.name||'Символ')+
+        ': '+item.matchedReels+' барабанов, 10 линий — '+item.prize+' очков!';
+      for(const reel of item.expandedReels){
+        const col=columns[reel];
+        if(!col)continue;
+        col.classList.remove('egypt-expanding-reel');
+        // Retigger SCATTER remains visible in its original cell.
+        const reelIds=Array.from({length:rowCount},(_,row)=>{
+          const index=row*reelCount+reel;
+          return result.cells[index]===scatterId?scatterId:item.symbolId;
+        });
+        showStatic(col,reelIds);
+        void col.offsetWidth;
+        col.classList.add('egypt-expanding-reel');
+        play('win_sound');
+        await delay(250);
+      }
+      paintEgyptLines(item);
+      await delay(1000);
+      clearEgyptLines();
+      columns.forEach((col,index)=>showStatic(col,
+        Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index])));
     }
-    columns.forEach(col=>col.classList.remove('egypt-expanding-reel'));
+    paintEgyptSelection();
   }
   function paintEgyptLines(result){
     clearEgyptLines();
@@ -1092,8 +1151,6 @@
         highlightWinningSymbols(result.mode==='bonus'
           ?(Array.isArray(result.wins)?result.wins.filter(win=>win.prize>0):[])
           :(Array.isArray(result.wins)?result.wins:[]));
-      }else{
-        paintEgyptLines(result);
       }
       if(result.mode==='bonus'&&result.steps?.length)
         applyBonusLocks(result.steps[result.steps.length-1].frozenCells);
@@ -1106,7 +1163,7 @@
       message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!'
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
-      if(result.mode!=='bonus')showBigWin(tier);
+      if(result.mode==='base')showBigWin(tier);
       if(result.mode==='base'&&result.freeSpins>0){
         // Bonus activation ends autoplay immediately; free spins are manual.
         if(autoRunning)stopAutoplay('Автоигра завершена: выпала бонусная игра. Бесплатные вращения запускаются вручную.');
@@ -1114,6 +1171,8 @@
         if(isEgypt){
           await animateEgyptSelection(Number(result.selectedSymbolId));
           updateBonus(true,result.freeSpins,1,0);
+          setEgyptCounters({played:0,currentTotal:result.freeSpins,seriesNumber:1,
+            retriggerCount:0,pendingBonuses:0});
           paintEgyptSelection();
           message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
         }else{
@@ -1122,21 +1181,44 @@
             ' бесплатных вращений. Начальный множитель ×2!';
         }
       }else if(result.mode==='egypt-bonus'){
-        egyptChosenId=Number(result.selectedSymbolId)||egyptChosenId;
-        const qualified=Array.isArray(result.lineWins)?result.lineWins.length:0;
-        message.textContent=qualified
-          ?'Египет: '+result.matchedReels+' барабанов, '+qualified+' линий, выигрыш '+result.total+' очков.'
-          :'Египет: '+result.matchedReels+' барабанов, нужно минимум '+result.minReels+'.';
-        if(qualified)await delay(2300);
-        if(result.total>0)showBigWin(tier);
+        egyptActiveIds=(result.selectedSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
+        if(egyptActiveIds.length)egyptChosenId=egyptActiveIds[egyptActiveIds.length-1];
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
+        setEgyptCounters(result);
         paintEgyptSelection();
+        if(result.retriggerSpins){
+          message.textContent='РЕТРИГГЕР! '+result.scatterCount+' SCATTER — ещё '+result.retriggerSpins+
+            ' бесплатных вращений! Всего ретриггеров: '+result.retriggerCount+
+            '. В очереди '+result.pendingBonuses+'.';
+          play('bonus_sound');
+          await delay(1700);
+        }
+        if(result.transition){
+          clearEgyptLines();
+          message.textContent='Бонусная серия №'+result.seriesNumber+
+            '! Следующие '+result.transition.freeSpins+' вращений. Общий выигрыш: '+result.bonusWin+'.';
+          if(result.transition.newSymbolId){
+            await animateEgyptSelection(result.transition.newSymbolId);
+          }else{
+            message.textContent+=' Все символы уже выбраны — продолжают играть вместе.';
+            await delay(1100);
+          }
+          egyptActiveIds=(result.activeSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
+          paintEgyptSelection();
+        }
         if(result.completedBonus&&bonusFinish){
+          clearEgyptLines();
+          hideBigWin();
           bonusFinishTotal.textContent=String(result.bonusWin);
           bonusFinish.hidden=false;
-          message.textContent='Бонус Египта завершён! Всего '+result.bonusWin+' очков за 10 линий.';
-        }else{
-          message.textContent+=' Осталось бесплатных вращений: '+result.remaining+'.';
+          message.textContent='Вся цепочка бонусов завершена: '+result.playedTotal+
+            ' бесплатных вращений и '+result.bonusWin+' очков! Выигрыш зачислен в баланс.';
+        }else if(!result.transition&&!result.retriggerSpins){
+          message.textContent=result.total>0
+            ?'За вращение: +'+result.total+' очков. Всего в бонусе: '+result.bonusWin+
+              '. Осталось: '+result.remaining+'.'
+            :'Без выигрыша. Осталось '+result.remaining+
+              ' вращений. Всего в бонусе: '+result.bonusWin+'.';
         }
       }else if(result.mode==='bonus'){
         // The tier is based on the final multiplied award, supplied by the server.
