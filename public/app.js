@@ -230,6 +230,8 @@
   const reelCount=columns.length;
   const rowCount=Number(root.dataset.rows)||4;
   const isEgypt=root.classList.contains('slot-theme-egypt');
+  const isSpace=root.classList.contains('slot-theme-space');
+  const wildId=Number(root.dataset.wildId)||0;
   // All symbols selected in the current Egyptian bonus are visibly framed
   // on their reel tiles (not just in the legend above the game).
   const egyptPlayingIds=new Set((root.dataset.egyptSymbols||'').split(',')
@@ -1350,6 +1352,32 @@
     if(!egyptActiveIds.includes(id))egyptActiveIds.push(id);
     paintEgyptSelection();
   }
+  // Render one continuous image over all three cells of the expanded reel.
+  function clearSpaceWild(){
+    root.querySelectorAll('.space-expanded-wild').forEach(element=>element.remove());
+    columns.forEach(column=>column.classList.remove('space-wild-reel'));
+  }
+  async function paintSpaceWild(reels){
+    clearSpaceWild();
+    const wild=symbols.get(wildId);
+    if(!wild||!Array.isArray(reels))return;
+    for(const reel of reels){
+      const column=columns[reel],window=column?.querySelector('.reel-window');
+      if(!window)continue;
+      const tile=document.createElement('div');
+      tile.className='space-expanded-wild';
+      tile.setAttribute('role','img');
+      tile.setAttribute('aria-label','Wild на весь барабан');
+      if(wild.image){
+        const img=document.createElement('img');
+        img.src=wild.image;img.alt='';img.draggable=false;
+        tile.append(img);
+      }else tile.textContent='WILD';
+      window.append(tile);
+      column.classList.add('space-wild-reel');
+      await delay(reducedMotion?30:220);
+    }
+  }
   function clearEgyptLines(){
     if(egyptLinesOverlay){egyptLinesOverlay.hidden=true;egyptLinesOverlay.replaceChildren();}
     columns.forEach(col=>col.classList.remove('egypt-expanded-reel'));
@@ -1568,6 +1596,7 @@
       egyptReelsHighlightReady=bonusActive;
       setEgyptFocus(0);
     }
+    clearSpaceWild();
     clearWinningGlow();
     clearBonusLocks();
     if(isEgypt){
@@ -1633,7 +1662,10 @@
           await paintEgyptLines({lineWins:result.wins.filter(win=>win.prize>0)});
         }
       }else{
-        const startingCells=result.mode==='egypt-bonus'&&
+        const startingCells=result.mode==='space-bonus'&&
+          Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
+          ?result.preExpansionCells
+          :result.mode==='egypt-bonus'&&
           Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
           ?result.preExpansionCells:result.cells;
         const animations=columns.map((col,index)=>{
@@ -1647,6 +1679,15 @@
           stopSpinSound();
           await animateEgyptExpansion(result);
         }
+        if(result.mode==='space-bonus'){
+          stopSpinSound();
+          columns.forEach((column,index)=>showStatic(column,
+            Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index])));
+          await paintSpaceWild(result.expandedReels);
+          if(result.wins?.length)await paintEgyptLines({lineWins:result.wins});
+        }
+        if(isSpace&&result.mode==='base'&&result.wins?.length)
+          await paintEgyptLines({lineWins:result.wins});
       }
       stopSpinSound();
       // The reels are settled; reward/bonus presentation must not be
@@ -1693,10 +1734,30 @@
           paintEgyptSelection();
           winDisplay.textContent='';
           message.textContent='Бонусная игра! '+result.freeSpins+' бесплатных вращений. Выбранный символ подсвечен сверху.';
+        }else if(isSpace){
+          updateBonus(true,result.freeSpins,1,0);
+          message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
+            ' бесплатных вращений. Wild расширяется на весь барабан!';
         }else{
           updateBonus(true,result.freeSpins,2,0);
           message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
             ' бесплатных вращений. Начальный множитель ×2!';
+        }
+      }else if(result.mode==='space-bonus'){
+        updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
+        winDisplay.textContent=result.total>0?'+'+result.total:'';
+        if(result.retriggerSpins){
+          message.textContent='SCATTER! Новая бонусная серия: +'+result.retriggerSpins+' вращений.';
+          await delay(reducedMotion?200:1100);
+        }
+        if(result.completedBonus&&bonusFinish){
+          bonusFinishTotal.textContent=String(result.bonusWin);
+          bonusFinish.hidden=false;
+          message.textContent='Космический бонус завершён. Всего выиграно '+result.bonusWin+' очков.';
+        }else{
+          message.textContent=result.total>0
+            ?'Бонус: +'+result.total+' очков. Всего: '+result.bonusWin+'. Осталось: '+result.remaining+'.'
+            :'Осталось бесплатных вращений: '+result.remaining+'.';
         }
       }else if(result.mode==='egypt-bonus'){
         if(tier==='big'||tier==='mega'){
