@@ -395,9 +395,9 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         db.prepare('UPDATE game_bonus_sessions SET selected_symbol_id=? WHERE user_id=? AND game_id=?')
           .run(chosen.id,req.user.id,game.id);
       }
-      const board=egyptBonusBoard({symbols:regular,selectedId:chosen.id,
-        reels:layout.reels,rows:layout.rows,randomInt:n=>crypto.randomInt(n)});
       const minimum=db.prepare('SELECT min_reels FROM egypt_symbol_bonus_rules WHERE symbol_id=?').get(chosen.id)?.min_reels||3;
+      const board=egyptBonusBoard({symbols:regular,selectedId:chosen.id,
+        reels:layout.reels,rows:layout.rows,minReels:minimum,randomInt:n=>crypto.randomInt(n)});
       const evaluated=scoreEgyptBonus({cells:board.cells,selectedId:chosen.id,
         minReels:minimum,bet:active.bet,payouts:getPayouts(game.id)});
       const total=active.bonus_win+evaluated.total;
@@ -419,7 +419,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         :evaluated.total>0&&evaluated.total*1000>=active.bet*big?'big'
         :evaluated.total>0?'normal':'none';
       return {mode:'egypt-bonus',cells:board.cells,preExpansionCells:board.initialCells,
-        selectedSymbolId:chosen.id,expandedReels:board.expandedReels,lineWins:evaluated.lineWins,
+        selectedSymbolId:chosen.id,expandedReels:board.expandedReels,landedReels:board.landedReels,lineWins:evaluated.lineWins,
         minReels:minimum,matchedReels:evaluated.matchedReels,
         perLine:evaluated.perLine,total:evaluated.total,
         baseWin:evaluated.total,bonusRoundWin:evaluated.total,
