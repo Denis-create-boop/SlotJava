@@ -629,6 +629,43 @@ db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 TH
  weight_1=100,weight_2=0,weight_3=0,weight_4=0
  WHERE game_id=(SELECT id FROM games WHERE slug='golden-seven')`).run();
 
+// Persistent Egypt retrigger chain. Active free spins are stored in
+// game_bonus_sessions; these tables store the accumulated symbol list and
+// FIFO queue without changing the first game's bonus implementation.
+db.exec(`
+CREATE TABLE IF NOT EXISTS egypt_bonus_chains (
+  user_id INTEGER NOT NULL,
+  game_id INTEGER NOT NULL,
+  symbols_json TEXT NOT NULL DEFAULT '[]',
+  played_current INTEGER NOT NULL DEFAULT 0 CHECK(played_current>=0),
+  played_total INTEGER NOT NULL DEFAULT 0 CHECK(played_total>=0),
+  current_total INTEGER NOT NULL DEFAULT 10 CHECK(current_total BETWEEN 1 AND 25),
+  series_number INTEGER NOT NULL DEFAULT 1 CHECK(series_number>=1),
+  retrigger_count INTEGER NOT NULL DEFAULT 0 CHECK(retrigger_count>=0),
+  PRIMARY KEY(user_id,game_id),
+  FOREIGN KEY(user_id,game_id) REFERENCES game_bonus_sessions(user_id,game_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS egypt_bonus_pending (
+  user_id INTEGER NOT NULL,
+  game_id INTEGER NOT NULL,
+  queue_order INTEGER NOT NULL,
+  free_spins INTEGER NOT NULL CHECK(free_spins BETWEEN 10 AND 25),
+  scatter_count INTEGER NOT NULL CHECK(scatter_count BETWEEN 3 AND 6),
+  PRIMARY KEY(user_id,game_id,queue_order),
+  FOREIGN KEY(user_id,game_id) REFERENCES egypt_bonus_chains(user_id,game_id) ON DELETE CASCADE
+);
+`);
+function getEgyptBonusChain(userId,gameId){
+  const row=db.prepare('SELECT * FROM egypt_bonus_chains WHERE user_id=? AND game_id=?').get(userId,gameId);
+  if(!row)return null;
+  let symbols=[];
+  try{symbols=JSON.parse(row.symbols_json)}catch{}
+  if(!Array.isArray(symbols))symbols=[];
+  const queue=db.prepare('SELECT queue_order,free_spins,scatter_count FROM egypt_bonus_pending WHERE user_id=? AND game_id=? ORDER BY queue_order')
+    .all(userId,gameId);
+  return {...row,symbols:symbols.filter(Number.isSafeInteger),queue};
+}
+
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
@@ -713,4 +750,4 @@ function listGames(onlyEnabled=false) {
 function gameById(id) {
   return db.prepare('SELECT id,slug,title,image_path,enabled FROM games WHERE id=?').get(id);
 }
-module.exports={getScatterSettings,getBonusSession,getGameBackgroundImages,getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
+module.exports={getEgyptBonusChain,getScatterSettings,getBonusSession,getGameBackgroundImages,getLibraryImages,getSymbolImageLinks,getWallet,getSymbols,getPayouts,getGameSettings,getGameAssets,listGames,gameById,db,hashPassword,verifyPassword,validUsername,validPassword,getUserByName,createUser,countActiveAdmins};
