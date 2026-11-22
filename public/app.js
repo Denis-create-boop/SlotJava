@@ -214,7 +214,7 @@
       const active=presenting&&egyptPlayingIds.has(tileId);
       tile.classList.toggle('is-egypt-bonus-symbol',active);
       tile.classList.toggle('is-egypt-focus',active&&tileId===id);
-      tile.classList.toggle('is-egypt-inactive',active&&tileId!==id);
+      tile.classList.toggle('is-egypt-inactive',active&&id>0&&tileId!==id);
     }
   }
   const egyptStarterArt=new Set([
@@ -875,6 +875,14 @@
       await Promise.all(columns.map(async(col,index)=>{
         const target=Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]);
         await animateColumn(col,index,target,plans[index]);
+        // As soon as an individual reel stops, illuminate every selected
+        // bonus symbol on THAT reel. Other reels may still be spinning.
+        if(isEgypt&&bonusActive){
+          for(const tile of col.querySelectorAll('.reel-track .ribbon-tile')){
+            if(egyptPlayingIds.has(Number(tile.dataset.symbolId)))
+              tile.classList.add('is-egypt-bonus-symbol');
+          }
+        }
         if(overlays.has(index))await stopSuspense(index);
       }));
     }finally{
