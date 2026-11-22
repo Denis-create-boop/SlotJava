@@ -356,7 +356,7 @@ const themedGames=[
     slug:'golden-seven',folder:'egypt',
     symbols:[
       ['Фараон','pharaoh'],['Клеопатра','cleopatra'],['Анубис','anubis'],
-      ['Глаз Гора','horus'],['Скарабей','scarab'],['Анкх','ankh'],
+      ['Глаз Гора','horus'],['SCATTER','scarab'],['Анкх','ankh'],
       ['Пирамида','pyramid'],['Кобра','cobra'],['Сфинкс','sphinx'],
       ['Солнце Ра','ra'],['Священная кошка','cat']
     ]
@@ -409,7 +409,7 @@ db.transaction(()=>{
     }
     // Images in each game's own folder; symbols may be reassigned by admin.
     for(const [idx,entry] of item.symbols.entries()){
-      const src='/static/images/'+item.folder+'/symbols.svg#'+entry[1];
+      const src=isEgypt?'/static/images/egypt/premium-'+entry[1]+'.svg':'/static/images/'+item.folder+'/symbols.svg#'+entry[1];
       insertArt.run(game.id,entry[0],src);
       const art=selectArt.get(game.id,src);
       if(empty&&art){
@@ -421,13 +421,46 @@ db.transaction(()=>{
       const created=db.prepare('SELECT id,position FROM game_symbols WHERE game_id=? ORDER BY position,id').all(game.id);
       for(const symbol of created){
         const artEntry=item.symbols[(symbol.position-1)%item.symbols.length];
-        const image=selectArt.get(game.id,'/static/images/'+item.folder+'/symbols.svg#'+artEntry[1]);
+        const artPath=isEgypt?'/static/images/egypt/premium-'+artEntry[1]+'.svg':'/static/images/'+item.folder+'/symbols.svg#'+artEntry[1];
+        const image=selectArt.get(game.id,artPath);
         if(image)assignSymbol.run(symbol.id,image.id);
         seedPrice.run(symbol.id,1100+(symbol.position%5)*350);
         for(let reel=3;reel<=(isEgypt?6:5);reel++)
           seedMultiplier.run(symbol.id,reel,reel===3?1000:reel===4?1400:reel===5?1800:2200);
       }
     }
+  }
+})();
+// Repair legacy Egyptian SVG-fragment image links. An SVG <symbol> fragment
+// is not a standalone image for <img>; use the existing separate premium SVGs.
+// Do not touch uploaded or administrator-selected artwork.
+db.transaction(()=>{
+  const egypt=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(!egypt)return;
+  const premium=new Set(['pharaoh','cleopatra','anubis','ankh','scarab','ten','j','q','k','a']);
+  const links=db.prepare(`SELECT l.id,l.builtin_path FROM game_image_library l
+    WHERE l.game_id=? AND l.builtin_path LIKE '/static/images/egypt/symbols.svg#%'`).all(egypt.id);
+  const add=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  const find=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+  const move=db.prepare('UPDATE game_symbol_images SET library_image_id=? WHERE library_image_id=?');
+  const moveBackground=db.prepare('UPDATE game_background_images SET library_image_id=? WHERE game_id=? AND library_image_id=?');
+  const remove=db.prepare('DELETE FROM game_image_library WHERE id=?');
+  for(const old of links){
+    const key=old.builtin_path.split('#')[1];
+    if(!premium.has(key))continue;
+    const dest='/static/images/egypt/premium-'+key+'.svg';
+    const label=key==='scarab'?'SCATTER':key.toUpperCase();
+    add.run(egypt.id,label,dest);
+    const target=find.get(egypt.id,dest);
+    if(!target||target.id===old.id)continue;
+    move.run(target.id,old.id);
+    moveBackground.run(target.id,egypt.id,old.id);
+    remove.run(old.id);
+  }
+  const scatter=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(egypt.id);
+  if(scatter){
+    db.prepare("UPDATE game_symbols SET name='SCATTER' WHERE id=? AND game_id=? AND name IN ('Скарабей','SCATTER')").run(scatter.symbol_id,egypt.id);
+    db.prepare("UPDATE game_image_library SET name='SCATTER' WHERE game_id=? AND builtin_path='/static/images/egypt/premium-scarab.svg'").run(egypt.id);
   }
 })();
 // Scatter is a special symbol only for the original 5x4 game. The symbol and

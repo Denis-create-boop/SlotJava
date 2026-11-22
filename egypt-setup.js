@@ -10,7 +10,7 @@ module.exports = function installEgyptSymbols(db) {
   if(flagged)return;
   const old=db.prepare('SELECT id,name FROM game_symbols WHERE game_id=? ORDER BY position,id').all(id);
   const defaults=new Set(['Фараон','Клеопатра','Анубис','Глаз Гора','Скарабей','Анкх',
-    'Пирамида','Кобра','Сфинкс','Солнце Ра','Священная кошка']);
+    'Пирамида','Кобра','Сфинкс','Солнце Ра','Священная кошка','SCATTER']);
   // A user may already have customised the list. Skip rather than delete their work.
   const unchanged=old.length>0&&old.every(s=>defaults.has(s.name)||/^(Фараон|Клеопатра|Анубис|Глаз Гора|Скарабей|Анкх|Пирамида|Кобра|Сфинкс|Солнце Ра|Священная кошка) [2-9]$/.test(s.name));
   const uploaded=old.some(s=>db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+s.id));
@@ -26,7 +26,7 @@ module.exports = function installEgyptSymbols(db) {
     ['Фараон','pharaoh',1900],['Анкх','ankh',1600],
     ['Клеопатра','cleopatra',1700],['Анубис','anubis',1800],
     ['10','ten',650],['J','j',750],['Q','q',850],['K','k',950],['A','a',1100],
-    ['Скарабей','scarab',0]
+    ['SCATTER','scarab',0]
   ];
   db.transaction(()=>{
     db.prepare('DELETE FROM game_symbols WHERE game_id=?').run(id);
