@@ -235,7 +235,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<input type="number" name="weight" min="0" max="10000" step="1" value="'+(egyptWeights.get(symbol.id)??100)+'" required></label>'+
         '<p class="hint">Вес действует на всех 6 барабанах, в обычных и бесплатных вращениях. 100 — обычная частота, 200 — вдвое чаще относительно символа с весом 100, 0 — не выпадает случайно. SCATTER настраивается отдельно.</p>'+
         '<button class="primary" type="submit">Сохранить частоту символа</button></form>':'')+
-        (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
+        (game.slug==='golden-seven'&&!isScatter&&!isWild?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
         '<label>Минимум совпадений (обычная игра и бонус) <select name="min_reels">'+
         '<option value="2"'+(egyptBonusRules.get(symbol.id)?.min_reels===2?' selected':'')+'>2 барабанов</option>'+
         '<option value="3"'+(egyptBonusRules.get(symbol.id)?.min_reels!==2?' selected':'')+'>3 барабанов</option>'+
