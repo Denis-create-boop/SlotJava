@@ -158,3 +158,42 @@ test('unlimited retriggers do not duplicate a symbol after all were selected',()
   assert.deepEqual(extra.selectedIds,[1,2]);
   assert.equal(extra.next.free_spins,25);
 });
+
+test('Egypt admin bonus price is applied separately to each of 10 lines',()=>{
+  const cells=Array(24).fill(7);
+  for(const reel of [0,2,4])cells[reel]=8;
+  const result=scoreEgyptSymbolSet({
+    cells,selectedIds:[8],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3},linePercentById:{8:2500}
+  });
+  assert.equal(result.symbolWins[0].perLine,25);
+  assert.equal(result.symbolWins[0].lineWins.length,10);
+  assert.equal(result.symbolWins[0].prize,250);
+  assert.equal(result.total,250);
+});
+test('Two selected symbols have separate admin payouts and both earn ten lines',()=>{
+  const cells=Array(24).fill(7);
+  for(const reel of [0,2,4])cells[reel]=8;
+  for(const reel of [1,3,5])cells[6+reel]=9;
+  const result=scoreEgyptSymbolSet({
+    cells,selectedIds:[8,9],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000},
+      {symbol_id:9,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3,9:3},linePercentById:{8:2500,9:500}
+  });
+  assert.deepEqual(result.symbolWins.map(item=>item.perLine),[25,5]);
+  assert.deepEqual(result.symbolWins.map(item=>item.prize),[250,50]);
+  assert.equal(result.total,300);
+});
+test('Unset bonus line payout defaults to existing ordinary symbol price',()=>{
+  const cells=Array(24).fill(7);
+  for(const reel of [0,2,4])cells[reel]=8;
+  const result=scoreEgyptSymbolSet({
+    cells,selectedIds:[8],bet:100,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3},linePercentById:{8:null}
+  });
+  assert.equal(result.symbolWins[0].perLine,10);
+  assert.equal(result.total,100);
+});
