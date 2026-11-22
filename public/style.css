@@ -1733,3 +1733,62 @@ header nav .header-user-balance{
   .slot-theme-egypt .egypt-bonus-games span{font-size:.58rem}
   .slot-theme-egypt .egypt-bonus-games strong{font-size:1.7rem}
 }
+
+
+/* Important Egypt bonus events must be obvious, not a tiny footer message. */
+.slot-theme-egypt .egypt-retrigger-announcement[hidden]{display:none!important}
+.slot-theme-egypt .egypt-retrigger-announcement{
+  position:absolute;inset:0;z-index:55;
+  display:flex;align-items:center;justify-content:center;
+  padding:12px;pointer-events:none;
+  border-radius:15px;
+  background:radial-gradient(ellipse at center,rgba(81,37,11,.94),rgba(21,10,23,.96) 77%);
+  border:3px solid #fce38a;
+  box-shadow:inset 0 0 65px #ffc24c79;
+}
+.slot-theme-egypt .egypt-retrigger-inner{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  text-align:center;color:#ffeec7;
+}
+.slot-theme-egypt .egypt-retrigger-stars{font-size:clamp(1.5rem,3vw,2.5rem);color:#ffd978}
+.slot-theme-egypt .egypt-retrigger-inner strong{
+  font-size:clamp(2.1rem,6vw,4.7rem);line-height:1.1;
+  color:#fff0ac;text-shadow:0 0 23px #ffad28,0 0 36px #e96c17;
+}
+.slot-theme-egypt .egypt-retrigger-inner b{
+  font-size:clamp(2.3rem,6.5vw,5.5rem);line-height:1;
+  color:#fff9d9;text-shadow:0 0 24px #ffba3e;
+}
+.slot-theme-egypt .egypt-retrigger-inner>span:not(.egypt-retrigger-stars){
+  font-size:clamp(.95rem,2.6vw,1.75rem);font-weight:900;letter-spacing:.06em;
+}
+.slot-theme-egypt .egypt-retrigger-inner small{font-size:clamp(.7rem,1.5vw,1rem);color:#ffe0a0}
+.slot-theme-egypt .egypt-retrigger-announcement.is-showing{
+  animation:egypt-retrigger-pop .55s cubic-bezier(.16,.7,.24,1) both;
+}
+@keyframes egypt-retrigger-pop{
+  from{opacity:0;transform:scale(.88)}
+  to{opacity:1;transform:scale(1)}
+}
+/* Selected bonus symbols glow directly on the reels. */
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol{
+  position:relative;isolation:isolate;z-index:4;
+  border:2px solid #ffdb74;border-radius:8px;
+  background:radial-gradient(ellipse,#7d55213a,#20121c3b);
+  box-shadow:inset 0 0 14px #ffcf6070,0 0 12px #ffa83891;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol img{
+  filter:drop-shadow(0 0 9px #ffce77) brightness(1.16);
+}
+.slot-theme-egypt .egypt-payline.is-drawing{
+  stroke-dasharray:8 5;
+  animation:egypt-payline-reveal .28s ease-out both;
+}
+@keyframes egypt-payline-reveal{
+  from{opacity:0;filter:drop-shadow(0 0 0 transparent)}
+  to{opacity:.93;filter:drop-shadow(0 0 5px #ffd175)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt .egypt-retrigger-announcement.is-showing,
+  .slot-theme-egypt .egypt-payline.is-drawing{animation:none}
+}
