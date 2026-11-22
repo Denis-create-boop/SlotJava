@@ -870,6 +870,9 @@
     const existing=oldTiles.length===rowCount
       ?oldTiles:Array.from({length:rowCount},()=>makeTile(sample()));
     const middle=Array.from({length:extra},sample);
+    // Wild spins on the same moving ribbon as every other ordinary tile.
+    if(isSpace&&wildId&&symbols.has(wildId)&&middle.length)
+      middle[Math.floor(middle.length/2)]=wildId;
     const incoming=buildStrip(finalIds.concat(middle));
     track.style.transition='none';
     track.replaceChildren(incoming,...existing);
@@ -879,12 +882,13 @@
     return new Promise(resolve=>{
       const delay=options.delay??index*160;
       const duration=options.duration??(1400+index*170);
-      let startTimer=null,endTimer=null,completed=false;
+      let startTimer=null,endTimer=null,completed=false,motion=null;
       const finish=()=>{
         if(completed)return;
         completed=true;
         if(startTimer!==null)window.clearTimeout(startTimer);
         if(endTimer!==null)window.clearTimeout(endTimer);
+        if(motion){motion.cancel();motion=null;}
         finishReelAnimations.delete(finish);
         // Skip the transition and show the EXACT server-selected cells.
         track.style.transition='none';
@@ -896,8 +900,22 @@
       if(quickStopRequested){finish();return;}
       startTimer=window.setTimeout(()=>{
         if(quickStopRequested){finish();return;}
-        track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
-        track.style.transform='translate3d(0,0,0)';
+        if(Number.isFinite(options.anticipationStart)&&typeof track.animate==='function'){
+          // Actual reel tiles: cruise before the second Scatter, accelerate
+          // sharply while glowing, then brake to the server-selected cells.
+          const accelerationAt=Math.max(.05,Math.min(.78,options.anticipationStart/duration));
+          const fastEnd=Math.min(.93,accelerationAt+.17);
+          const position=fraction=>'translate3d(0,'+(startY*fraction)+'px,0)';
+          motion=track.animate([
+            {offset:0,transform:position(1),easing:'linear'},
+            {offset:accelerationAt,transform:position(.57),easing:'linear'},
+            {offset:fastEnd,transform:position(.08),easing:'cubic-bezier(.16,.66,.13,1)'},
+            {offset:1,transform:position(0)}
+          ],{duration,fill:'forwards',easing:'linear'});
+        }else{
+          track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
+          track.style.transform='translate3d(0,0,0)';
+        }
         endTimer=window.setTimeout(finish,duration+50);
       },delay);
     });
@@ -986,6 +1004,71 @@
         columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
       }
       reelMotionActive=false;
+    }
+  }
+
+  // Cosmic Scatter suspense: starts ONLY after two Scatter have actually
+  // landed on consecutive stopping reels, and only if reels remain to the
+  // right. The outcome is predetermined on the server and never changed here.
+  async function animateSpaceScatterSuspense(cells){
+    const scatterReels=columns.map((_,index)=>index).filter(index=>
+      Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]).includes(scatterId));
+    const second=scatterId&&scatterReels.length>=2?scatterReels[1]:-1;
+    const waiting=second>=0?columns.map((_,index)=>index).filter(index=>index>second):[];
+    const suspense=waiting.length>0&&!reducedMotion;
+    const baseDelay=index=>index*145;
+    const baseDuration=index=>1450+index*170;
+    const secondStop=suspense?baseDelay(second)+baseDuration(second)+50:0;
+    const overlays=new Map();
+    const plans=columns.map((_,index)=>{
+      const delay=baseDelay(index);
+      if(!suspense||index<=second)return {delay,duration:baseDuration(index)};
+      // Each remaining reel keeps moving after the second Scatter is visible.
+      // Their finishing times remain strictly staggered left to right.
+      const finishAt=secondStop+2450+(index-second-1)*650;
+      return {delay,duration:finishAt-delay,anticipationStart:Math.max(0,secondStop-delay)};
+    });
+    const lightRemaining=()=>{
+      if(quickStopRequested)return;
+      for(const index of waiting){
+        const column=columns[index],view=column.querySelector('.reel-window');
+        if(!view||overlays.has(index))continue;
+        const glow=document.createElement('div');
+        glow.className='space-scatter-suspense-glow';
+        glow.setAttribute('aria-hidden','true');
+        view.append(glow);
+        column.classList.add('space-scatter-anticipation-reel');
+        overlays.set(index,glow);
+      }
+      if(overlays.size){
+        message.textContent='ДВА SCATTER! Оставшиеся барабаны ускоряются — будет ли третий?';
+        play('bonus_sound');
+      }
+    };
+    const finishGlow=async index=>{
+      const glow=overlays.get(index);
+      if(!glow)return;
+      glow.classList.add('is-finishing');
+      columns[index].classList.add('space-scatter-anticipation-stopping');
+      if(!quickStopRequested)await delay(250);
+      glow.remove();
+      overlays.delete(index);
+      columns[index].classList.remove('space-scatter-anticipation-reel','space-scatter-anticipation-stopping');
+    };
+    let timer=null;
+    if(suspense)timer=window.setTimeout(lightRemaining,secondStop+60);
+    try{
+      await Promise.all(columns.map(async(column,index)=>{
+        const finalIds=Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]);
+        await animateColumn(column,index,finalIds,plans[index]);
+        await finishGlow(index);
+      }));
+    }finally{
+      if(timer!==null)window.clearTimeout(timer);
+      for(const [index,glow] of overlays){
+        glow.remove();
+        columns[index].classList.remove('space-scatter-anticipation-reel','space-scatter-anticipation-stopping');
+      }
     }
   }
 
@@ -1727,11 +1810,17 @@
           :result.mode==='egypt-bonus'&&
           Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
           ?result.preExpansionCells:result.cells;
-        const animations=columns.map((col,index)=>{
-          const target=Array.from({length:rowCount},(_,row)=>startingCells[row*reelCount+index]);
-          return animateColumn(col,index,target);
-        });
-        await Promise.all(animations);
+        if(isSpace&&(result.mode==='base'||result.mode==='space-bonus')){
+          // Scatters appear as reels land; Wild keeps spinning behind them.
+          // In bonus mode use the cells BEFORE tall-Wild expansion.
+          await animateSpaceScatterSuspense(startingCells);
+        }else{
+          const animations=columns.map((col,index)=>{
+            const target=Array.from({length:rowCount},(_,row)=>startingCells[row*reelCount+index]);
+            return animateColumn(col,index,target);
+          });
+          await Promise.all(animations);
+        }
         button.disabled=true;
         button.classList.remove('is-spin-stoppable');
         if(result.mode==='egypt-bonus'){
