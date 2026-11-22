@@ -1091,7 +1091,7 @@
 
   function clearWinningGlow(){
     root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>{
-      tile.classList.remove('is-winning');
+      tile.classList.remove('is-winning','is-winning-wild');
       tile.querySelectorAll('.slot-symbol-prize').forEach(label=>label.remove());
       tile.removeAttribute('data-winning-prize');
     });
@@ -1107,9 +1107,15 @@
           const row=win.rows[reel];
           if(!Number.isInteger(row)||row<0||row>=rowCount)continue;
           const tile=columns[reel].querySelector('.reel-track')?.children[row];
-          if(!tile||Number(tile.dataset.symbolId)!==win.symbolId)continue;
+          if(!tile)continue;
+          const landedId=Number(tile.dataset.symbolId);
+          // WILD on a paying Egyptian line replaces the winning symbol,
+          // so it grows and glows just like that symbol. Other WILD tiles
+          // (outside the scored positions) must remain unchanged.
+          if(landedId!==win.symbolId&&!(wildId&&landedId===wildId))continue;
           tile.style.setProperty('--win-delay',(reel*.13)+'s');
           tile.classList.add('is-winning');
+          tile.classList.toggle('is-winning-wild',landedId===wildId);
         }
       }
       return;
