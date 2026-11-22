@@ -122,7 +122,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-bonus-lines-canvas-v5"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-bonus-lines-canvas-v5" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=loader-simple-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -313,9 +313,8 @@ function firstGamePage(game,req){
   return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" aria-busy="true">'+
     '<div class="slot-loading-screen" id="slot-loading-screen" role="status" aria-live="polite">'+
       '<div class="slot-loading-panel"><span class="slot-loading-glyph" aria-hidden="true">✦</span>'+
-      '<strong>ЗАГРУЗКА ИГРЫ</strong><span id="slot-loading-info">Подготовка изображений…</span>'+
-      '<div class="slot-loading-progress" aria-hidden="true"><div id="slot-loading-fill"></div></div>'+
-      '<span id="slot-loading-count">0%</span></div></div>'+
+      '<strong>ЗАГРУЗКА</strong>'+
+      '<div class="slot-loading-progress" aria-hidden="true"><div id="slot-loading-fill"></div></div></div></div>'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
