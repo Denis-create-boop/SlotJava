@@ -305,10 +305,14 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
       '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
-      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div></section>';
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div>'+spaceMoveBackground+'</section>';
+    const spaceMoveBackground=game.slug==='lucky-stars'&&(assignedBackgrounds.has('background')||assets.has('background'))?
+      '<form method="post" action="/admin/games/'+id+'/move-background-to-reels">'+csrf+
+      '<p class="hint">Если рамка с пятью барабанами появилась на весь экран, перенеси её в фон игрового поля. Общий фон после переноса можно установить отдельно.</p>'+
+      '<button class="primary" type="submit">Перенести общий фон в фон игрового поля</button></form>':'';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
-      '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
+      '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div>'+spaceMoveBackground+'</section>';
     if(activeTab==='cells')panel=panelStart('Фон барабанов')+
       '<p class="hint">Одна картинка повторяется внутри каждой из ' + (layout.reels*layout.rows) + ' ячеек, непосредственно за вращающимися символами. Выберите фон из папки или загрузите новый.</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['cells_background'])+'</div></section>';
@@ -730,6 +734,33 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     })();
     if(image)try{fs.unlinkSync(path.join(uploadsDir,image.file_name));}catch{}
     res.redirect(sectionUrl(id,'symbols'));
+  });
+  // Move artwork accidentally selected as wallpaper to the reel-frame slot.
+  app.post('/admin/games/:id/move-background-to-reels',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(game?.slug!=='lucky-stars')return res.sendStatus(404);
+    const library=db.prepare('SELECT library_image_id FROM game_background_images WHERE game_id=? AND asset_key=?').get(id,'background');
+    const uploaded=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'background');
+    if(!library&&!uploaded)return show(req,res,'Общий фон не назначен.',true,'background');
+    const oldReelUpload=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'reels_background');
+    db.transaction(()=>{
+      db.prepare('DELETE FROM game_background_images WHERE game_id=? AND asset_key IN (?,?)')
+        .run(id,'background','reels_background');
+      db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'reels_background');
+      if(library){
+        db.prepare('INSERT INTO game_background_images(game_id,asset_key,library_image_id) VALUES(?,?,?)')
+          .run(id,'reels_background',library.library_image_id);
+        db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'background');
+      }else{
+        db.prepare('UPDATE game_assets SET asset_key=? WHERE game_id=? AND asset_key=?')
+          .run('reels_background',id,'background');
+      }
+    })();
+    if(oldReelUpload&&oldReelUpload.file_name!==uploaded?.file_name)
+      try{fs.unlinkSync(path.join(uploadsDir,oldReelUpload.file_name));}catch(e){console.warn('Old reel art cleanup:',e.code);}
+    if(library&&uploaded)
+      try{fs.unlinkSync(path.join(uploadsDir,uploaded.file_name));}catch(e){console.warn('Old wallpaper cleanup:',e.code);}
+    res.redirect(sectionUrl(id,'reels')+'&moved=1');
   });
   app.post('/admin/games/:id/backgrounds/:key',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),key=req.params.key;
