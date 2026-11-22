@@ -53,7 +53,7 @@ function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,minReels=3,randomInt
   return {cells:board,initialCells,expandedReels,landedReels};
 }
 
-function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
+function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts,lines=EGYPT_LINES}){
   if(cells.length!==24||![2,3].includes(minReels))throw Error('Invalid Egyptian bonus grid/rule.');
   const reelCount=6;
   const expandedReels=Array.from({length:6},(_,reel)=>reel)
@@ -63,7 +63,7 @@ function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
   const milli=payouts.multipliers.find(row=>row.symbol_id===selectedId&&row.reel_count===matchedReels)?.multiplier_milli??1000;
   // All ten paylines are active. On an expanded reel, every line intersects
   // the selected symbol, even when other expanded reels are non-adjacent.
-  const lineWins=matchedReels>=minReels?EGYPT_LINES.map((positions,index)=>({
+  const lineWins=matchedReels>=minReels?lines.map((positions,index)=>({
     line:index+1,rows:positions.slice(),reels:expandedReels.slice()
   })):[];
   const perLine=price>0&&milli>0?Math.round(bet*price*milli/10000000):0;
@@ -88,14 +88,14 @@ function egyptLinePrize({symbolId,matches,bet,payouts,linePricesById={}}){
 // Main Egyptian slot: ten fixed paylines, checked LEFT TO RIGHT. A line
 // counts a symbol at most once per reel. Other positions on the same reel
 // are irrelevant. Each line uses its own 2..6 match coefficient.
-function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePricesById={}}){
+function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES}){
   if(!Array.isArray(cells)||cells.length!==24||!Number.isSafeInteger(bet)||bet<0)
     throw Error('Invalid Egyptian base spin.');
   const byId=new Map(symbols.map(item=>[item.id,item]));
   const wins=[];
   let total=0;
-  for(let lineIndex=0;lineIndex<EGYPT_LINES.length;lineIndex++){
-    const rows=EGYPT_LINES[lineIndex];
+  for(let lineIndex=0;lineIndex<lines.length;lineIndex++){
+    const rows=lines[lineIndex];
     const symbolId=cells[rows[0]*6];
     const symbol=byId.get(symbolId);
     if(!symbol)continue;
@@ -116,7 +116,7 @@ function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePric
 // settled board. This avoids one expanding symbol erasing another or a SCATTER.
 // Display expansions sequentially; the payout is the sum across selected
 // symbols and all ten lines, irrespective of adjacent reel positions.
-function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePricesById={}}){
+function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES}){
   if(!Array.isArray(cells)||cells.length!==24)throw Error('Egypt requires a 6x4 board.');
   const distinct=[...new Set(selectedIds)];
   const symbolWins=[];
@@ -130,7 +130,7 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},line
     const qualified=landedReels.length>=minimum&&perLine>0;
     // Each of the ten paylines earns its OWN award; never pay the symbol
     // once and merely draw ten decorative paylines.
-    const lineWins=qualified?EGYPT_LINES.map((rows,i)=>({
+    const lineWins=qualified?lines.map((rows,i)=>({
       line:i+1,rows,reels:landedReels,prize:perLine,symbolId
     })):[];
     const prize=lineWins.reduce((sum,line)=>sum+line.prize,0);
