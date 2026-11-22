@@ -15,6 +15,29 @@ const EGYPT_LINES=Object.freeze([
   [2,3,2,1,0,1],
 ].map(line=>Object.freeze(line)));
 
+// One relative appearance weight per ordinary Egyptian symbol. Weights
+// apply uniformly to every reel in both paid and free spins. SCATTER is
+// generated separately and never enters this picker.
+function egyptWeightedPicker(symbols,weightsById={},randomInt){
+  if(typeof randomInt!=='function')throw Error('Random number generator is required.');
+  const entries=symbols.map(symbol=>({
+    id:symbol.id,weight:weightsById[symbol.id]??100
+  })).filter(entry=>Number.isSafeInteger(entry.weight)&&entry.weight>0);
+  const total=entries.reduce((sum,entry)=>sum+entry.weight,0);
+  if(!entries.length||!Number.isSafeInteger(total)||total>10000000)
+    throw Error('Set a positive weight for at least one Egyptian symbol.');
+  return ()=>{
+    const ticket=randomInt(total);
+    if(!Number.isInteger(ticket)||ticket<0||ticket>=total)
+      throw Error('Invalid random number for Egyptian symbol weight.');
+    let remaining=ticket;
+    for(const entry of entries){
+      if(remaining<entry.weight)return entry.id;
+      remaining-=entry.weight;
+    }
+    return entries[entries.length-1].id;
+  };
+}
 function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,minReels=3,randomInt}){
   if(reels!==6||rows!==4||![2,3].includes(minReels))throw Error('Egypt bonus requires six reels, four rows and a minimum of two or three reels.');
   if(!symbols.some(symbol=>symbol.id===selectedId))throw Error('Egypt bonus symbol is missing.');
@@ -139,4 +162,4 @@ function nextEgyptBonusSeries({remaining,queue,selectedIds,symbols,randomInt}){
 function egyptFreeSpinsFor(scatterCount){
   return scatterCount>=6?25:scatterCount===5?20:scatterCount===4?15:scatterCount===3?10:0;
 }
-module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,scoreEgyptBaseLines,egyptLinePrize,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries};
+module.exports={EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,scoreEgyptBaseLines,egyptLinePrize,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries};
