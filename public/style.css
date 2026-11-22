@@ -2383,6 +2383,51 @@ body:has(.slot-game.slot-theme-space)>header{
   .slot-page-background{height:100dvh;}
 }
 
+/* Cosmic: reduce the decorative background to a framed area behind
+   the machine; enlarge the playable reel panel without page scrolling. */
+@media (min-width: 701px){
+  body:has(.slot-game.slot-theme-space)>main>.slot-page-background{
+    position:absolute;
+    inset:auto;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:min(calc(100% - 26px),1250px);
+    height:min(calc(100% - 16px),690px);
+    object-fit:cover;
+    border-radius:20px;
+    box-shadow:0 12px 45px rgba(0,0,0,.35);
+  }
+  .slot-game.slot-theme-space{
+    width:min(100%,1100px);
+    max-width:1100px;
+    padding:10px 12px;
+  }
+  .slot-theme-space .slot-machine{
+    width:100%;
+    max-width:1060px;
+  }
+  .slot-theme-space .slot-reels.slot-reels-ribbon{
+    --reel-cell-height:clamp(57px,11.1dvh,112px);
+  }
+}
+@media (min-width:701px) and (max-height:620px){
+  .slot-theme-space .slot-reels.slot-reels-ribbon{
+    --reel-cell-height:clamp(42px,8dvh,62px);
+  }
+}
+@media (max-width:700px){
+  body:has(.slot-game.slot-theme-space)>main>.slot-page-background{
+    position:absolute;
+    inset:50% auto auto 50%;
+    transform:translate(-50%,-50%);
+    width:calc(100% - 16px);
+    height:min(78dvh,640px);
+    object-fit:cover;
+    border-radius:12px;
+  }
+}
+
 /* Admin: make it obvious which image the running database assigns to each layer. */
 .space-background-diagnostics{margin:22px 0;padding:16px;border:1px solid #7e78a5;border-radius:14px;background:#15172add}
 .space-background-diagnostics h3{margin:0 0 8px}
