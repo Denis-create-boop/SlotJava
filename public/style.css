@@ -1272,20 +1272,23 @@ header nav .header-user-balance{
 }
 
 
-/* Egypt: slightly larger reels and matching temple background on desktop.
-   Keep the existing compact sizing on phones and prevent horizontal overflow. */
+/* Egypt desktop: larger 6x4 reels and full matching background.
+   All overrides stay scoped to Egypt and desktop layouts. */
 @media (min-width: 801px) {
   .slot-game.slot-theme-egypt {
-    width: min(100%, 990px);
-    max-width: 990px;
-    padding: clamp(15px, 1.8vw, 22px);
+    width: min(100%, 1100px);
+    max-width: 1100px;
+    padding: clamp(16px, 1.9vw, 24px);
   }
-  .slot-theme-egypt .slot-machine {
+  .slot-game.slot-theme-egypt .slot-machine {
     width: 100%;
-    max-width: 940px;
+    max-width: 1050px;
   }
-  .slot-theme-egypt .slot-reels.slot-reels-ribbon {
-    --reel-cell-height: clamp(62px, 9.3vh, 96px);
-    padding: clamp(9px, 1.2vw, 15px);
+  .slot-game.slot-theme-egypt .slot-reels.slot-reels-ribbon {
+    --reel-cell-height: clamp(83px, 11vh, 110px);
+    padding: clamp(11px, 1.3vw, 17px);
+  }
+  .slot-game.slot-theme-egypt .reel-columns {
+    gap: clamp(4px, .6vw, 9px);
   }
 }
