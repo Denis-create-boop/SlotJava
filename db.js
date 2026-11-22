@@ -431,38 +431,6 @@ db.transaction(()=>{
     }
   }
 })();
-// Repair legacy Egyptian SVG-fragment image links. An SVG <symbol> fragment
-// is not a standalone image for <img>; use the existing separate premium SVGs.
-// Do not touch uploaded or administrator-selected artwork.
-db.transaction(()=>{
-  const egypt=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
-  if(!egypt)return;
-  const premium=new Set(['pharaoh','cleopatra','anubis','ankh','scarab','ten','j','q','k','a']);
-  const links=db.prepare(`SELECT l.id,l.builtin_path FROM game_image_library l
-    WHERE l.game_id=? AND l.builtin_path LIKE '/static/images/egypt/symbols.svg#%'`).all(egypt.id);
-  const add=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
-  const find=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
-  const move=db.prepare('UPDATE game_symbol_images SET library_image_id=? WHERE library_image_id=?');
-  const moveBackground=db.prepare('UPDATE game_background_images SET library_image_id=? WHERE game_id=? AND library_image_id=?');
-  const remove=db.prepare('DELETE FROM game_image_library WHERE id=?');
-  for(const old of links){
-    const key=old.builtin_path.split('#')[1];
-    if(!premium.has(key))continue;
-    const dest='/static/images/egypt/premium-'+key+'.svg';
-    const label=key==='scarab'?'SCATTER':key.toUpperCase();
-    add.run(egypt.id,label,dest);
-    const target=find.get(egypt.id,dest);
-    if(!target||target.id===old.id)continue;
-    move.run(target.id,old.id);
-    moveBackground.run(target.id,egypt.id,old.id);
-    remove.run(old.id);
-  }
-  const scatter=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(egypt.id);
-  if(scatter){
-    db.prepare("UPDATE game_symbols SET name='SCATTER' WHERE id=? AND game_id=? AND name IN ('Скарабей','SCATTER')").run(scatter.symbol_id,egypt.id);
-    db.prepare("UPDATE game_image_library SET name='SCATTER' WHERE game_id=? AND builtin_path='/static/images/egypt/premium-scarab.svg'").run(egypt.id);
-  }
-})();
 // Scatter is a special symbol only for the original 5x4 game. The symbol and
 // its artwork are created once after other games are seeded, so Egypt still
 // gets exactly one more regular symbol than the original game had.
@@ -541,6 +509,74 @@ if(firstGame){
 }
 // Egyptian starter artwork and scatters are installed without touching the other games.
 require('./egypt-setup')(db);
+db.exec(`CREATE TABLE IF NOT EXISTS game_hidden_builtin_images (
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  builtin_path TEXT NOT NULL,
+  PRIMARY KEY(game_id,builtin_path)
+)`);
+
+// Repair legacy Egyptian SVG-fragment image links. An SVG <symbol> fragment
+// is not a standalone image for <img>; use the existing separate premium SVGs.
+// Do not touch uploaded or administrator-selected artwork.
+db.transaction(()=>{
+  const egypt=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(!egypt)return;
+  const premium=new Set(['pharaoh','cleopatra','anubis','ankh','scarab','ten','j','q','k','a']);
+  const links=db.prepare(`SELECT l.id,l.builtin_path FROM game_image_library l
+    WHERE l.game_id=? AND l.builtin_path LIKE '/static/images/egypt/symbols.svg#%'`).all(egypt.id);
+  const add=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  const find=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+  const move=db.prepare('UPDATE game_symbol_images SET library_image_id=? WHERE library_image_id=?');
+  const moveBackground=db.prepare('UPDATE game_background_images SET library_image_id=? WHERE game_id=? AND library_image_id=?');
+  const remove=db.prepare('DELETE FROM game_image_library WHERE id=?');
+  for(const old of links){
+    const key=old.builtin_path.split('#')[1];
+    if(!premium.has(key))continue;
+    const dest='/static/images/egypt/premium-'+key+'.svg';
+    const label=key==='scarab'?'SCATTER':key.toUpperCase();
+    const hidden=db.prepare('SELECT 1 FROM game_hidden_builtin_images WHERE game_id=? AND builtin_path=?').get(egypt.id,dest);
+    if(hidden)continue;
+    add.run(egypt.id,label,dest);
+    const target=find.get(egypt.id,dest);
+    if(!target||target.id===old.id)continue;
+    move.run(target.id,old.id);
+    moveBackground.run(target.id,egypt.id,old.id);
+    remove.run(old.id);
+  }
+  // One-time recovery for older databases with no image link for named starter symbols.
+  // Never override uploaded art, explicit links, or images removed through admin.
+  const flag='egypt_missing_starter_image_links_2026_v2';
+  const hasFlag=db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag);
+  if(!hasFlag){
+    const starters=new Map([
+      ['Фараон','pharaoh'],['Анубис','anubis'],['Клеопатра','cleopatra'],
+      ['Анкх','ankh'],['10','ten'],['J','j'],['Q','q'],['K','k'],['A','a'],
+      ['Скарабей','scarab'],['SCATTER','scarab']
+    ]);
+    const symbols=db.prepare('SELECT id,name FROM game_symbols WHERE game_id=?').all(egypt.id);
+    const isLinked=db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?');
+    const oldUpload=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
+    const isHidden=db.prepare('SELECT 1 FROM game_hidden_builtin_images WHERE game_id=? AND builtin_path=?');
+    const assign=db.prepare('INSERT OR IGNORE INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
+    for(const symbol of symbols){
+      const key=starters.get(symbol.name);
+      if(!key||isLinked.get(symbol.id)||oldUpload.get(egypt.id,'symbol_'+symbol.id))continue;
+      const destination='/static/images/egypt/premium-'+key+'.svg';
+      if(isHidden.get(egypt.id,destination))continue;
+      const label=key==='scarab'?'SCATTER':symbol.name;
+      add.run(egypt.id,label,destination);
+      const image=find.get(egypt.id,destination);
+      if(image)assign.run(symbol.id,image.id);
+    }
+    db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+  }
+  const scatter=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(egypt.id);
+  if(scatter){
+    db.prepare("UPDATE game_symbols SET name='SCATTER' WHERE id=? AND game_id=? AND name IN ('Скарабей','SCATTER')").run(scatter.symbol_id,egypt.id);
+    db.prepare("UPDATE game_image_library SET name='SCATTER' WHERE game_id=? AND builtin_path='/static/images/egypt/premium-scarab.svg'").run(egypt.id);
+  }
+})();
+
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
