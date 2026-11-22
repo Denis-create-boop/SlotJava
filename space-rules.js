@@ -58,11 +58,14 @@ function expandSpaceWild(cells,wildId,scatterId){
   const expanded=cells.slice();
   for(let col=0;col<5;col++){
     if(![0,1,2].some(row=>cells[row*5+col]===wildId))continue;
-    // A full-reel image would conceal a Scatter. Leave such columns
-    // unexpanded: Scatter must never be substituted, even visually.
-    if(scatterId&&[0,1,2].some(row=>cells[row*5+col]===scatterId))continue;
+    // The Wild expands to the reel while SCATTER stays unchanged.
+    // A Scatter retains its trigger value, blocks substituted paylines
+    // through its cell and is drawn above the tall Wild artwork.
     reels.push(col);
-    for(let row=0;row<3;row++)expanded[row*5+col]=wildId;
+    for(let row=0;row<3;row++){
+      const pos=row*5+col;
+      if(cells[pos]!==scatterId)expanded[pos]=wildId;
+    }
   }
   return {cells:expanded,expandedReels:reels};
 }
