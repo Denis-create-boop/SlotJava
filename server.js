@@ -639,7 +639,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
         randomInt:n=>crypto.randomInt(n),scoreBoard:(cells,symbols,payouts,bet,rows)=>scoreBoard(cells,symbols,payouts,bet,rows,null,wildSymbol(game.id)),
-        scatterId:scatter.symbolId,scatterRules:scatter.rules
+        scatterId:scatter.symbolId,scatterRules:scatter.rules,wildId:wildSymbol(game.id)
       });
       // Scatter raises the multiplier immediately during this free spin,
       // before its award is calculated. The ordinary win +1 applies AFTER.
