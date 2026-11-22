@@ -80,4 +80,19 @@ function expandSpaceWild(cells,wildId,scatterId,wins=[],alreadyExpanded=[]){
   }
   return {cells:expanded,expandedReels:reels};
 }
-module.exports={SPACE_LINES,scoreSpaceLines,expandSpaceWild};
+// Resolve all cascade stages, not only the initially paid lines.
+// The starting position of each Wild remains authoritative throughout.
+function resolveSpaceWildBonus({cells,wildId,scatterId,...scoreOptions}){
+  const initial=scoreSpaceLines({cells,wildId,scatterId,...scoreOptions});
+  let expansion=expandSpaceWild(cells,wildId,scatterId,initial.wins);
+  let scored=expansion.expandedReels.length
+    ?scoreSpaceLines({cells:expansion.cells,wildId,scatterId,...scoreOptions}):initial;
+  for(let stage=0;stage<5;stage++){
+    const next=expandSpaceWild(cells,wildId,scatterId,scored.wins,expansion.expandedReels);
+    if(next.expandedReels.length===expansion.expandedReels.length)break;
+    expansion=next;
+    scored=scoreSpaceLines({cells:expansion.cells,wildId,scatterId,...scoreOptions});
+  }
+  return {expansion,scored};
+}
+module.exports={SPACE_LINES,scoreSpaceLines,expandSpaceWild,resolveSpaceWildBonus};
