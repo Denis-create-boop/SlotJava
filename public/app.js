@@ -942,12 +942,13 @@
       reelMotionActive=false;
       return;
     }
-    const eligible=(root.dataset.egyptScatterEligible||'').split(',').map(v=>v==='1');
     const scatterReels=columns.map((_,reel)=>reel)
       .filter(reel=>Array.from({length:rowCount},(_,row)=>cells[row*reelCount+reel]).includes(scatterId));
-    const secondScatter=scatterReels.length>=2?scatterReels[1]:-1;
+    const secondScatter=scatterId&&scatterReels.length>=2?scatterReels[1]:-1;
+    // ALL still-moving reels to the right keep spinning, even when their
+    // configured Scatter probability is zero. Their odds are unchanged.
     const waitingReels=secondScatter>=0
-      ?columns.map((_,i)=>i).filter(i=>i>secondScatter&&eligible[i]):[];
+      ?columns.map((_,i)=>i).filter(i=>i>secondScatter):[];
     const anticipation=waitingReels.length>0&&!reducedMotion;
     const overlays=new Map();
     // After the second landed SCATTER all eligible reels accelerate together.
