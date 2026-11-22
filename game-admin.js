@@ -181,10 +181,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<button type="submit" class="danger-action" title="Удаление снимет картинку с '+linkedCount+' назначений">Удалить</button></form>'+
         '</div>';
     }).join('');
-    const egyptMinReels=new Map(game.slug==='golden-seven'
-      ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels
+    const egyptBonusRules=new Map(game.slug==='golden-seven'
+      ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels,
+          r.line_percent_hundredths
         FROM game_symbols s LEFT JOIN egypt_symbol_bonus_rules r ON r.symbol_id=s.id
-        WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row.min_reels]):[]);
+        WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row]):[]);
     const symbolItems=symbols.map(symbol=>{
       const isScatter=scatter&&symbol.id===scatter.symbolId;
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
@@ -205,10 +206,15 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
         (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
-        '<label>Бонус Египта: выигрыш выбранного символа от <select name="min_reels">'+
-        '<option value="2"'+(egyptMinReels.get(symbol.id)===2?' selected':'')+'>2 барабанов</option>'+
-        '<option value="3"'+(egyptMinReels.get(symbol.id)!==2?' selected':'')+'>3 барабанов</option>'+
-        '</select></label><button class="primary" type="submit">Сохранить правило бонуса</button></form>':'')+
+        '<label>Бонус Египта: выбранный символ играет от <select name="min_reels">'+
+        '<option value="2"'+(egyptBonusRules.get(symbol.id)?.min_reels===2?' selected':'')+'>2 барабанов</option>'+
+        '<option value="3"'+(egyptBonusRules.get(symbol.id)?.min_reels!==2?' selected':'')+'>3 барабанов</option>'+
+        '</select></label>'+
+        '<label>Выплата ЗА ОДНУ бонусную линию, % от ставки'+
+        '<input type="number" name="line_percent" min="0" max="10000" step="0.01" '+
+        'value="'+((egyptBonusRules.get(symbol.id)?.line_percent_hundredths??unitPrices.get(symbol.id)??0)/100).toFixed(2)+'" required></label>'+
+        '<p class="hint">10 линий. Например: ставка 100, выплата 10% за линию = 10 очков на каждой линии, всего 100 очков. Множитель количества барабанов из обычной игры применяется также в бонусе.</p>'+
+        '<button class="primary" type="submit">Сохранить бонусные выплаты</button></form>':'')+
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">'+(game.slug==='golden-seven'?'Обычная игра Египта: символ выигрывает с первых двух либо трёх соседних барабанов слева направо — смотрите выбранный порог ниже. Для двух барабанов применяется множитель ×1, для трёх и более — настройки цепочки. В бонусе выбранный символ расширяется и считается по 10 линиям на любых барабанах.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
         '<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
@@ -440,8 +446,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
     const minimum=Number(req.body?.min_reels);
     if(![2,3].includes(minimum))return show(req,res,'Укажите 2 или 3 барабана.',true,'symbols');
-    db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels) VALUES(?,?)
-      ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels`).run(symbolId,minimum);
+    const raw=req.body?.line_percent;
+    if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,4})(?:\\.\\d{1,2})?$/.test(raw)||Number(raw)>10000)
+      return show(req,res,'Выплата за одну линию должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
+    const linePercent=Math.round(Number(raw)*100);
+    db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels,line_percent_hundredths) VALUES(?,?,?)
+      ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels,
+      line_percent_hundredths=excluded.line_percent_hundredths`).run(symbolId,minimum,linePercent);
     res.redirect(sectionUrl(id,'symbols')+'&saved=1');
   });
   app.post('/admin/games/:id/library',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
