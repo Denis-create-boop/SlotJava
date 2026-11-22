@@ -706,6 +706,48 @@ db.exec(`CREATE TABLE IF NOT EXISTS egypt_paylines (
   }
 }
 
+// Space: editable paylines and Scatter configuration; idempotent migration.
+db.exec(`CREATE TABLE IF NOT EXISTS space_paylines (
+  id INTEGER PRIMARY KEY,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  rows_json TEXT NOT NULL,
+  UNIQUE(game_id,position)
+);
+CREATE TABLE IF NOT EXISTS game_wild_symbols (
+  game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+  symbol_id INTEGER NOT NULL UNIQUE REFERENCES game_symbols(id) ON DELETE RESTRICT
+)`);
+{
+  const game=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
+  if(game){
+    const defaults=require('./space-rules').SPACE_LINES;
+    const has=db.prepare('SELECT COUNT(*) AS n FROM space_paylines WHERE game_id=?').get(game.id).n;
+    if(!has){
+      const insert=db.prepare('INSERT INTO space_paylines(game_id,position,rows_json) VALUES(?,?,?)');
+      db.transaction(()=>defaults.forEach((rows,index)=>insert.run(game.id,index+1,JSON.stringify(rows))))();
+    }
+    let scatter=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(game.id);
+    if(!scatter){
+      let candidate=db.prepare("SELECT id FROM game_symbols WHERE game_id=? AND name='SCATTER'").get(game.id);
+      if(!candidate)candidate={id:db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)')
+        .run(game.id,'SCATTER',db.prepare('SELECT COALESCE(MAX(position),0)+1 AS p FROM game_symbols WHERE game_id=?').get(game.id).p).lastInsertRowid};
+      db.prepare('INSERT INTO game_scatter_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,candidate.id);
+    }
+    const rule=db.prepare('INSERT OR IGNORE INTO game_scatter_reels(game_id,reel_index,chance_percent,max_symbols,weight_1,weight_2,weight_3,weight_4) VALUES(?,?,12,1,100,0,0,0)');
+    for(let reel=1;reel<=5;reel++)rule.run(game.id,reel);
+  }
+}
+// Ensure one protected Wild symbol per game without changing existing symbol art.
+for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-classic','golden-seven','lucky-stars')").all()){
+  const existing=db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(game.id);
+  if(existing)continue;
+  let symbol=db.prepare("SELECT id FROM game_symbols WHERE game_id=? AND UPPER(name)='WILD' ORDER BY id LIMIT 1").get(game.id);
+  if(!symbol)symbol={id:db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)')
+    .run(game.id,'WILD',db.prepare('SELECT COALESCE(MAX(position),0)+1 AS p FROM game_symbols WHERE game_id=?').get(game.id).p).lastInsertRowid};
+  db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
+}
+
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
