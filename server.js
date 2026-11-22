@@ -315,6 +315,7 @@ function firstGamePage(game,req){
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
     (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
+    (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     (game.slug==='slot-classic'&&scatter&&url('bonus_frame')?'<img class="slot-bonus-field-frame" src="'+h(url('bonus_frame'))+'" alt="" aria-hidden="true">':'')+
@@ -326,7 +327,7 @@ function firstGamePage(game,req){
     '<div class="reel-columns">'+reels+'</div>'+
     (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
     '</div>'+
-    (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>':'')+
+
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
     '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'><div class="egypt-selected-portrait" id="egypt-selected-portrait" aria-hidden="true"></div><div class="egypt-selected-info"><small>ВЫБРАННЫЙ СИМВОЛ БОНУСА</small><strong id="egypt-selected-name"></strong><span>10 призовых линий</span></div></div>':'')+
 
