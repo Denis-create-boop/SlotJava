@@ -827,6 +827,22 @@
   }
   function highlightWinningSymbols(wins){
     clearWinningGlow();
+    if(isEgypt){
+      // In the base Egyptian game only the cells ON the ten defined
+      // paylines may be highlighted; no extra copies on a reel count.
+      for(const win of wins){
+        if(!Number.isInteger(win.line)||!Array.isArray(win.rows)||win.prize<=0)continue;
+        for(let reel=0;reel<Math.min(reelCount,win.reels);reel++){
+          const row=win.rows[reel];
+          if(!Number.isInteger(row)||row<0||row>=rowCount)continue;
+          const tile=columns[reel].querySelector('.reel-track')?.children[row];
+          if(!tile||Number(tile.dataset.symbolId)!==win.symbolId)continue;
+          tile.style.setProperty('--win-delay',(reel*.13)+'s');
+          tile.classList.add('is-winning');
+        }
+      }
+      return;
+    }
     for(const win of wins){
       if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels)||win.reels<(isEgypt?2:3))continue;
       const chainLength=Math.min(columns.length,win.reels);
