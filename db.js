@@ -449,35 +449,40 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS game_bonus_sessions (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-    remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 20),
+    remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 25),
     multiplier INTEGER NOT NULL CHECK(multiplier BETWEEN 2 AND 100),
     bonus_win INTEGER NOT NULL DEFAULT 0 CHECK(bonus_win >= 0),
     bet INTEGER NOT NULL CHECK(bet BETWEEN 1 AND 1000),
     PRIMARY KEY(user_id,game_id)
   );
 `);
-// Old installations can also retain a restricted stake list in BONUS sessions.
-// At high bets, creating the bonus then fails and rolls back the entire paid
-// spin. Rebuild the table in place while preserving active sessions, multipliers,
-// remaining spins and accumulated bonus winnings.
+// Upgrade old bonus-session CHECK constraints without losing active rounds.
+// Egypt may now award 25 free spins for six SCATTER. Existing bonus sessions
+// may also carry a selected Egyptian symbol: preserve that column on rebuild.
 const bonusSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_bonus_sessions'").get()?.sql||'';
-if(/["'`\[]?bet["'`\]]?\s+IN\s*\(/i.test(bonusSchema)){
+const restrictedOldBets=/["'`\[]?bet["'`\]]?\s+IN\s*\(/i.test(bonusSchema);
+const restrictedOldSpins=/remaining\s+BETWEEN\s+1\s+AND\s+20/i.test(bonusSchema);
+if(restrictedOldBets||restrictedOldSpins){
+  const hasSelected=db.pragma('table_info(game_bonus_sessions)')
+    .some(column=>column.name==='selected_symbol_id');
   db.transaction(()=>{
     db.exec(`
       CREATE TABLE game_bonus_sessions_new (
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-        remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 20),
+        remaining INTEGER NOT NULL CHECK(remaining BETWEEN 1 AND 25),
         multiplier INTEGER NOT NULL CHECK(multiplier BETWEEN 2 AND 100),
         bonus_win INTEGER NOT NULL DEFAULT 0 CHECK(bonus_win >= 0),
         bet INTEGER NOT NULL CHECK(bet BETWEEN 1 AND 1000),
+        selected_symbol_id INTEGER,
         PRIMARY KEY(user_id,game_id)
       );
-      INSERT INTO game_bonus_sessions_new(user_id,game_id,remaining,multiplier,bonus_win,bet)
-      SELECT user_id,game_id,remaining,multiplier,bonus_win,bet FROM game_bonus_sessions;
-      DROP TABLE game_bonus_sessions;
-      ALTER TABLE game_bonus_sessions_new RENAME TO game_bonus_sessions;
     `);
+    db.exec(`INSERT INTO game_bonus_sessions_new(user_id,game_id,remaining,multiplier,bonus_win,bet,selected_symbol_id)
+      SELECT user_id,game_id,remaining,multiplier,bonus_win,bet,${hasSelected?'selected_symbol_id':'NULL'}
+      FROM game_bonus_sessions`);
+    db.exec('DROP TABLE game_bonus_sessions');
+    db.exec('ALTER TABLE game_bonus_sessions_new RENAME TO game_bonus_sessions');
   })();
 }
 // Probability weights for exactly 1..4 Scatter on each reel.
