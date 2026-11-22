@@ -204,17 +204,29 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels
         FROM game_symbols s LEFT JOIN egypt_symbol_bonus_rules r ON r.symbol_id=s.id
         WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row]):[]);
+    const spaceMin=new Map(game.slug==='lucky-stars'
+      ?db.prepare(`SELECT r.symbol_id,r.min_reels FROM space_symbol_rules r JOIN game_symbols s ON s.id=r.symbol_id
+        WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row.min_reels]):[]);
+    const spaceRatios=new Map(game.slug==='lucky-stars'
+      ?db.prepare(`SELECT r.symbol_id,r.matches,r.multiplier_milli FROM space_symbol_multipliers r
+        JOIN game_symbols s ON s.id=r.symbol_id WHERE s.game_id=?`)
+        .all(id).map(row=>[row.symbol_id+':'+row.matches,row.multiplier_milli]):[]);
     const symbolItems=symbols.map(symbol=>{
       const isScatter=scatter&&symbol.id===scatter.symbolId;
       const isWild=!!db.prepare('SELECT 1 FROM game_wild_symbols WHERE game_id=? AND symbol_id=?').get(id,symbol.id);
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
       const multipliers=multipliersBySymbol.get(symbol.id)||new Map();
-      const reelInputs=Array.from({length:game.slug==='golden-seven'?5:layout.reels-2},(_,i)=>{
-        const reel=i+(game.slug==='golden-seven'?2:3);
+      const reelInputs=Array.from({length:game.slug==='golden-seven'?5:game.slug==='lucky-stars'?4:layout.reels-2},(_,i)=>{
+        const reel=i+(['golden-seven','lucky-stars'].includes(game.slug)?2:3);
         if(game.slug==='golden-seven'){
           const price=egyptLinePrices.get(symbol.id+':'+reel)??0;
           return '<label class="payout-input">За '+reel+' символа(ов) на линии, × от ставки'+
             '<input type="number" min="0" max="10000" step="0.00000001" name="r_'+reel+'" value="'+(price/100000000).toFixed(8)+'" required></label>';
+        }
+        if(game.slug==='lucky-stars'){
+          const ratio=spaceRatios.get(symbol.id+':'+reel)??0;
+          return '<label class="payout-input">За '+reel+' совпадения на линии, × от ставки'+
+            '<input type="number" min="0" max="1000" step="0.001" name="r_'+reel+'" value="'+(ratio/1000).toFixed(3)+'" required></label>';
         }
         const ratio=multipliers.get(reel)??1000;
         return '<label class="payout-input">Цепочка до барабана №'+reel+', ×'+
@@ -249,10 +261,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<button class="primary" type="submit">Сохранить минимум совпадений</button></form>':'')+
         (isWild?'<p class="hint"><strong>WILD</strong> не имеет собственной цены. Заменяет любой обычный символ, кроме SCATTER, и получает цену заменяемого символа. Например: Солнце — WILD — Солнце = три Солнца.</p>':'')+
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':isWild?'':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Египет: одна таблица выплат для обычной и бонусной игры. Задайте самостоятельную цену за 2, 3, 4, 5 и 6 совпавших барабанов. В обычной игре совпадения подряд слева направо на одной из 10 линий. В бонусе выбранный символ расширяется и совпавшие барабаны могут быть несоседними. Каждая выигрышная линия оплачивается отдельно.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
-        (game.slug==='golden-seven'?'':'<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>')+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все настроенные линии — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
-        '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">'+(game.slug==='golden-seven'?'Сохранить выплаты за 2–6 символов':'Сохранить цену и множители')+'</button></form>')+
+        (game.slug==='lucky-stars'?'<label>Выигрыш начинается с <select name="min_reels">'+
+          '<option value="2"'+(spaceMin.get(symbol.id)===2?' selected':'')+'>2 барабанов</option>'+
+          '<option value="3"'+(spaceMin.get(symbol.id)!==2?' selected':'')+'>3 барабанов</option></select></label>':'')+
+        '<p class="hint">'+(game.slug==='lucky-stars'?'Космос: за каждую выигрышную линию ставка умножается на коэффициент за точное количество подряд совпавших барабанов. Один символ на каждом барабане линии; WILD заменяет обычный символ. Например, ставка 100 и ×3 за три барабана = 300 очков за линию.':game.slug==='golden-seven'?'Египет: одна таблица выплат для обычной и бонусной игры. Задайте самостоятельную цену за 2, 3, 4, 5 и 6 совпавших барабанов. В обычной игре совпадения подряд слева направо на одной из 10 линий. В бонусе выбранный символ расширяется и совпавшие барабаны могут быть несоседними. Каждая выигрышная линия оплачивается отдельно.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
+        (game.slug==='golden-seven'||game.slug==='lucky-stars'?'':'<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>')+
+        '<p class="hint">'+(game.slug==='lucky-stars'?'Множитель ×0 отключает оплату за соответствующее число барабанов. Для символов с минимумом 3 совпадения коэффициент за 2 барабана сохраняется, но не применяется.':game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все настроенные линии — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
+        '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">'+(game.slug==='golden-seven'?'Сохранить выплаты за 2–6 символов':game.slug==='lucky-stars'?'Сохранить минимум и множители':'Сохранить цену и множители')+'</button></form>')+
         (isScatter||isWild?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
     }).join('');
@@ -443,7 +458,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
-      '<p class="hint">'+(game.slug==='golden-seven'?'Установите множитель ставки для 2–6 символов на линии и относительный вес их выпадения. Линии можно создавать и редактировать отдельно в разделе «Линии выигрыша».':'Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.')+'</p>'+
+      '<p class="hint">'+(game.slug==='lucky-stars'?'Для каждого символа выберите начало выплат — от 2 или от 3 барабанов — и установите отдельный множитель ставки за 2, 3, 4 и 5 подряд совпавших символов на линии.':game.slug==='golden-seven'?'Установите множитель ставки для 2–6 символов на линии и относительный вес их выпадения. Линии можно создавать и редактировать отдельно в разделе «Линии выигрыша».':'Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.')+'</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+ 
@@ -749,6 +764,27 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const game=gameById(id);
     if(!game||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     if(getScatterSettings(id)?.symbolId===symbolId||db.prepare('SELECT 1 FROM game_wild_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId))return res.sendStatus(403);
+    if(game.slug==='lucky-stars'){
+      const minimum=Number(req.body?.min_reels);
+      if(![2,3].includes(minimum))
+        return show(req,res,'Укажите начало выплат от 2 или от 3 барабанов.',true,'symbols');
+      const entries=[];
+      for(let count=2;count<=5;count++){
+        const raw=req.body?.['r_'+count];
+        if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,3})?$/.test(raw)||Number(raw)>1000)
+          return show(req,res,'Множитель должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
+        entries.push([count,Math.round(Number(raw)*1000)]);
+      }
+      const rule=db.prepare(`INSERT INTO space_symbol_rules(symbol_id,min_reels) VALUES(?,?)
+        ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels`);
+      const pay=db.prepare(`INSERT INTO space_symbol_multipliers(symbol_id,matches,multiplier_milli)
+        VALUES(?,?,?) ON CONFLICT(symbol_id,matches) DO UPDATE SET multiplier_milli=excluded.multiplier_milli`);
+      db.transaction(()=>{
+        rule.run(symbolId,minimum);
+        for(const [count,ratio] of entries)pay.run(symbolId,count,ratio);
+      })();
+      return res.redirect(sectionUrl(id,'symbols')+'&saved=1');
+    }
     if(game.slug==='golden-seven'){
       const entries=[];
       for(let count=2;count<=6;count++){
