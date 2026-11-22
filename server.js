@@ -122,7 +122,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-landing-sum-10-v3"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-rolling-highlight-focus-v4" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-suspense-real-reels-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -228,13 +228,21 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
-    const candidates=payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
+    const candidates=egyptPrices
+      ?symbols.filter(symbol=>Array.from({length:5},(_,i)=>i+2)
+          .some(count=>(egyptPrices[symbol.id+':'+count]??0)>0))
+          .map(symbol=>({symbol_id:symbol.id}))
+      :payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
       const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
-      const activeReels=minReels+crypto.randomInt(reelCount-minReels+1);
-      if(egyptPrices&&((egyptPrices[rule.symbol_id+':'+activeReels]??0)<=0))continue;
+      const available=egyptPrices?Array.from({length:reelCount-minReels+1},(_,i)=>i+minReels)
+        .filter(count=>(egyptPrices[rule.symbol_id+':'+count]??0)>0):null;
+      if(available&&!available.length)continue;
+      const activeReels=available
+        ?available[crypto.randomInt(available.length)]
+        :minReels+crypto.randomInt(reelCount-minReels+1);
       if(!egyptPrices&&(reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
       const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
       const line=egyptPrices?crypto.randomInt(10):null;
