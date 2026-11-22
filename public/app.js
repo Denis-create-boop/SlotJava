@@ -52,7 +52,12 @@
   const egyptRoundPrizeCumulative=document.getElementById('egypt-round-prize-cumulative');
   function showEgyptRoundPrize(amount,total){
     if(!egyptRoundPrize)return;
-    if(egyptRoundPrizeValue)egyptRoundPrizeValue.textContent=amount>0?'+'+amount:'—';
+    if(!(amount>0)){
+      egyptRoundPrize.hidden=true;
+      egyptRoundPrize.classList.remove('is-revealing');
+      return;
+    }
+    if(egyptRoundPrizeValue)egyptRoundPrizeValue.textContent='+'+amount;
     if(egyptRoundPrizeCumulative)egyptRoundPrizeCumulative.textContent=String(total);
     egyptRoundPrize.hidden=false;
     egyptRoundPrize.classList.remove('is-revealing');
@@ -192,6 +197,18 @@
   // on their reel tiles (not just in the legend above the game).
   const egyptPlayingIds=new Set((root.dataset.egyptSymbols||'').split(',')
     .map(Number).filter(Number.isSafeInteger));
+  let egyptFocusedSymbolId=0;
+  function setEgyptFocus(id=0){
+    egyptFocusedSymbolId=id;
+    const dimOthers=id>0;
+    for(const tile of root.querySelectorAll('.reel-window .ribbon-tile')){
+      const tileId=Number(tile.dataset.symbolId);
+      const active=bonusActive&&egyptPlayingIds.has(tileId);
+      tile.classList.toggle('is-egypt-bonus-symbol',active);
+      tile.classList.toggle('is-egypt-focus',active&&tileId===id);
+      tile.classList.toggle('is-egypt-inactive',active&&dimOthers&&tileId!==id);
+    }
+  }
   const egyptStarterArt=new Set([
     'Фараон','Клеопатра','Анубис','Анкх','10','J','Q','K','A','Скарабей','SCATTER'
   ]);
@@ -620,7 +637,9 @@
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
     tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
-      (isEgypt&&bonusActive&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'');
+      (isEgypt&&bonusActive&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
+      (isEgypt&&bonusActive&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
+      (isEgypt&&bonusActive&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -1040,10 +1059,7 @@
     if(!isEgypt)return;
     egyptPlayingIds.clear();
     for(const id of egyptActiveIds)egyptPlayingIds.add(id);
-    for(const tile of root.querySelectorAll('.reel-window .ribbon-tile')){
-      tile.classList.toggle('is-egypt-bonus-symbol',bonusActive&&
-        egyptPlayingIds.has(Number(tile.dataset.symbolId)));
-    }
+    setEgyptFocus(focusId);
     if(egyptSymbolStrip)egyptSymbolStrip.hidden=!bonusActive;
     if(egyptSymbolStripItems){
       const tiles=regularDefinitions.map(symbol=>{
@@ -1124,8 +1140,8 @@
         '. Выпало на '+item.matchedReels+' барабанах.';
       await delay(reducedMotion?120:550);
       if(item.prize<=0||!item.expandedReels?.length){
-        message.textContent=name+': нет выигрышных линий в этом вращении.';
-        await delay(reducedMotion?150:700);
+        // No zero-win banner or zero amount: just move to the next symbol.
+        await delay(reducedMotion?120:400);
         continue;
       }
       for(const reel of item.expandedReels){
@@ -1370,7 +1386,7 @@
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=result.mode!=='base'&&result.total===0?'—':String(result.total);
       if(result.mode==='egypt-bonus'){
-        winDisplay.textContent=result.total>0?'+'+result.total:'—';
+        winDisplay.textContent=result.total>0?'+'+result.total:'';
         winDisplay.classList.remove('egypt-spin-win-pop');
         void winDisplay.offsetWidth;
         if(result.total>0)winDisplay.classList.add('egypt-spin-win-pop');
@@ -1393,7 +1409,7 @@
             currentTotal:result.freeSpins,seriesNumber:1,
             retriggerCount:0,pendingBonuses:0});
           paintEgyptSelection();
-          winDisplay.textContent='—';
+          winDisplay.textContent='';
           message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
         }else{
           updateBonus(true,result.freeSpins,2,0);
@@ -1406,7 +1422,7 @@
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
         // updateBonus only updates the cumulative prize; the main win meter
         // always displays the current spin award, including zero as a dash.
-        winDisplay.textContent=result.total>0?'+'+result.total:'—';
+        winDisplay.textContent=result.total>0?'+'+result.total:'';
         showEgyptRoundPrize(result.total,result.bonusWin);
         setEgyptCounters(result);
         paintEgyptSelection();
@@ -1435,8 +1451,7 @@
           message.textContent=result.total>0
             ?'За вращение: +'+result.total+' очков. Всего в бонусе: '+result.bonusWin+
               '. Осталось: '+result.remaining+'.'
-            :'Без выигрыша. Осталось '+result.remaining+
-              ' вращений. Всего в бонусе: '+result.bonusWin+'.';
+            :'Осталось бесплатных вращений: '+result.remaining+'.';
         }
       }else if(result.mode==='bonus'){
         // The tier is based on the final multiplied award, supplied by the server.
