@@ -610,7 +610,12 @@
     try{
       const animations=columns.map((col,index)=>{
         const target=Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]);
-        return animateColumn(col,index,target).then(()=>{
+        return animateColumn(col,index,target).then(async()=>{
+          if(overlays.has(index)&&!reducedMotion){
+            // Give the lit reel a readable rapid-spin finale before revealing
+            // its already-determined result.
+            await new Promise(resolve=>window.setTimeout(resolve,720));
+          }
           if(overlays.has(index)){
             overlays.get(index).remove();
             overlays.delete(index);
