@@ -217,7 +217,7 @@ test('Egypt base pays separately for exactly one three-reel line',()=>{
   const result=scoreEgyptBaseLines({
     cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],bet:100,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3},lineMultipliersById:{'8:3':2000}
+    minReelsById:{8:3},linePricesById:{'8:3':20000000}
   });
   assert.equal(result.total,20);
   assert.equal(result.wins.length,1);
@@ -229,7 +229,7 @@ test('Egypt base supports two-reel lines with an independent x2 coefficient',()=
   cells[0]=8;cells[1]=8;
   const payouts={prices:[{symbol_id:8,percent_hundredths:2000}],multipliers:[]};
   const base={cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],
-    bet:100,payouts,lineMultipliersById:{'8:2':1500}};
+    bet:100,payouts,linePricesById:{'8:2':30000000}};
   assert.equal(scoreEgyptBaseLines({...base,minReelsById:{8:3}}).total,0);
   const eligible=scoreEgyptBaseLines({...base,minReelsById:{8:2}});
   // Row 0 on reels 1 and 2 is shared by two of the ten fixed paths.
@@ -242,7 +242,7 @@ test('Egypt base caps payouts to ten line paths and uses exact match count',()=>
   const scored=scoreEgyptBaseLines({
     cells,symbols:[{id:8,name:'Ankh'}],bet:100,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    lineMultipliersById:{'8:6':3000}
+    linePricesById:{'8:6':30000000}
   });
   assert.equal(scored.wins.length,10);
   assert.ok(scored.wins.every(win=>win.reels===6&&win.prize===30));
@@ -255,7 +255,7 @@ test('Egypt bonus uses configured 2–6 line coefficients for each chosen symbol
     cells,selectedIds:[8],bet:100,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
     minReelsById:{8:3},
-    lineMultipliersById:{'8:3':2500}
+    linePricesById:{'8:3':25000000}
   });
   assert.equal(scored.symbolWins[0].perLine,25);
   assert.equal(scored.symbolWins[0].lineWins.length,10);
@@ -277,7 +277,7 @@ test('Each of ten Egyptian bonus lines pays individually: 1 point each equals 10
   const result=scoreEgyptSymbolSet({cells,selectedIds:[8],bet:10,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
     minReelsById:{8:3},
-    lineMultipliersById:{'8:3':1000}});
+    linePricesById:{'8:3':10000000}});
   assert.equal(result.symbolWins[0].perLine,1);
   assert.equal(result.symbolWins[0].lineWins.length,10);
   assert.ok(result.symbolWins[0].lineWins.every(line=>line.prize===1));
@@ -295,4 +295,30 @@ test('Egypt pays independently for multiple chosen symbols and ten lines each',(
   assert.deepEqual(result.symbolWins.map(w=>w.perLine),[1,2]);
   assert.deepEqual(result.symbolWins.map(w=>w.prize),[10,20]);
   assert.equal(result.total,30);
+});
+
+test('Egypt base and bonus use same direct price for 3 matched reels',()=>{
+ const payouts={prices:[],multipliers:[]};
+ const prices={'8:3':25000000};
+ const cells=Array(24).fill(7);
+ cells[0]=8;cells[1]=8;cells[2]=8;
+ const base=scoreEgyptBaseLines({cells,symbols:[{id:7,name:'Other'},{id:8,name:'Ankh'}],
+   bet:100,payouts,minReelsById:{8:3},linePricesById:prices});
+ assert.equal(base.wins[0].prize,25);
+ const bonusCells=Array(24).fill(7);
+ bonusCells[0]=8;bonusCells[2]=8;bonusCells[4]=8;
+ const bonus=scoreEgyptSymbolSet({cells:bonusCells,selectedIds:[8],bet:100,
+   payouts,minReelsById:{8:3},linePricesById:prices});
+ assert.equal(bonus.symbolWins[0].perLine,25);
+ assert.equal(bonus.total,250);
+});
+test('Zero direct price overrides legacy price and disables matching payout',()=>{
+ const cells=Array(24).fill(8);
+ const payouts={prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]};
+ const bonus=scoreEgyptSymbolSet({cells,selectedIds:[8],bet:100,payouts,
+   linePricesById:{'8:6':0}});
+ assert.equal(bonus.total,0);
+ const base=scoreEgyptBaseLines({cells,symbols:[{id:8,name:'Ankh'}],bet:100,payouts,
+   linePricesById:{'8:6':0}});
+ assert.equal(base.total,0);
 });
