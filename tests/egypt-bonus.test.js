@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor}=require('../egypt-bonus');
+const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries}=require('../egypt-bonus');
 const {scatterOnBoard,freeSpinsFor}=require('../slot-bonus');
 
 test('Egypt uses ten distinct six-reel paylines over four rows',()=>{
@@ -94,4 +94,67 @@ test('the same two nonadjacent reels expand when configured to pay from two',()=
     assert.equal(board.cells[row*6],8);
     assert.equal(board.cells[row*6+2],8);
   }
+});
+
+test('several chosen symbols pay separately on nonadjacent reels',()=>{
+  const board=Array(24).fill(7);
+  for(const col of [0,2,4])board[col]=8;
+  for(const col of [1,5])board[6+col]=9;
+  board[3*6+3]=99; // a retrigger SCATTER does not count as selected art
+  const result=scoreEgyptSymbolSet({
+    cells:board,selectedIds:[8,9],bet:100,minReelsById:{8:3,9:2},
+    payouts:{prices:[
+      {symbol_id:8,percent_hundredths:1000},
+      {symbol_id:9,percent_hundredths:1000}],multipliers:[]}
+  });
+  assert.equal(result.symbolWins.length,2);
+  assert.equal(result.symbolWins[0].prize,100);
+  assert.equal(result.symbolWins[1].prize,100);
+  assert.equal(result.symbolWins[0].lineWins.length,10);
+  assert.equal(result.symbolWins[1].lineWins.length,10);
+  assert.equal(result.total,200);
+});
+test('nonwinning selected symbol never expands on a zero-prize line',()=>{
+  const board=Array(24).fill(7);
+  board[1]=8;board[3]=8;
+  const result=scoreEgyptSymbolSet({
+    cells:board,selectedIds:[8],bet:100,minReelsById:{8:3},
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]}
+  });
+  assert.equal(result.total,0);
+  assert.deepEqual(result.symbolWins[0].expandedReels,[]);
+});
+test('retrigger FIFO activates a new symbol and only completes when queue is empty',()=>{
+  const symbols=[{id:1},{id:2},{id:3}];
+  const queue=[{queue_order:1,free_spins:10},{queue_order:2,free_spins:15}];
+  const first=nextEgyptBonusSeries({
+    remaining:0,queue,selectedIds:[1],symbols,randomInt:()=>0
+  });
+  assert.equal(first.kind,'transition');
+  assert.equal(first.next.free_spins,10);
+  assert.deepEqual(first.selectedIds,[1,2]);
+  const during=nextEgyptBonusSeries({
+    remaining:4,queue:queue.slice(1),selectedIds:first.selectedIds,symbols,randomInt:()=>0
+  });
+  assert.equal(during.kind,'continue');
+  const second=nextEgyptBonusSeries({
+    remaining:0,queue:queue.slice(1),selectedIds:first.selectedIds,symbols,randomInt:()=>0
+  });
+  assert.equal(second.next.free_spins,15);
+  assert.deepEqual(second.selectedIds,[1,2,3]);
+  const final=nextEgyptBonusSeries({
+    remaining:0,queue:[],selectedIds:second.selectedIds,symbols,randomInt:()=>0
+  });
+  assert.equal(final.kind,'complete');
+});
+test('unlimited retriggers do not duplicate a symbol after all were selected',()=>{
+  const symbols=[{id:1},{id:2}];
+  assert.equal(chooseNewEgyptSymbol(symbols,[1,2],()=>0),null);
+  const extra=nextEgyptBonusSeries({
+    remaining:0,queue:[{free_spins:25}],selectedIds:[1,2],symbols,randomInt:()=>0
+  });
+  assert.equal(extra.kind,'transition');
+  assert.equal(extra.newSymbolId,null);
+  assert.deepEqual(extra.selectedIds,[1,2]);
+  assert.equal(extra.next.free_spins,25);
 });
