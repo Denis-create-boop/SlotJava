@@ -515,24 +515,24 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId&&symbol.id!==wildSymbol(game.id));
       if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
       const weights=egyptSymbolWeights(game.id);
-      const enabled=regular.filter(symbol=>(weights[symbol.id]??100)>0);
+      const enabled=regular.filter(symbol=>symbol.id!==wildSymbol(game.id)&&(weights[symbol.id]??100)>0);
       if(!enabled.length)return {error:'У всех символов Египта вес 0. Укажите хотя бы один положительный вес в админке.'};
-      const choose=egyptWeightedPicker(enabled,weights,n=>crypto.randomInt(n));
+      const choose=egyptWeightedPicker(regular.filter(symbol=>(weights[symbol.id]??100)>0),weights,n=>crypto.randomInt(n));
       let chain=getEgyptBonusChain(req.user.id,game.id);
       if(!chain){
         // Migrate in-progress bonuses from older releases without forfeiting
         // their accumulated winnings or selected symbol.
-        const initial=regular.some(s=>s.id===active.selected_symbol_id)
-          ?active.selected_symbol_id:regular[crypto.randomInt(regular.length)].id;
+        const initial=enabled.some(s=>s.id===active.selected_symbol_id)
+          ?active.selected_symbol_id:enabled[crypto.randomInt(enabled.length)].id;
         db.prepare('UPDATE game_bonus_sessions SET selected_symbol_id=? WHERE user_id=? AND game_id=?')
           .run(initial,req.user.id,game.id);
         db.prepare(`INSERT INTO egypt_bonus_chains(user_id,game_id,symbols_json,current_total)
           VALUES(?,?,?,?)`).run(req.user.id,game.id,JSON.stringify([initial]),active.remaining);
         chain=getEgyptBonusChain(req.user.id,game.id);
       }
-      const selected=chain.symbols.filter(id=>regular.some(symbol=>symbol.id===id));
+      const selected=chain.symbols.filter(id=>enabled.some(symbol=>symbol.id===id));
       if(!selected.length){
-        const chosen=choose();
+        const chosen=egyptWeightedPicker(enabled,weights,n=>crypto.randomInt(n))();
         selected.push(chosen);
         db.prepare('UPDATE egypt_bonus_chains SET symbols_json=? WHERE user_id=? AND game_id=?')
           .run(JSON.stringify(selected),req.user.id,game.id);
@@ -638,7 +638,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const round=playBonusRound({
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
-        randomInt:n=>crypto.randomInt(n),scoreBoard:(...args)=>scoreBoard(...args,wildSymbol(game.id)),
+        randomInt:n=>crypto.randomInt(n),scoreBoard:(cells,symbols,payouts,bet,rows)=>scoreBoard(cells,symbols,payouts,bet,rows,null,wildSymbol(game.id)),
         scatterId:scatter.symbolId,scatterRules:scatter.rules
       });
       // Scatter raises the multiplier immediately during this free spin,
