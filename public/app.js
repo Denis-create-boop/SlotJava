@@ -917,6 +917,19 @@
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
       if(result.mode!=='bonus')showBigWin(tier);
+      if(result.mode==='base'&&result.egyptTrigger){
+        // Visual trigger only. Egypt bonus rules and payouts are intentionally
+        // not borrowed from the classic game until they are configured.
+        const field=root.querySelector('.slot-reels-ribbon');
+        const announcement=document.createElement('div');
+        announcement.className='egypt-scatter-announcement';
+        announcement.innerHTML='<strong>СКАРАБЕИ!</strong><span>БОНУС ОТКРЫТ</span><small>Правила бонусной игры появятся позже</small>';
+        if(field)field.append(announcement);
+        play('bonus_sound');
+        message.textContent='Выпало '+result.scatterCount+' скарабеев! Бонусный символ активирован. Механика бонуса ещё настраивается.';
+        await delay(2200);
+        announcement.remove();
+      }
       if(result.mode==='base'&&result.freeSpins>0){
         // Bonus activation ends autoplay immediately; free spins are manual.
         if(autoRunning)stopAutoplay('Автоигра завершена: выпала бонусная игра. Бесплатные вращения запускаются вручную.');
