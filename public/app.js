@@ -163,7 +163,7 @@
   soundToggle.addEventListener('change',()=>{
     soundEnabled=soundToggle.checked;
     try {window.localStorage.setItem('slotjava-sound',soundEnabled?'on':'off');} catch {}
-    if(!soundEnabled){root.querySelectorAll('audio').forEach(audio=>audio.pause());if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}updateMusicVolume();}
+    if(!soundEnabled){stopEgyptSpinMotor();root.querySelectorAll('audio').forEach(audio=>audio.pause());if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}updateMusicVolume();}
     else startBackgroundMusic();
   });
   function openSettings(){
@@ -377,9 +377,11 @@
         [0,.14,.28,.42,.56,.7].forEach((offset,i)=>hit(i%2?145:98,t+offset,.18,.065,'sawtooth'));
         [220,261.63,329.63,440].forEach((hz,i)=>hit(hz,t+.45+i*.15,.45,.045));
       }else if(name==='win_sound'||name==='big_win_sound'||name==='mega_win_sound'){
-        const extended=name==='mega_win_sound'?5:name==='big_win_sound'?4:3;
-        [220,261.63,329.63,440,523.25].slice(0,extended).forEach((hz,i)=>hit(hz,t+i*.14,i===extended-1?.7:.26,.045));
-        hit(110,t,.22,.075);
+        // Clearly audible ascending win fanfare, distinct from temple music.
+        const extended=name==='mega_win_sound'?6:name==='big_win_sound'?5:4;
+        [293.66,392,493.88,587.33,783.99,987.77].slice(0,extended)
+          .forEach((hz,i)=>hit(hz,t+i*.115,i===extended-1?.82:.26,.105,'triangle'));
+        hit(110,t,.32,.115,'sawtooth');
       }else{hit(123.47,t,.15,.055);hit(185,t+.12,.18,.05);}
       return;
     }
@@ -499,11 +501,75 @@
       }
     }catch(error){console.warn('Mega boom unavailable:',error);}
   }
+  // Built-in Egyptian reel motor (continuous until the final reel stops).
+  // Files uploaded in the admin still take priority if available.
+  let egyptSpinMotor=null;
+  function startEgyptSpinMotor(){
+    if(!soundEnabled||!egyptSounds||egyptSpinMotor)return;
+    const ctx=getAudioContext();
+    if(!ctx)return;
+    try{
+      const size=2*ctx.sampleRate;
+      const buffer=ctx.createBuffer(1,size,ctx.sampleRate);
+      const noiseData=buffer.getChannelData(0);
+      for(let i=0;i<size;i++)noiseData[i]=(Math.random()*2-1)*.55;
+      const noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),
+        motor=ctx.createOscillator(),harmonic=ctx.createOscillator(),
+        master=ctx.createGain(),noiseGain=ctx.createGain(),
+        motorGain=ctx.createGain(),harmonicGain=ctx.createGain();
+      noise.buffer=buffer;noise.loop=true;
+      filter.type='lowpass';filter.frequency.value=490;filter.Q.value=.6;
+      noiseGain.gain.value=.11;
+      motor.type='sawtooth';motor.frequency.value=85;
+      motorGain.gain.value=.027;
+      harmonic.type='sine';harmonic.frequency.value=133;
+      harmonicGain.gain.value=.025;
+      master.gain.setValueAtTime(.0001,ctx.currentTime);
+      master.gain.linearRampToValueAtTime(.46,ctx.currentTime+.25);
+      noise.connect(filter).connect(noiseGain).connect(master);
+      motor.connect(motorGain).connect(master);
+      harmonic.connect(harmonicGain).connect(master);
+      master.connect(ctx.destination);
+      const start=ctx.currentTime+.015;
+      noise.start(start);motor.start(start);harmonic.start(start);
+      egyptSpinMotor={sources:[noise,motor,harmonic],master,ctx};
+    }catch(error){
+      console.warn('Egypt reel motor sound unavailable:',error);
+      egyptSpinMotor=null;
+    }
+  }
+  function stopEgyptSpinMotor(){
+    const active=egyptSpinMotor;
+    if(!active)return;
+    egyptSpinMotor=null;
+    const t=active.ctx.currentTime;
+    active.master.gain.cancelScheduledValues(t);
+    active.master.gain.setTargetAtTime(0,t,.11);
+    for(const source of active.sources){
+      try{source.stop(t+.48);}catch{}
+    }
+  }
   function play(name){
     if(!soundEnabled)return;
     const audio=sound(name);
+    if(name==='spin_sound'&&egyptSounds){
+      // Even with no uploaded file, rolling audio keeps playing for the full
+      // spin, rather than the short stinger that used to fire once.
+      if(!audio){startEgyptSpinMotor();return;}
+    }
     if(!audio){playGeneratedSound(name);return;}
-    try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
+    try{
+      audio.currentTime=0;
+      const playback=audio.play();
+      if(playback?.catch)playback.catch(error=>{
+        console.warn('Uploaded sound failed, using synthesized fallback:',name,error);
+        if(name==='spin_sound'&&egyptSounds)startEgyptSpinMotor();
+        else playGeneratedSound(name);
+      });
+    }catch(error){
+      if(name==='spin_sound'&&egyptSounds)startEgyptSpinMotor();
+      else playGeneratedSound(name);
+    }
   }
   const music=sound('music');
   const bonusMusic=sound('bonus_music');
@@ -665,6 +731,7 @@
     ambientMusicTimer=window.setInterval(playMeasure,4150);
   }
   function stopSpinSound(){
+    stopEgyptSpinMotor();
     const reelSound=sound('spin_sound');
     if(reelSound){reelSound.pause();reelSound.currentTime=0;}
   }
