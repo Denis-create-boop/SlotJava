@@ -250,10 +250,10 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
     const candidates=egyptPrices
-      ?availableSymbols.filter(symbol=>Array.from({length:5},(_,i)=>i+2)
+      ?availableSymbols.filter(symbol=>symbol.id!==wildId&&Array.from({length:5},(_,i)=>i+2)
           .some(count=>(egyptPrices[symbol.id+':'+count]??0)>0))
           .map(symbol=>({symbol_id:symbol.id}))
-      :payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
+      :payouts.prices.filter(p=>p.symbol_id!==wildId&&p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=egyptPrices
         ?{symbol_id:egyptWeightedPicker(
