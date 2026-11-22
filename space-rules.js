@@ -11,11 +11,12 @@ const SPACE_LINES=Object.freeze([
 // Wild substitutes for ordinary symbols, but can never stand for Scatter.
 // Pays exactly once per line: choose the highest paying interpretation,
 // rather than counting the same line separately for every ordinary symbol.
-function scoreSpaceLines({cells,symbols,bet,payouts,lines=SPACE_LINES,wildId=0,scatterId=0}){
-  if(!Array.isArray(cells)||cells.length!==15)throw Error('Space requires 5x3 grid');
-  const byId=new Map(symbols.map(s=>[s.id,s]));
-  const prices=new Map(payouts.prices.map(p=>[p.symbol_id,p.percent_hundredths]));
-  const ratios=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
+function scoreSpaceLines({cells,symbols,bet,payouts,lines=SPACE_LINES,wildId=0,scatterId=0,rules=null}){
+  if(!Array.isArray(cells)||cells.length!==15||!Number.isSafeInteger(bet)||bet<0)
+    throw Error('Space requires 5x3 grid and a valid bet');
+  const ratios=new Map((payouts.multipliers||[]).map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
+  const direct=new Map((rules?.multipliers||[]).map(p=>[p.symbol_id+':'+p.matches,p.multiplier_milli]));
+  const minimums=new Map((rules?.minimums||[]).map(p=>[p.symbol_id,p.min_reels]));
   const wins=[];let total=0;
   for(let index=0;index<lines.length;index++){
     const rows=lines[index];
@@ -25,15 +26,31 @@ function scoreSpaceLines({cells,symbols,bet,payouts,lines=SPACE_LINES,wildId=0,s
     for(const symbol of symbols){
       if(symbol.id===wildId||symbol.id===scatterId)continue;
       let count=0;
-      while(count<5&&[symbol.id,wildId].includes(cells[rows[count]*5+count]))count++;
-      if(count<3)continue;
-      const price=prices.get(symbol.id)||0,ratio=ratios.get(symbol.id+':'+count)??1000;
-      const prize=price>0&&ratio>0?Math.round(bet*count*price*ratio/10000000):0;
-      if(!best||prize>best.prize)best={line:index+1,rows:rows.slice(),symbolId:symbol.id,name:symbol.name,reels:count,count,prize};
+      while(count<5&&(cells[rows[count]*5+count]===symbol.id||
+        (wildId!==0&&cells[rows[count]*5+count]===wildId)))count++;
+      if(count<(minimums.get(symbol.id)===2?2:3))continue;
+      let prize=0;
+      if(rules){
+        // One payline pays stake × the multiplier for N consecutive reels.
+        // Wild has no own payout and can only substitute the current symbol.
+        const milli=direct.get(symbol.id+':'+count)??0;
+        if(milli>0)prize=Math.round(bet*milli/1000);
+      }else{
+        // Backwards compatibility for direct callers still using the old paytable.
+        const price=(payouts.prices||[]).find(p=>p.symbol_id===symbol.id)?.percent_hundredths||0;
+        const milli=ratios.get(symbol.id+':'+count)??1000;
+        if(price>0&&milli>0)prize=Math.round(bet*count*price*milli/10000000);
+      }
+      if(prize>0&&(!best||prize>best.prize))
+        best={line:index+1,rows:rows.slice(),symbolId:symbol.id,name:symbol.name,
+          reels:count,count,prize};
     }
-    if(best?.prize>0){total+=best.prize;wins.push(best);}
+    if(best){
+      total+=best.prize;
+      if(!Number.isSafeInteger(total))throw Error('Space payout overflow');
+      wins.push(best);
+    }
   }
-  if(!Number.isSafeInteger(total)||total<0)throw Error('Space payout overflow');
   return {total,wins};
 }
 function expandSpaceWild(cells,wildId,scatterId){
