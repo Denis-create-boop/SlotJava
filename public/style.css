@@ -2176,7 +2176,7 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
 .slot-bet-step{
   display:flex;align-items:center;justify-content:center;
   min-width:0;padding:0;
-  font:900 clamp(1.25rem,2vw,1.75rem)/1 inherit;
+  font-family:inherit;font-weight:900;font-size:clamp(1.25rem,2vw,1.75rem);line-height:1;
   color:#ffe7ad;
   border:1px solid rgba(238,190,91,.74);border-radius:10px;
   background:linear-gradient(155deg,#564026,#251a26);
