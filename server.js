@@ -8,6 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
+const { egyptBonusBoard,scoreEgyptBonus } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -121,7 +122,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-layout-fix-20261122"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-art-check-3" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-bonus-lines-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -295,7 +296,8 @@ function firstGamePage(game,req){
   const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
-  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'">'+
+  const selectedEgypt=game.slug==='golden-seven'?(bonus?.selected_symbol_id||0):0;
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
@@ -308,7 +310,11 @@ function firstGamePage(game,req){
     (scatter?'<div class="slot-bonus-intro" id="slot-bonus-intro" hidden aria-live="polite"><strong>SCATTER!</strong><span>БОНУСНАЯ ИГРА</span><b><em id="slot-bonus-intro-count">10</em> бесплатных вращений</b><small>Начальный множитель ×2</small></div>':'')+
     (scatter?'<div class="slot-bonus-math" id="slot-bonus-math" hidden aria-live="polite"><span id="slot-bonus-math-caption">Выигрыш за спин</span><strong id="slot-bonus-math-base">0</strong><div id="slot-bonus-math-multiply" hidden><em>×</em><b id="slot-bonus-math-factor">2</b></div><div id="slot-bonus-math-result" hidden><small>Итого за спин</small><strong id="slot-bonus-math-total">0</strong></div></div>':'')+
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
-    '<div class="reel-columns">'+reels+'</div></div>'+
+    '<div class="reel-columns">'+reels+'</div>'+
+    (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
+    '</div>'+
+    (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
+    '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'></div>':'')+
 
     (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span><span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
@@ -369,6 +375,46 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const layout=gameLayout(game);
     const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
     const active=scatter?getBonusSession(req.user.id,game.id):null;
+    if(active&&game.slug==='golden-seven'){
+      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter?.symbolId);
+      if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
+      let chosen=regular.find(symbol=>symbol.id===active.selected_symbol_id);
+      if(!chosen){
+        chosen=regular[crypto.randomInt(regular.length)];
+        db.prepare('UPDATE game_bonus_sessions SET selected_symbol_id=? WHERE user_id=? AND game_id=?')
+          .run(chosen.id,req.user.id,game.id);
+      }
+      const board=egyptBonusBoard({symbols:regular,selectedId:chosen.id,
+        reels:layout.reels,rows:layout.rows,randomInt:n=>crypto.randomInt(n)});
+      const minimum=db.prepare('SELECT min_reels FROM egypt_symbol_bonus_rules WHERE symbol_id=?').get(chosen.id)?.min_reels||3;
+      const evaluated=scoreEgyptBonus({cells:board.cells,selectedId:chosen.id,
+        minReels:minimum,bet:active.bet,payouts:getPayouts(game.id)});
+      const total=active.bonus_win+evaluated.total;
+      if(!Number.isSafeInteger(total)||total<0)return {error:'Превышен допустимый бонусный выигрыш.'};
+      const remaining=active.remaining-1;
+      let balanceAfter=wallet.balance;
+      if(remaining===0){
+        balanceAfter+=total;
+        if(!Number.isSafeInteger(balanceAfter))return {error:'Превышен допустимый баланс.'};
+        db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?').run(balanceAfter,req.user.id);
+        db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?').run(req.user.id,game.id);
+      }else{
+        db.prepare('UPDATE game_bonus_sessions SET remaining=?,bonus_win=? WHERE user_id=? AND game_id=?')
+          .run(remaining,total,req.user.id,game.id);
+      }
+      const big=settings?.big_win_multiplier_milli??5000;
+      const mega=settings?.mega_win_multiplier_milli??15000;
+      const winTier=evaluated.total>0&&evaluated.total*1000>=active.bet*mega?'mega'
+        :evaluated.total>0&&evaluated.total*1000>=active.bet*big?'big'
+        :evaluated.total>0?'normal':'none';
+      return {mode:'egypt-bonus',cells:board.cells,selectedSymbolId:chosen.id,
+        expandedReels:board.expandedReels,lineWins:evaluated.lineWins,
+        minReels:minimum,matchedReels:evaluated.matchedReels,
+        perLine:evaluated.perLine,total:evaluated.total,
+        baseWin:evaluated.total,bonusRoundWin:evaluated.total,
+        bonusWin:total,remaining,completedBonus:remaining===0,
+        balance:balanceAfter,bet:active.bet,winTier,wins:[]};
+    }
     if(active){
       // Free spins are transacted atomically and have a separate pending
       // balance. No credits can be applied before the final free spin.
@@ -443,12 +489,22 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       :payout>0?'normal':'none';
     const egyptTrigger=game.slug==='golden-seven'&&spin.scatterCount>=3;
     const freeSpins=scatter?freeSpinsFor(spin.scatterCount):0;
+    let selectedEgypt=0;
     if(freeSpins){
-      db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
-        VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
+      if(game.slug==='golden-seven'){
+        const options=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+        if(!options.length)return {error:'Нет символов для бонусной игры Египта.'};
+        selectedEgypt=options[crypto.randomInt(options.length)].id;
+        db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet,selected_symbol_id)
+          VALUES(?,?,?,2,0,?,?)`).run(req.user.id,game.id,freeSpins,wallet.bet,selectedEgypt);
+      }else{
+        db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
+          VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
+      }
     }
     return {...spin,mode:'base',total:payout,balance:updatedBalance,bet:wallet.bet,
-      winTier,freeSpins,egyptTrigger,bonusMultiplier:freeSpins?2:null,
+      winTier,freeSpins,egyptTrigger,selectedSymbolId:selectedEgypt,
+      bonusMultiplier:freeSpins?(game.slug==='golden-seven'?1:2):null,
       bonusWin:freeSpins?0:null,remaining:freeSpins};
   })();
   res.set('Cache-Control','no-store');
