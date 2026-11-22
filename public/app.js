@@ -1162,8 +1162,10 @@
       if(i<steps.length-1){
         stopSpinSound();
         message.textContent='Респин! Выигравшие ячейки замерли, остальные вращаются.';
-        play('spin_sound');
-        if(!quickStopRequested)await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:320));
+        if(!quickStopRequested){
+          play('spin_sound');
+          await new Promise(resolve=>window.setTimeout(resolve,reducedMotion?70:320));
+        }
       }
     }
   }
@@ -1628,10 +1630,14 @@
       if(autoRunning)paintAutoplay();
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
         await animateBonusSteps(result.steps);
+        button.disabled=true;
+        button.classList.remove('is-spin-stoppable');
       }else if(isEgypt&&(result.mode==='base'||result.mode==='egypt-bonus')){
         // Bonus SCATTER can retrigger. It needs the same two-SCATTER
         // anticipation as a normal Egyptian spin.
         await animateEgyptScatterSuspense(result.cells);
+        button.disabled=true;
+        button.classList.remove('is-spin-stoppable');
         if(result.mode==='egypt-bonus'){
           stopSpinSound();
           egyptReelsHighlightReady=true;
@@ -1651,6 +1657,8 @@
           return animateColumn(col,index,target);
         });
         await Promise.all(animations);
+        button.disabled=true;
+        button.classList.remove('is-spin-stoppable');
         if(result.mode==='egypt-bonus'){
           stopSpinSound();
           await animateEgyptExpansion(result);
