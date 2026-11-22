@@ -123,7 +123,6 @@
   const settingsDialog=document.getElementById('slot-settings-dialog');
   const betForm=document.getElementById('slot-bet-form');
   const soundToggle=document.getElementById('slot-sound-toggle');
-  const uploadedMusicToggle=document.getElementById('slot-use-uploaded-music');
   const musicVolumeControl=document.getElementById('slot-music-volume');
   const musicVolumeValue=document.getElementById('slot-music-volume-value');
   let musicVolume=65;
@@ -143,26 +142,11 @@
     });
   }
   let soundEnabled=true;
-  let useUploadedMusic=false;
+  // Administrator-selected soundtracks play automatically when available.
+  // Users can adjust general sound and volume, but not select the music source.
   try {
     soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';
-    // Uploaded soundtrack should be active by default once available.
-    // An explicit user opt-out still takes priority.
-    const uploadedMusicPreference=window.localStorage.getItem('slotjava-use-uploaded-music');
-    useUploadedMusic=uploadedMusicPreference!=='no' && (uploadedMusicPreference==='yes'||!!root.querySelector('[data-sound="music"], [data-sound="bonus_music"]'));
   } catch {}
-  if(uploadedMusicToggle){
-    uploadedMusicToggle.checked=useUploadedMusic;
-    uploadedMusicToggle.addEventListener('change',()=>{
-      useUploadedMusic=uploadedMusicToggle.checked;
-      try {window.localStorage.setItem('slotjava-use-uploaded-music',useUploadedMusic?'yes':'no');} catch {}
-      if(music)music.pause();
-      if(bonusMusic)bonusMusic.pause();
-      if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}
-      updateMusicVolume();
-      try {startBackgroundMusic();} catch(error){console.warn('Music unavailable:',error);}
-    });
-  }
   soundToggle.checked=soundEnabled;
   soundToggle.addEventListener('change',()=>{
     soundEnabled=soundToggle.checked;
@@ -633,7 +617,7 @@
   function startBackgroundMusic(){
     if(!soundEnabled)return;
     const chosenMusic=bonusActive&&bonusMusic?bonusMusic:music;
-    if(useUploadedMusic&&chosenMusic){
+    if(chosenMusic){
       if(music&&music!==chosenMusic&&!music.paused){music.pause();music.currentTime=0;}
       if(bonusMusic&&bonusMusic!==chosenMusic&&!bonusMusic.paused){bonusMusic.pause();bonusMusic.currentTime=0;}
       if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}
