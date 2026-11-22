@@ -366,7 +366,7 @@ function firstGamePage(game,req){
       '<strong>ЗАГРУЗКА</strong>'+
       '<div class="slot-loading-progress" aria-hidden="true"><div id="slot-loading-fill"></div></div></div></div>'+
     backgroundImage('background','slot-full-background')+
-    (game.slug==='golden-seven'?backgroundImage('egypt_bonus_background','slot-bonus-background'):'')+
+    (game.slug==='golden-seven'?backgroundImage('egypt_bonus_background','slot-bonus-background'):game.slug==='lucky-stars'?backgroundImage('space_bonus_background','slot-bonus-background'):'')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
     (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
