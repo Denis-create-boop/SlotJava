@@ -586,7 +586,7 @@
   function highlightWinningSymbols(wins){
     clearWinningGlow();
     for(const win of wins){
-      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels)||win.reels<3)continue;
+      if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels)||win.reels<(isEgypt?2:3))continue;
       const chainLength=Math.min(columns.length,win.reels);
       let prizeTile=null;
       for(let col=0;col<chainLength;col++){
