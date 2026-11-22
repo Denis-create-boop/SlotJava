@@ -56,9 +56,11 @@ function scoreSpaceLines({cells,symbols,bet,payouts,lines=SPACE_LINES,wildId=0,s
 // Only a WILD taking part in an already paid line may expand.
 // A WILD on an unrelated row or on a losing line stays its original size.
 // Scatter on the same reel is preserved both in the score and on screen.
-function expandSpaceWild(cells,wildId,scatterId,wins=[]){
+function expandSpaceWild(cells,wildId,scatterId,wins=[],alreadyExpanded=[]){
   const expanded=cells.slice();
-  const eligible=new Set();
+  // Keep reels activated by earlier winning lines. Their newly expanded cells
+  // can create another winning line that reaches a Wild farther to the right.
+  const eligible=new Set(alreadyExpanded);
   if(!wildId||!Array.isArray(wins))return {cells:expanded,expandedReels:[]};
   for(const win of wins){
     if(!win||win.prize<=0||!Array.isArray(win.rows))continue;
