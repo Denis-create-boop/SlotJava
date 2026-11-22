@@ -2466,3 +2466,60 @@ body:has(.slot-game.slot-theme-space)>header{
   .slot-theme-space #slot-bonus-multiplier.space-multiplier-level-up,
   .slot-theme-space #slot-bonus-plus.is-pop{animation:none}
 }
+
+/* Cosmic Wild fills its reel, but actual SCATTER cells stay visible on top. */
+.slot-theme-space .space-expanded-wild{isolation:isolate}
+.slot-theme-space .space-expanded-wild > img{width:100%;height:100%;object-fit:fill}
+.slot-theme-space .space-wild-scatter-overlay{
+  position:absolute;left:0;right:0;z-index:4;
+  display:flex;align-items:center;justify-content:center;
+  padding:3px 5px;pointer-events:none;
+  background:radial-gradient(ellipse at center,#180c37e8,#1509439c 68%,transparent);
+  box-shadow:inset 0 0 13px #ffe49796;
+}
+.slot-theme-space .space-wild-scatter-overlay .ribbon-tile{
+  width:100%;height:100%;min-height:0;flex:1;
+  border:none;background:transparent;padding:2px;
+}
+.slot-theme-space .space-wild-scatter-overlay .ribbon-tile img{
+  width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 0 9px #ffbf59);
+}
+
+/* A repeat bonus announces the award before the total counter refresh. */
+.slot-theme-space .space-retrigger-announcement[hidden]{display:none!important}
+.slot-theme-space .space-retrigger-announcement{
+  position:absolute;inset:0;z-index:60;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  border:3px solid #ffd75c;border-radius:14px;
+  background:radial-gradient(ellipse at center,#321052f5,#110c34f7 68%,#070a1cfa);
+  box-shadow:inset 0 0 48px #bb64fb73,0 0 30px #ffb94d69;
+}
+.slot-theme-space .space-retrigger-content{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;padding:14px;text-align:center;
+  color:#fff2bc;text-shadow:0 0 18px #edabf4;
+}
+.slot-theme-space .space-retrigger-content strong{
+  font-size:clamp(1.5rem,4vw,3.4rem);color:#ffe890;
+}
+.slot-theme-space .space-retrigger-content span{
+  font-size:clamp(1rem,2.2vw,1.8rem);font-weight:900;
+}
+.slot-theme-space .space-retrigger-content b{
+  font-size:clamp(3rem,8vw,6.5rem);line-height:1;
+  color:#fff7bd;text-shadow:0 0 25px #ffb636,0 0 46px #a156fb;
+}
+.slot-theme-space .space-retrigger-content small{
+  font-size:clamp(.8rem,1.5vw,1.15rem);color:#f5e6ff;
+}
+.slot-theme-space .space-retrigger-announcement.is-showing{
+  animation:space-retrigger-reveal .6s cubic-bezier(.16,.74,.24,1) both;
+}
+@keyframes space-retrigger-reveal{
+  from{opacity:0;transform:scale(.82)}
+  to{opacity:1;transform:scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-space .space-retrigger-announcement.is-showing{animation:none}
+}
