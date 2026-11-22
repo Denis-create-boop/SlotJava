@@ -121,9 +121,9 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=space-multiplier-20261122"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=cosmic-retrigger-20261122"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=space-multiplier-20261122" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=cosmic-retrigger-20261122" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -384,6 +384,9 @@ function firstGamePage(game,req){
   const scatter=getScatterSettings(game.id);
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
+  const cosmicQueuedSpins=game.slug==='lucky-stars'&&bonus
+    ?db.prepare('SELECT COALESCE(SUM(spins),0) AS total FROM space_bonus_pending WHERE user_id=? AND game_id=?')
+      .get(req.user.id,game.id).total:0;
   const egyptChain=game.slug==='golden-seven'&&bonus?getEgyptBonusChain(req.user.id,game.id):null;
   const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
   const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
@@ -433,7 +436,7 @@ function firstGamePage(game,req){
     '':'')+
 
     (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'>'+
-      '<span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
+      '<span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+((bonus?.remaining||0)+cosmicQueuedSpins)+'</strong></span>'+
       (game.slug==='golden-seven'?'':'<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span>')+
       '</div>':'')+
 
