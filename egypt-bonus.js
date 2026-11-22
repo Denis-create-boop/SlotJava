@@ -88,7 +88,7 @@ function egyptLinePrize({symbolId,matches,bet,payouts,linePricesById={}}){
 // Main Egyptian slot: ten fixed paylines, checked LEFT TO RIGHT. A line
 // counts a symbol at most once per reel. Other positions on the same reel
 // are irrelevant. Each line uses its own 2..6 match coefficient.
-function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES}){
+function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES,wildId=0}){
   if(!Array.isArray(cells)||cells.length!==24||!Number.isSafeInteger(bet)||bet<0)
     throw Error('Invalid Egyptian base spin.');
   const byId=new Map(symbols.map(item=>[item.id,item]));
@@ -96,19 +96,24 @@ function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePric
   let total=0;
   for(let lineIndex=0;lineIndex<lines.length;lineIndex++){
     const rows=lines[lineIndex];
-    const symbolId=cells[rows[0]*6];
-    const symbol=byId.get(symbolId);
-    if(!symbol)continue;
-    let count=0;
-    while(count<6&&cells[rows[count]*6+count]===symbolId)count++;
-    const minimum=Number(minReelsById[symbolId])===2?2:3;
-    if(count<minimum)continue;
-    const prize=egyptLinePrize({symbolId,matches:count,bet,payouts,linePricesById});
-    if(prize<=0)continue;
-    total+=prize;
+    // Leading Wild may substitute for any priced ordinary symbol. Pay this
+    // line once, under the highest paying eligible interpretation.
+    let best=null;
+    for(const symbol of symbols){
+      if(symbol.id===wildId)continue;
+      let count=0;
+      while(count<6&&[symbol.id,wildId].includes(cells[rows[count]*6+count]))count++;
+      const minimum=Number(minReelsById[symbol.id])===2?2:3;
+      if(count<minimum)continue;
+      const prize=egyptLinePrize({symbolId:symbol.id,matches:count,bet,payouts,linePricesById});
+      if(prize>0&&(!best||prize>best.prize))
+        best={line:lineIndex+1,rows:rows.slice(),symbolId:symbol.id,name:symbol.name,
+          reels:count,count,prize};
+    }
+    if(!best)continue;
+    total+=best.prize;
     if(!Number.isSafeInteger(total))throw Error('Egypt line win overflow.');
-    wins.push({line:lineIndex+1,rows:rows.slice(),symbolId,name:symbol.name,
-      reels:count,count,prize});
+    wins.push(best);
   }
   return {total,wins};
 }
@@ -116,7 +121,7 @@ function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePric
 // settled board. This avoids one expanding symbol erasing another or a SCATTER.
 // Display expansions sequentially; the payout is the sum across selected
 // symbols and all ten lines, irrespective of adjacent reel positions.
-function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES}){
+function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePricesById={},lines=EGYPT_LINES,wildId=0}){
   if(!Array.isArray(cells)||cells.length!==24)throw Error('Egypt requires a 6x4 board.');
   const distinct=[...new Set(selectedIds)];
   const symbolWins=[];
@@ -124,7 +129,7 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},line
   for(const symbolId of distinct){
     const minimum=Number(minReelsById[symbolId])===2?2:3;
     const landedReels=Array.from({length:6},(_,reel)=>reel).filter(reel=>
-      Array.from({length:4},(_,row)=>cells[row*6+reel]).includes(symbolId));
+      Array.from({length:4},(_,row)=>cells[row*6+reel]).some(id=>id===symbolId||id===wildId));
     const perLine=landedReels.length>=minimum
       ?egyptLinePrize({symbolId,matches:landedReels.length,bet,payouts,linePricesById}):0;
     const qualified=landedReels.length>=minimum&&perLine>0;
