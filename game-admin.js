@@ -180,6 +180,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<button type="submit" class="danger-action" title="Удаление снимет картинку с '+linkedCount+' назначений">Удалить</button></form>'+
         '</div>';
     }).join('');
+    const egyptMinReels=new Map(game.slug==='golden-seven'
+      ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels
+        FROM game_symbols s LEFT JOIN egypt_symbol_bonus_rules r ON r.symbol_id=s.id
+        WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row.min_reels]):[]);
     const symbolItems=symbols.map(symbol=>{
       const isScatter=scatter&&symbol.id===scatter.symbolId;
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
@@ -199,6 +203,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
         '<button class="primary" type="submit">Применить картинку</button></form></div>'+
         (!chosen&&assets.has('symbol_'+symbol.id)?'<p class="hint">Пока используется ранее загруженная картинка символа. Выберите изображение из папки для замены.</p>':'')+
+        (game.slug==='golden-seven'&&!isScatter?'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/egypt-min-reels">'+csrf+
+        '<label>Бонус Египта: выигрыш выбранного символа от <select name="min_reels">'+
+        '<option value="2"'+(egyptMinReels.get(symbol.id)===2?' selected':'')+'>2 барабанов</option>'+
+        '<option value="3"'+(egyptMinReels.get(symbol.id)!==2?' selected':'')+'>3 барабанов</option>'+
+        '</select></label><button class="primary" type="submit">Сохранить правило бонуса</button></form>':'')+
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.</p>'+
         '<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
@@ -298,6 +307,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           const count=index+1;
           return '<label>Ровно '+count+' Scatter — вес<input type="number" min="0" max="100" step="1" name="weight_'+reel+'_'+count+'" value="'+(rule['weight_'+count]??0)+'" required></label>';
         }).join('');
+        if(game.slug==='golden-seven')
+          return '<div class="scatter-rule"><strong>Барабан №'+reel+'</strong>'+
+            '<label>Шанс одного SCATTER, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
+            '<input type="hidden" name="max_'+reel+'" value="1">'+
+            Array.from({length:4},(_,n)=>'<input type="hidden" name="weight_'+reel+'_'+(n+1)+'" value="'+(n===0?100:0)+'">').join('')+
+            '<small>На этом барабане максимум один SCATTER</small></div>';
         return '<div class="scatter-rule"><strong>Барабан №'+reel+'</strong>'+
           '<label>Шанс появления Scatter, %<input type="number" min="0" max="100" step="1" name="chance_'+reel+'" value="'+rule.chance_percent+'" required></label>'+
           '<label>Максимум Scatter на барабане<input type="number" min="0" max="'+layout.rows+'" step="1" name="max_'+reel+'" value="'+rule.max_symbols+'" required></label>'+
@@ -305,7 +320,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       }).join('');
       panel=panelStart('Настройки бонусной игры SCATTER')+
         '<p class="hint">Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.</p>'+
-        '<p class="hint">'+(game.slug==='golden-seven'?'В Египте три и более скарабеев включают заставку бонуса. Механика бесплатных вращений будет настроена позже; пока начислений за бонус нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 или 6 — 20. Максимум один SCATTER на барабан. Перед бонусом случайно выбирается символ. Он расширяется на весь барабан, где выпал, и выигрывает на 10 линиях при наличии на 2 или 3 любых барабанах (по настройке символа). Множителя первой игры здесь нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
@@ -356,6 +371,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const update=db.prepare(`UPDATE game_scatter_reels SET
       chance_percent=?,max_symbols=?,weight_1=?,weight_2=?,weight_3=?,weight_4=?
       WHERE game_id=? AND reel_index=?`);
+    if(game.slug==='golden-seven'){
+      for(const row of changes){
+        row[1]=1;row[2]=100;row[3]=0;row[4]=0;row[5]=0;
+      }
+    }
     db.transaction(()=>{for(const row of changes)update.run(...row);})();
     res.redirect(sectionUrl(id,'scatter')+'&saved=1');
   });
@@ -398,6 +418,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM game_symbols WHERE game_id=?').get(id).n;
     db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
     res.redirect(sectionUrl(id,'symbols'));
+  });
+  app.post('/admin/games/:id/symbols/:symbolId/egypt-min-reels',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId),game=id?gameById(id):null;
+    if(!game||game.slug!=='golden-seven'||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
+    const minimum=Number(req.body?.min_reels);
+    if(![2,3].includes(minimum))return show(req,res,'Укажите 2 или 3 барабана.',true,'symbols');
+    db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels) VALUES(?,?)
+      ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels`).run(symbolId,minimum);
+    res.redirect(sectionUrl(id,'symbols')+'&saved=1');
   });
   app.post('/admin/games/:id/library',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
     const id=gameId(req),name=typeof req.body.name==='string'?req.body.name.trim():'';
