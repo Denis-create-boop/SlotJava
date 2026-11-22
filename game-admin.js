@@ -199,8 +199,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         const reel=i+(game.slug==='golden-seven'?2:3);
         if(game.slug==='golden-seven'){
           const price=egyptLinePrices.get(symbol.id+':'+reel)??0;
-          return '<label class="payout-input">За '+reel+' символа(ов) на линии, % от ставки'+
-            '<input type="number" min="0" max="10000" step="0.00001" name="r_'+reel+'" value="'+(price/1000000).toFixed(5)+'" required></label>';
+          return '<label class="payout-input">За '+reel+' символа(ов) на линии, × от ставки'+
+            '<input type="number" min="0" max="10000" step="0.00000001" name="r_'+reel+'" value="'+(price/100000000).toFixed(8)+'" required></label>';
         }
         const ratio=multipliers.get(reel)??1000;
         return '<label class="payout-input">Цепочка до барабана №'+reel+', ×'+
@@ -226,7 +226,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: одна таблица выплат для обычной и бонусной игры. Задайте самостоятельную цену за 2, 3, 4, 5 и 6 совпавших барабанов. В обычной игре совпадения подряд слева направо на одной из 10 линий. В бонусе выбранный символ расширяется и совпавшие барабаны могут быть несоседними. Каждая выигрышная линия оплачивается отдельно.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
         (game.slug==='golden-seven'?'':'<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>')+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указано 5% = 5 очков за каждую выигрышную линию. Если сыграли все 10 линий — всего 50 очков. Ноль отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все 10 линий — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
         '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">'+(game.slug==='golden-seven'?'Сохранить выплаты за 2–6 символов':'Сохранить цену и множители')+'</button></form>')+
         (isScatter?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
@@ -542,9 +542,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const entries=[];
       for(let count=2;count<=6;count++){
         const raw=req.body?.['r_'+count];
-        if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,5})?$/.test(raw)||Number(raw)>10000)
-          return show(req,res,'Цена за 2–6 символов должна быть от 0 до 10000% с точностью до 0.00001%.',true,'symbols');
-        entries.push([count,Math.round(Number(raw)*1000000)]);
+        if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,8})?$/.test(raw)||Number(raw)>10000)
+          return show(req,res,'Множитель за 2–6 символов должен быть от ×0 до ×10000 с точностью до 0.00000001.',true,'symbols');
+        // Stored as micro-percent (legacy column name); 1× = 100000000.
+        entries.push([count,Math.round(Number(raw)*100000000)]);
       }
       const setPrice=db.prepare(`INSERT INTO egypt_line_prices(symbol_id,matches,percent_millionths) VALUES(?,?,?)
         ON CONFLICT(symbol_id,matches) DO UPDATE SET percent_millionths=excluded.percent_millionths`);
