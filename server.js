@@ -119,7 +119,7 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-layout-fix-20261122"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
     '<footer>SlotJava · браузерная версия в разработке</footer><script src="/static/app.js" defer></script></body></html>';
 }
