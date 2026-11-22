@@ -771,7 +771,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const entries=[];
       for(let count=2;count<=5;count++){
         const raw=req.body?.['r_'+count];
-        if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,3})?$/.test(raw)||Number(raw)>1000)
+        if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
           return show(req,res,'Множитель должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
         entries.push([count,Math.round(Number(raw)*1000)]);
       }
