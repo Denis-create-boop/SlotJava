@@ -1408,7 +1408,7 @@
             retriggerCount:0,pendingBonuses:0});
           paintEgyptSelection();
           winDisplay.textContent='';
-          message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
+          message.textContent='Бонусная игра! '+result.freeSpins+' бесплатных вращений. Выбранный символ подсвечен сверху.';
         }else{
           updateBonus(true,result.freeSpins,2,0);
           message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
