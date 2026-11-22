@@ -2127,3 +2127,20 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
 .slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-inactive img{
   filter:grayscale(.46) brightness(.68)!important;
 }
+
+
+/* Separate Egyptian free-spin background. The original scene is unchanged
+   in normal spins; the bonus image overlays it only while free spins run. */
+.slot-theme-egypt>.slot-bonus-background{
+  position:absolute;inset:0;
+  width:100%;height:100%;object-fit:cover;object-position:center;
+  z-index:-1;pointer-events:none;
+  opacity:0;visibility:hidden;
+  transition:opacity .55s ease,visibility .55s;
+}
+.slot-theme-egypt.is-bonus-active>.slot-bonus-background{
+  opacity:1;visibility:visible;
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt>.slot-bonus-background{transition:none}
+}
