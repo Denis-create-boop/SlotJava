@@ -643,6 +643,37 @@ db.prepare(`INSERT OR IGNORE INTO egypt_line_multipliers(symbol_id,matches,multi
   JOIN games g ON g.id=s.game_id
   WHERE g.slug='golden-seven' AND m.reel_count BETWEEN 3 AND 6`).run();
 
+// The Egypt paytable has ONE direct price for each symbol and match count.
+// Store micro-percent units (1,000,000 = 1% of stake), preserving the exact
+// old unit-price × reel-coefficient payout when upgrading existing databases.
+// INSERT OR IGNORE never overwrites prices subsequently edited in admin.
+db.exec(`CREATE TABLE IF NOT EXISTS egypt_line_prices (
+  symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 6),
+  percent_millionths INTEGER NOT NULL CHECK(percent_millionths BETWEEN 0 AND 10000000000000),
+  PRIMARY KEY(symbol_id,matches)
+)`);
+{
+  const game=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(game){
+    const symbols=db.prepare('SELECT id FROM game_symbols WHERE game_id=?').all(game.id);
+    const original=db.prepare('SELECT percent_hundredths FROM symbol_unit_prices WHERE symbol_id=?');
+    const coeff=db.prepare('SELECT multiplier_milli FROM egypt_line_multipliers WHERE symbol_id=? AND matches=?');
+    const legacy=db.prepare('SELECT multiplier_milli FROM symbol_reel_multipliers WHERE symbol_id=? AND reel_count=?');
+    const insert=db.prepare('INSERT OR IGNORE INTO egypt_line_prices(symbol_id,matches,percent_millionths) VALUES(?,?,?)');
+    db.transaction(()=>{
+      for(const item of symbols){
+        const base=original.get(item.id)?.percent_hundredths||0;
+        for(let matches=2;matches<=6;matches++){
+          const multiplier=coeff.get(item.id,matches)?.multiplier_milli??
+            legacy.get(item.id,matches)?.multiplier_milli??1000;
+          insert.run(item.id,matches,base*multiplier*10);
+        }
+      }
+    })();
+  }
+}
+
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
