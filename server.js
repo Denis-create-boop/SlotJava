@@ -120,9 +120,9 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-scatter-suspense-v1"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-suspense-portrait-v2"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-scatter-suspense-v1" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-suspense-portrait-v2" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -325,7 +325,7 @@ function firstGamePage(game,req){
     (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
     '</div>'+
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
-    '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'></div>':'')+
+    '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'><div class="egypt-selected-portrait" id="egypt-selected-portrait" aria-hidden="true"></div><div class="egypt-selected-info"><small>ВЫБРАННЫЙ СИМВОЛ БОНУСА</small><strong id="egypt-selected-name"></strong><span>10 призовых линий</span></div></div>':'')+
 
     (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span><span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
@@ -400,6 +400,12 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         reels:layout.reels,rows:layout.rows,minReels:minimum,randomInt:n=>crypto.randomInt(n)});
       const evaluated=scoreEgyptBonus({cells:board.cells,selectedId:chosen.id,
         minReels:minimum,bet:active.bet,payouts:getPayouts(game.id)});
+      if(evaluated.total===0){
+        // Zero-payout lines must not expand the symbol or show paylines.
+        board.cells=board.initialCells.slice();
+        board.expandedReels=[];
+        evaluated.lineWins=[];
+      }
       const total=active.bonus_win+evaluated.total;
       if(!Number.isSafeInteger(total)||total<0)return {error:'Превышен допустимый бонусный выигрыш.'};
       const remaining=active.remaining-1;
