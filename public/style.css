@@ -1405,13 +1405,15 @@ header nav .header-user-balance{
   to{filter:brightness(1.55);border-color:#fff0b2}
 }
 @keyframes egypt-suspense-fast-spin{
-  from{transform:translateY(0)}
-  to{transform:translateY(-50%)}
+  /* Real reels move from a negative offset toward zero (downwards).
+     Keep the two-copy suspense strip moving in that same direction. */
+  from{transform:translateY(-50%)}
+  to{transform:translateY(0)}
 }
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt .reel-column.egypt-suspense-reel,
   .slot-theme-egypt .egypt-suspense-strip{animation:none}
-  .slot-theme-egypt .egypt-suspense-strip{transform:translateY(0)}
+  .slot-theme-egypt .egypt-suspense-strip{transform:translateY(-50%)}
 }
 
 
@@ -1924,4 +1926,26 @@ body>.egypt-payline-overlay .egypt-payline-count{
 }
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt .egypt-round-prize.is-revealing{animation:none}
+}
+
+
+/* Reliable Egypt bonus payoff overlay: an independent canvas drawn in
+   viewport coordinates, immune to cabinet clipping and reel stacking. */
+body>.egypt-lines-canvas{
+  position:fixed;inset:0;
+  z-index:2147483000;
+  pointer-events:none;
+  width:100vw;height:100vh;
+}
+body>.egypt-line-award{
+  position:fixed;z-index:2147483001;
+  max-width:calc(100vw - 16px);
+  padding:9px 16px;
+  border:2px solid #ffe391;border-radius:12px;
+  color:#fff9ca;background:linear-gradient(120deg,#6e3b15,#281321);
+  text-shadow:0 0 9px #ffc047;
+  box-shadow:0 0 18px #f4af49aa,inset 0 0 9px #ffda763c;
+  font-size:clamp(.9rem,1.5vw,1.1rem);font-weight:950;
+  letter-spacing:.02em;text-align:center;
+  pointer-events:none;
 }
