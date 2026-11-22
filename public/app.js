@@ -1066,10 +1066,11 @@
         const card=document.createElement('div');
         card.className='egypt-symbol-strip-item';
         const selected=egyptActiveIds.includes(symbol.id);
-        const bright=selected&&(!focusId||focusId===symbol.id);
+        const bright=selected&&focusId===symbol.id;
         card.classList.toggle('is-active',bright);
-        card.classList.toggle('is-dimmed',!bright);
-        card.setAttribute('aria-label',symbol.name+(selected?' — играет':' — не выбран'));
+        card.classList.toggle('is-selected',selected&&!bright);
+        card.classList.toggle('is-dimmed',!selected);
+        card.setAttribute('aria-label',symbol.name+(bright?' — выигрывает':selected?' — выбран для бонуса':' — не выбран'));
         card.append(makeTile(symbol.id));
         const title=document.createElement('small');
         title.textContent=symbol.name;
@@ -1091,13 +1092,12 @@
   }
   paintEgyptSelection();
   async function animateEgyptSelection(id){
-    if(!id||!egyptPicker||!egyptPickerPortrait||!egyptPickerName)return;
+    if(!id||!egyptPicker||!egyptPickerPortrait)return;
     const pool=regularDefinitions.filter(item=>!egyptActiveIds.includes(item.id));
     if(!pool.length)return;
     egyptPicker.hidden=false;
     const render=item=>{
       egyptPickerPortrait.replaceChildren(makeTile(item.id));
-      egyptPickerName.textContent=item.name;
     };
     // Cycle ONLY through unselected symbols; the old bonus symbols cannot be
     // picked again. The server has already selected a random available ID.
@@ -1132,18 +1132,16 @@
     for(const item of wins){
       shown++;
       resetBoard();
-      paintEgyptSelection(item.symbolId);
-      const name=symbols.get(item.symbolId)?.name||'Символ';
-      // Always introduce every selected symbol—even when its result is zero—
-      // so a second or third symbol is never silently skipped.
-      message.textContent='Бонусный символ '+shown+' из '+activeIds.length+': '+name+
-        '. Выпало на '+item.matchedReels+' барабанах.';
-      await delay(reducedMotion?120:550);
       if(item.prize<=0||!item.expandedReels?.length){
-        // No zero-win banner or zero amount: just move to the next symbol.
-        await delay(reducedMotion?120:400);
+        // Symbols without a payable line remain softly marked only in the
+        // upper ribbon; no bright focus or named announcement is shown.
         continue;
       }
+      paintEgyptSelection(item.symbolId);
+      const name=symbols.get(item.symbolId)?.name||'Символ';
+      message.textContent='Выигрышный символ '+shown+' из '+activeIds.length+
+        ': '+item.matchedReels+' барабанов.';
+      await delay(reducedMotion?120:450);
       for(const reel of item.expandedReels){
         const col=columns[reel];
         if(!col)continue;
