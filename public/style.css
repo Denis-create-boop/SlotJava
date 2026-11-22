@@ -2351,3 +2351,34 @@ transition:background .12s,box-shadow .12s}
   }
   .slot-theme-space .slot-auto-trigger.spin-round{width:47px;height:47px}
 }
+
+/* Cosmic overall artwork: full browser viewport, independent of reel size.
+   Keep it behind the panel, without creating page scroll. */
+.slot-page-background{
+  position:fixed;
+  inset:0;
+  display:block;
+  width:100vw;
+  height:100dvh;
+  max-width:none;
+  object-fit:cover;
+  object-position:center center;
+  pointer-events:none;
+  z-index:0;
+}
+body:has(.slot-game.slot-theme-space)>main{
+  position:relative;
+  isolation:isolate;
+}
+body:has(.slot-game.slot-theme-space)>main>.slot-game.slot-theme-space{
+  position:relative;
+  z-index:1;
+  background:linear-gradient(150deg,rgba(8,12,32,.35),rgba(8,12,30,.48));
+}
+body:has(.slot-game.slot-theme-space)>header{
+  position:relative;
+  z-index:2;
+}
+@media(max-width:700px){
+  .slot-page-background{height:100dvh;}
+}
