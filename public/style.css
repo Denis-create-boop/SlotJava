@@ -1348,3 +1348,26 @@ header nav .header-user-balance{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt .reel-column.egypt-expanded-reel{animation:none}
 }
+
+.slot-theme-egypt .reel-column.egypt-expanding-reel .ribbon-tile{
+  animation:egypt-expansion-pop .48s cubic-bezier(.22,.75,.28,1) both
+}
+@keyframes egypt-expansion-pop{
+  0%{opacity:.25;transform:scale(.55);filter:brightness(1.8)}
+  70%{opacity:1;transform:scale(1.08)}
+  100%{opacity:1;transform:scale(1);filter:brightness(1)}
+}
+.egypt-lines-gallery{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:12px;margin:16px 0 20px
+}
+.egypt-line-card{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:10px;border:1px solid #9e8149;border-radius:12px;
+  background:linear-gradient(140deg,#37291d,#1b1623)
+}
+.egypt-line-card strong{color:#ffe3a5}
+.egypt-line-card svg{width:100%;height:auto;max-height:120px}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt .reel-column.egypt-expanding-reel .ribbon-tile{animation:none}
+}
