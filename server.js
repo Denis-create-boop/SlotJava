@@ -120,7 +120,7 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-bonus-lines-canvas-v5"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-win-overlay-fixed-v1"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
     '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=loader-simple-v1" defer></script></body></html>';
 }
@@ -336,7 +336,9 @@ function firstGamePage(game,req){
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
     '<div class="reel-columns">'+reels+'</div>'+
     (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
-    '</div>'+
+    (game.slug==='golden-seven'?'<div class="egypt-round-prize" id="egypt-round-prize" hidden role="status" aria-live="polite">'+
+      '<span>ВЫИГРЫШ ЗА ВРАЩЕНИЕ</span><strong id="egypt-round-prize-value">—</strong>'+
+      '<small>Всего за бонус: <b id="egypt-round-prize-cumulative">'+(bonus?.bonus_win||0)+'</b></small></div>':'')+    '</div>'+
 
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
     '':'')+
@@ -345,9 +347,7 @@ function firstGamePage(game,req){
       '<span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
       (game.slug==='golden-seven'?'':'<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span>')+
       '</div>':'')+
-    (game.slug==='golden-seven'?'<div class="egypt-round-prize" id="egypt-round-prize" hidden role="status" aria-live="polite">'+
-      '<span>ВЫИГРЫШ ЗА ВРАЩЕНИЕ</span><strong id="egypt-round-prize-value">—</strong>'+
-      '<small>Всего за бонус: <b id="egypt-round-prize-cumulative">'+(bonus?.bonus_win||0)+'</b></small></div>':'')+
+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
