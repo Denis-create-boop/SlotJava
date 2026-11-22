@@ -11,6 +11,7 @@ fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
 const assetTypes={
   background:{label:'Фон игрового окна',kind:'image'},
   egypt_bonus_background:{label:'Фон бонусной игры «Египет»',kind:'image'},
+  space_bonus_background:{label:'Фон бонусной игры «Космическая одиссея»',kind:'image'},
   space_expanding_wild:{label:'Космос: один высокий WILD на три ячейки',kind:'image'},
   field_background:{label:'Общий фон поля с барабанами',kind:'image'},
   cells_background:{label:'Общий фон всех ячеек с символами',kind:'image'},
@@ -109,7 +110,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       .get(gameId,imageId);
   }
   function assetTab(key){
-    if(key==='background'||key==='logo'||key==='bonus_frame'||key==='egypt_bonus_background')return 'background';
+    if(key==='background'||key==='logo'||key==='bonus_frame'||key==='egypt_bonus_background'||key==='space_bonus_background')return 'background';
     if(key==='space_expanding_wild')return 'symbols';
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
@@ -185,6 +186,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           '<button type="submit">Переименовать</button></form>'+
         '<div class="library-quick-actions">'+
         quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
+        (game.slug==='lucky-stars'?quickAssign(['space_bonus_background','Фон космической бонуски']):'')+
         (game.slug==='lucky-stars'?quickAssign(['space_expanding_wild','На весь барабан WILD']):'')+
         '</div>'+
         '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/replace" enctype="multipart/form-data">'+csrf+
@@ -302,8 +304,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
     if(activeTab==='background')panel=panelStart('Изменение фона')+
-      '<p class="hint">'+(game.slug==='golden-seven'?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
-      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:['background','logo'])+'</div></section>';
+      '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div></section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div></section>';
