@@ -797,6 +797,30 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
   db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
 }
 
+// Egyptian Wild: provide a visible replaceable image-library item and
+// attach it to the protected Wild symbol. Replacing this item in the image
+// library immediately changes the reel symbol too. Existing choices are
+// intentionally never overwritten.
+{
+  const egypt=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(egypt){
+    const wild=db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(egypt.id);
+    if(wild){
+      const pathname='/static/images/egypt/wild-placeholder.svg';
+      const register=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+      register.run(egypt.id,'WILD — Египет (замените картинку)',pathname);
+      const picture=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?')
+        .get(egypt.id,pathname);
+      const linked=db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?').get(wild.symbol_id);
+      const uploaded=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?')
+        .get(egypt.id,'symbol_'+wild.symbol_id);
+      if(picture&&!linked&&!uploaded)
+        db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)')
+          .run(wild.symbol_id,picture.id);
+    }
+  }
+}
+
 // Synchronize legacy default Cosmic symbol names with already selected
 // library artwork once. Preserve custom symbol names, Wild, Scatter and payouts.
 {
