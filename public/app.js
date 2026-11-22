@@ -47,8 +47,10 @@
   const bonusFinishTotal=document.getElementById('slot-bonus-finish-total');
   const spinLabel=document.getElementById('slot-spin-label');
   let bonusActive=root.dataset.bonusActive==='1';
+  let audioReady=false;
   bonusFinish?.querySelector('button')?.addEventListener('click',()=>{bonusFinish.hidden=true;});
   function updateBonus(active,remaining=0,multiplier=2,total=0){
+    const bonusMusicChanged=bonusActive!==active;
     bonusActive=active;
     root.classList.toggle('is-bonus-active',active);
     if(bonusTop)bonusTop.hidden=!active;
@@ -61,6 +63,7 @@
     if(select)select.disabled=active;
     const saveBet=document.querySelector('#slot-bet-form button[type="submit"]');
     if(saveBet)saveBet.disabled=active;
+    if(audioReady&&bonusMusicChanged)startBackgroundMusic();
   }
   updateBonus(bonusActive,
     Number(bonusRemaining?.textContent)||0,
@@ -111,6 +114,7 @@
       useUploadedMusic=uploadedMusicToggle.checked;
       try {window.localStorage.setItem('slotjava-use-uploaded-music',useUploadedMusic?'yes':'no');} catch {}
       if(music)music.pause();
+      if(bonusMusic)bonusMusic.pause();
       if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}
       updateMusicVolume();
       try {startBackgroundMusic();} catch(error){console.warn('Music unavailable:',error);}
@@ -171,6 +175,7 @@
   let ambientGain=null;
   function updateMusicVolume(){
     if(music)music.volume=Math.min(1,musicVolume/100);
+    if(bonusMusic)bonusMusic.volume=Math.min(1,musicVolume/100);
     if(ambientGain&&audioContext){
       ambientGain.gain.setTargetAtTime(soundEnabled&&!useUploadedMusic?musicVolume/100:0,audioContext.currentTime,.12);
     }
@@ -252,17 +257,26 @@
     try{audio.currentTime=0;const p=audio.play();if(p?.catch)p.catch(()=>{});}catch{}
   }
   const music=sound('music');
+  const bonusMusic=sound('bonus_music');
   if(music)music.loop=true;
+  if(bonusMusic)bonusMusic.loop=true;
+  audioReady=true;
   updateMusicVolume();
   const spinningAudio=sound('spin_sound');
   if(spinningAudio){spinningAudio.loop=true;spinningAudio.volume=.8;}
   function startBackgroundMusic(){
     if(!soundEnabled)return;
-    if(music&&useUploadedMusic){
-      if(music.paused)try{const promise=music.play();if(promise?.catch)promise.catch(()=>{});}catch{}
+    const chosenMusic=bonusActive&&bonusMusic?bonusMusic:music;
+    if(useUploadedMusic&&chosenMusic){
+      if(music&&music!==chosenMusic&&!music.paused){music.pause();music.currentTime=0;}
+      if(bonusMusic&&bonusMusic!==chosenMusic&&!bonusMusic.paused){bonusMusic.pause();bonusMusic.currentTime=0;}
+      if(ambientMusicTimer!==null){window.clearInterval(ambientMusicTimer);ambientMusicTimer=null;}
+      if(ambientGain&&audioContext)ambientGain.gain.setTargetAtTime(0,audioContext.currentTime,.12);
+      if(chosenMusic.paused)try{const promise=chosenMusic.play();if(promise?.catch)promise.catch(()=>{});}catch{}
       return;
     }
     if(music&&!music.paused)music.pause();
+    if(bonusMusic&&!bonusMusic.paused)bonusMusic.pause();
     if(!classicSounds||ambientMusicTimer!==null)return;
     // Updated built-in soundtrack: dark minor-key bass, chords and guitar.
     // Audio starts after user interaction; sounds are synthesized, not borrowed.
