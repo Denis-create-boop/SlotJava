@@ -85,7 +85,7 @@ function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},lineMult
 // settled board. This avoids one expanding symbol erasing another or a SCATTER.
 // Display expansions sequentially; the payout is the sum across selected
 // symbols and all ten lines, irrespective of adjacent reel positions.
-function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePercentById={},lineMultipliersById={}}){
+function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},lineMultipliersById={}}){
   if(!Array.isArray(cells)||cells.length!==24)throw Error('Egypt requires a 6x4 board.');
   const distinct=[...new Set(selectedIds)];
   const symbolWins=[];
@@ -94,9 +94,8 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},line
     const minimum=Number(minReelsById[symbolId])===2?2:3;
     const landedReels=Array.from({length:6},(_,reel)=>reel).filter(reel=>
       Array.from({length:4},(_,row)=>cells[row*6+reel]).includes(symbolId));
-    const price=payouts.prices.find(row=>row.symbol_id===symbolId)?.percent_hundredths||0;
-    const configuredLinePrice=linePercentById[symbolId];
-    const linePrice=configuredLinePrice===null||configuredLinePrice===undefined?price:configuredLinePrice;
+    // Same symbol price and 2–6 match coefficient as the regular Egypt game.
+    const linePrice=payouts.prices.find(row=>row.symbol_id===symbolId)?.percent_hundredths||0;
     const milli=lineMultipliersById[symbolId+':'+landedReels.length]??
       payouts.multipliers.find(row=>row.symbol_id===symbolId&&row.reel_count===landedReels.length)?.multiplier_milli??1000;
     const perLine=landedReels.length>=minimum&&linePrice>0&&milli>0
