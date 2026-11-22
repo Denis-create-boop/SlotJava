@@ -20,18 +20,25 @@
     insufficientTimer=window.setTimeout(()=>{insufficientOverlay.hidden=true;insufficientTimer=null;},3900);
   }
 
+  const bigWinHome=bigWinOverlay?.parentElement;
   let bigWinTimer=null;
   function hideBigWin(){
     if(bigWinTimer!==null){window.clearTimeout(bigWinTimer);bigWinTimer=null;}
     bigWinOverlay.hidden=true;
-    bigWinOverlay.classList.remove('is-visible','is-mega');
+    bigWinOverlay.classList.remove('is-visible','is-mega','is-egypt-mega');
     bigWinLabel.textContent='';
+    if(bigWinHome&&bigWinOverlay.parentElement!==bigWinHome)
+      bigWinHome.append(bigWinOverlay);
   }
   function showBigWin(tier){
     hideBigWin();
     if(tier!=='big'&&tier!=='mega')return;
-    bigWinLabel.textContent=tier==='mega'?'Очень крупный выигрыш!':'Крупный выигрыш!';
+    bigWinLabel.textContent=tier==='mega'?'ОЧЕНЬ КРУПНЫЙ ВЫИГРЫШ!':'КРУПНЫЙ ВЫИГРЫШ!';
     bigWinOverlay.classList.toggle('is-mega',tier==='mega');
+    if(root.classList.contains('slot-theme-egypt')&&tier==='mega'){
+      document.body.append(bigWinOverlay);
+      bigWinOverlay.classList.add('is-egypt-mega');
+    }
     bigWinOverlay.hidden=false;
     bigWinOverlay.classList.add('is-visible');
     bigWinTimer=window.setTimeout(hideBigWin,3800);
@@ -459,6 +466,38 @@
     }
   }
 
+  // Original double "BOOM—BOOM" impact for the Egyptian mega-win.
+  // Works without any uploaded audio; respects the sound toggle.
+  function playEgyptMegaBoom(){
+    if(!soundEnabled||!root.classList.contains('slot-theme-egypt'))return;
+    try{
+      const ctx=getAudioContext();
+      if(!ctx)return;
+      for(const offset of [0,.42]){
+        const at=ctx.currentTime+.02+offset;
+        const bass=ctx.createOscillator(),volume=ctx.createGain();
+        bass.type='sine';
+        bass.frequency.setValueAtTime(130,at);
+        bass.frequency.exponentialRampToValueAtTime(32,at+.38);
+        volume.gain.setValueAtTime(.0001,at);
+        volume.gain.exponentialRampToValueAtTime(.22,at+.016);
+        volume.gain.exponentialRampToValueAtTime(.0001,at+.55);
+        bass.connect(volume).connect(ctx.destination);
+        bass.start(at);bass.stop(at+.56);
+        const duration=.35,buffer=ctx.createBuffer(1,Math.floor(ctx.sampleRate*duration),ctx.sampleRate);
+        const data=buffer.getChannelData(0);
+        for(let i=0;i<data.length;i++)
+          data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,2);
+        const noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+        noise.buffer=buffer;filter.type='lowpass';filter.frequency.value=380;
+        gain.gain.setValueAtTime(.0001,at);
+        gain.gain.exponentialRampToValueAtTime(.12,at+.012);
+        gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        noise.connect(filter).connect(gain).connect(ctx.destination);
+        noise.start(at);noise.stop(at+duration);
+      }
+    }catch(error){console.warn('Mega boom unavailable:',error);}
+  }
   function play(name){
     if(!soundEnabled)return;
     const audio=sound(name);
@@ -1066,11 +1105,13 @@
         const card=document.createElement('div');
         card.className='egypt-symbol-strip-item';
         const selected=egyptActiveIds.includes(symbol.id);
-        const bright=selected&&focusId===symbol.id;
+        // Every selected symbol stays brightly lit in the top ribbon; focus
+        // only determines which reel symbols glow most during payout.
+        const bright=selected;
         card.classList.toggle('is-active',bright);
-        card.classList.toggle('is-selected',selected&&!bright);
+        card.classList.toggle('is-selected',false);
         card.classList.toggle('is-dimmed',!selected);
-        card.setAttribute('aria-label',symbol.name+(bright?' — выигрывает':selected?' — выбран для бонуса':' — не выбран'));
+        card.setAttribute('aria-label',symbol.name+(selected?' — выбран для бонуса':' — не выбран'));
         card.append(makeTile(symbol.id));
         const title=document.createElement('small');
         title.textContent=symbol.name;
@@ -1203,9 +1244,9 @@
           if(col===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
         });
         ctx.lineCap='round';ctx.lineJoin='round';
-        ctx.strokeStyle='#28100b';ctx.lineWidth=13;ctx.stroke();
+        ctx.strokeStyle='#28100b';ctx.lineWidth=8;ctx.stroke();
         ctx.strokeStyle=win.line%2?'#ffe667':'#6df5ff';
-        ctx.lineWidth=7;ctx.shadowColor='#ffce56';ctx.shadowBlur=15;ctx.stroke();
+        ctx.lineWidth=4;ctx.shadowColor='#ffce56';ctx.shadowBlur=15;ctx.stroke();
         ctx.shadowBlur=0;
         label.textContent='ЛИНИЯ '+win.line+' / 10  ·  +'+result.perLine+' очков';
         label.style.left=Math.max(8,Math.min(width-260,coords[0].left+8))+'px';
@@ -1415,6 +1456,16 @@
             ' бесплатных вращений. Начальный множитель ×2!';
         }
       }else if(result.mode==='egypt-bonus'){
+        if(tier==='big'||tier==='mega'){
+          // The configured admin thresholds apply to each FREE spin too.
+          // Celebrate only after its selected symbols and 10-line awards
+          // have been presented, before the retrigger/next-series notice.
+          showBigWin(tier);
+          play(tier==='mega'?'mega_win_sound':'big_win_sound');
+          if(tier==='mega')playEgyptMegaBoom();
+          await delay(tier==='mega'?3700:2200);
+          hideBigWin();
+        }
         egyptActiveIds=(result.selectedSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
         if(egyptActiveIds.length)egyptChosenId=egyptActiveIds[egyptActiveIds.length-1];
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
@@ -1474,7 +1525,8 @@
       }
       if(result.total>0){
         // Large bonus wins already played their fanfare before multiplication.
-        const announcedBonus=result.mode==='bonus'&&(tier==='big'||tier==='mega');
+        const announcedBonus=(result.mode==='bonus'||result.mode==='egypt-bonus')&&
+          (tier==='big'||tier==='mega');
         if(!announcedBonus){
           const soundKey=tier==='mega'?'mega_win_sound':tier==='big'?'big_win_sound':'win_sound';
           play(sound(soundKey)?soundKey:'win_sound');
