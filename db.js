@@ -797,6 +797,35 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
   db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
 }
 
+// Synchronize legacy default Cosmic symbol names with already selected
+// library artwork once. Preserve custom symbol names, Wild, Scatter and payouts.
+{
+  const flag='cosmic_default_symbol_names_from_images_v1';
+  if(!db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag)){
+    const game=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
+    if(game){
+      const defaultNames=new Set(['Ракета','Сатурн','Астронавт','Галактика',
+        'Луна','Спутник','Комета','Звезда','НЛО','Земля']);
+      const rows=db.prepare(`SELECT s.id,s.name,l.name AS picture_name
+        FROM game_symbols s
+        JOIN game_symbol_images link ON link.symbol_id=s.id
+        JOIN game_image_library l ON l.id=link.library_image_id AND l.game_id=s.game_id
+        WHERE s.game_id=? AND NOT EXISTS
+          (SELECT 1 FROM game_wild_symbols w WHERE w.game_id=s.game_id AND w.symbol_id=s.id)
+          AND NOT EXISTS
+          (SELECT 1 FROM game_scatter_symbols sc WHERE sc.game_id=s.game_id AND sc.symbol_id=s.id)`).all(game.id);
+      const update=db.prepare('UPDATE game_symbols SET name=? WHERE id=? AND game_id=?');
+      db.transaction(()=>{
+        for(const row of rows){
+          const picture=row.picture_name?.trim();
+          if(defaultNames.has(row.name)&&picture&&picture.length<=60&&picture!==row.name)
+            update.run(picture,row.id,game.id);
+        }
+        db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+      })();
+    }
+  }
+}
 // Built-in Cosmic Odyssey art is registered once and remains editable in the image library.
 // Re-running migrations never overwrites an administrator-selected symbol picture.
 {
