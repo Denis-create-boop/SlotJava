@@ -329,11 +329,13 @@ function firstGamePage(game,req){
     '</div>'+
 
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
-    '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'><div class="egypt-selected-portrait" id="egypt-selected-portrait" aria-hidden="true"></div><div class="egypt-selected-info"><small>ВЫБРАННЫЙ СИМВОЛ БОНУСА</small><strong id="egypt-selected-name"></strong><span>10 призовых линий</span></div></div>':'')+
+    '':'')+
 
     (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений осталось: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
       (game.slug==='golden-seven'?'<span>Сыграно: <strong id="egypt-bonus-played">'+(egyptChain?.played_current||0)+'</strong> / <strong id="egypt-bonus-series-total">'+(egyptChain?.current_total||bonus?.remaining||0)+'</strong></span>'+
       '<span>Серия № <strong id="egypt-bonus-series">'+(egyptChain?.series_number||1)+'</strong></span>'+
+      '<span>Сыграно всего: <strong id="egypt-bonus-played-total">'+(egyptChain?.played_total||0)+'</strong></span>'+
+      '<span>Осталось всего: <strong id="egypt-bonus-remaining-total">'+((bonus?.remaining||0)+(egyptChain?.queue||[]).reduce((sum,item)=>sum+item.free_spins,0))+'</strong></span>'+
       '<span>Ретриггеров: <strong id="egypt-bonus-retriggers">'+(egyptChain?.retrigger_count||0)+'</strong></span>'+
       '<span>В очереди: <strong id="egypt-bonus-queue">'+(egyptChain?.queue.length||0)+'</strong></span>':'')+
       '<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
@@ -500,6 +502,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         total:round.total,baseWin:round.total,bonusRoundWin:round.total,
         bonusWin:accumulated,remaining:nextRemaining,
         played:playedSeries,playedTotal,currentTotal,seriesNumber,
+        remainingTotal:nextRemaining+queued.reduce((sum,item)=>sum+item.free_spins,0),
         retriggerCount:chain.retrigger_count+(retriggerSpins?1:0),
         pendingBonuses:queued.length,
         completedBonus:finished,balance:balanceAfter,bet:active.bet,winTier,wins:[]};
