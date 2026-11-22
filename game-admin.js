@@ -224,9 +224,9 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
       const chosen=libraryImages.find(image=>image.id===selected);
       const preview=chosen?'<img class="asset-preview" src="'+h(libraryUrl(id,chosen))+'" alt="'+h(chosen.name)+'">':'';
-      const visibleName=game.slug==='lucky-stars'&&chosen&&!isWild&&!isScatter?chosen.name:symbol.name;
+      const visibleName=symbol.name;
       return '<details class="symbol-admin-card"><summary class="symbol-admin-summary"><span>'+h(visibleName)+' <small>ID '+symbol.id+'</small></span><span class="symbol-expand-hint">Настроить <span aria-hidden="true">▾</span></span></summary>'+
-        (visibleName!==symbol.name?'<p class="hint">В игре пока сохранено название «'+h(symbol.name)+'». Для синхронизации нажми кнопку выше или сохрани название ниже.</p>':'')+
+        (chosen&&chosen.name!==symbol.name?'<p class="hint">Картинка называется «'+h(chosen.name)+'», название игрового символа — «'+h(symbol.name)+'». Изменить название можно ниже или синхронизировать все кнопкой над списком.</p>':'')+
         '<form method="post" class="symbol-name-form" action="/admin/games/'+id+'/symbols/'+symbol.id+'/name">'+csrf+
         '<label>Название символа в игре<input type="text" name="name" minlength="1" maxlength="60" value="'+h(symbol.name)+'" required></label>'+
         '<button type="submit">Сохранить название</button></form>'+
