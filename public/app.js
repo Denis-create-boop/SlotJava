@@ -576,6 +576,59 @@
     });
   }
 
+  // Egyptian near-miss anticipation: after TWO already stopped SCATTER reels,
+  // the still-spinning reels light up and spin a separate fast visual strip.
+  // Server-selected final symbols and bonus odds are never changed.
+  async function animateEgyptScatterSuspense(cells){
+    let stoppedScatters=0;
+    const overlays=new Map();
+    const startSuspense=(firstRemaining)=>{
+      for(let index=firstRemaining;index<reelCount;index++){
+        if(overlays.has(index))continue;
+        const column=columns[index],windowEl=column.querySelector('.reel-window');
+        if(!windowEl)continue;
+        const veil=document.createElement('div');
+        veil.className='egypt-suspense-veil';
+        veil.setAttribute('aria-hidden','true');
+        const strip=document.createElement('div');
+        strip.className='egypt-suspense-strip';
+        const preview=Array.from({length:rowCount},()=>{
+          const item=definitions[Math.floor(Math.random()*definitions.length)];
+          return item?.id??sample();
+        });
+        for(const id of preview.concat(preview))strip.append(makeTile(id));
+        veil.append(strip);
+        windowEl.append(veil);
+        column.classList.add('egypt-suspense-reel');
+        overlays.set(index,veil);
+      }
+      if(overlays.size){
+        message.textContent='ДВА SCATTER! Оставшиеся барабаны могут запустить бонус!';
+        play('bonus_sound');
+      }
+    };
+    try{
+      const animations=columns.map((col,index)=>{
+        const target=Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]);
+        return animateColumn(col,index,target).then(()=>{
+          if(overlays.has(index)){
+            overlays.get(index).remove();
+            overlays.delete(index);
+            col.classList.remove('egypt-suspense-reel');
+          }
+          if(target.includes(scatterId))stoppedScatters++;
+          if(stoppedScatters===2&&index<reelCount-1)startSuspense(index+1);
+        });
+      });
+      await Promise.all(animations);
+    }finally{
+      overlays.forEach((veil,index)=>{
+        veil.remove();
+        columns[index].classList.remove('egypt-suspense-reel');
+      });
+    }
+  }
+
   function clearWinningGlow(){
     root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>{
       tile.classList.remove('is-winning');
@@ -988,6 +1041,8 @@
       if(autoRunning)paintAutoplay();
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
         await animateBonusSteps(result.steps);
+      }else if(isEgypt&&result.mode==='base'){
+        await animateEgyptScatterSuspense(result.cells);
       }else{
         const startingCells=result.mode==='egypt-bonus'&&
           Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
