@@ -336,3 +336,30 @@ test('Egypt zero weight prevents random appearance and unset weight defaults to 
 test('Egypt requires at least one symbol with a positive appearance weight',()=>{
   assert.throws(()=>egyptWeightedPicker([{id:1},{id:2}],{1:0,2:0},max=>0));
 });
+
+test('Custom Egyptian paylines replace default paths in base score',()=>{
+  const cells=Array(24).fill(7);
+  cells[0]=8;cells[6+1]=8;cells[2*6+2]=8;
+  const payouts={prices:[],multipliers:[]};
+  const custom=[[0,1,2,0,0,0]];
+  const args={cells,symbols:[{id:7,name:'other'},{id:8,name:'gold'}],
+    bet:10,payouts,minReelsById:{8:3},linePricesById:{'8:3':100000000}};
+  const scored=scoreEgyptBaseLines({...args,lines:custom});
+  assert.equal(scored.total,10);
+  assert.deepEqual(scored.wins[0].rows,custom[0]);
+  assert.equal(scored.wins.length,1);
+  assert.equal(scoreEgyptBaseLines({...args,lines:[[3,3,3,3,3,3]]}).total,0);
+});
+test('Edited Egyptian bonus paylines pay once per configured path',()=>{
+  const cells=Array(24).fill(7);
+  for(const reel of [0,2,4])cells[reel]=8;
+  const base={cells,selectedIds:[8],bet:10,payouts:{prices:[],multipliers:[]},
+    minReelsById:{8:3},linePricesById:{'8:3':100000000}};
+  const one=scoreEgyptSymbolSet({...base,lines:[[0,1,2,3,0,1]]});
+  const three=scoreEgyptSymbolSet({...base,lines:[[0,1,2,3,0,1],[1,2,3,0,1,2],[3,3,3,3,3,3]]});
+  assert.equal(one.total,10);
+  assert.equal(one.symbolWins[0].lineWins.length,1);
+  assert.equal(three.total,30);
+  assert.equal(three.symbolWins[0].lineWins.length,3);
+  assert.deepEqual(three.symbolWins[0].lineWins[1].rows,[1,2,3,0,1,2]);
+});
