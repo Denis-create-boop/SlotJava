@@ -123,7 +123,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=space-scatter-suspense-20261122"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-wild-winning-grow-20261122" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-wild-suspense-20261122" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -388,7 +388,8 @@ function firstGamePage(game,req){
     ?db.prepare('SELECT COALESCE(SUM(spins),0) AS total FROM space_bonus_pending WHERE user_id=? AND game_id=?')
       .get(req.user.id,game.id).total:0;
   const egyptChain=game.slug==='golden-seven'&&bonus?getEgyptBonusChain(req.user.id,game.id):null;
-  const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
+  const egyptSelectedIds=(egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]))
+    .filter(id=>id!==wildSymbol(game.id));
   const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
   const egyptLinesCount=game.slug==='golden-seven'?egyptPaylines(game.id).length:game.slug==='lucky-stars'?spacePaylines(game.id).length:0;
   const egyptScatterOdds=['golden-seven','lucky-stars'].includes(game.slug)&&scatter
