@@ -270,3 +270,29 @@ test('Egypt Scatter positions never create paying symbol lines',()=>{
   });
   assert.equal(scored.total,0);
 });
+
+test('Each of ten Egyptian bonus lines pays individually: 1 point each equals 10',()=>{
+  const cells=Array(24).fill(7);
+  cells[0]=8;cells[2]=8;cells[4]=8;
+  const result=scoreEgyptSymbolSet({cells,selectedIds:[8],bet:10,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
+    minReelsById:{8:3},linePercentById:{8:1000},
+    lineMultipliersById:{'8:3':1000}});
+  assert.equal(result.symbolWins[0].perLine,1);
+  assert.equal(result.symbolWins[0].lineWins.length,10);
+  assert.ok(result.symbolWins[0].lineWins.every(line=>line.prize===1));
+  assert.equal(result.symbolWins[0].prize,10);
+  assert.equal(result.total,10);
+});
+test('Egypt pays independently for multiple chosen symbols and ten lines each',()=>{
+  const cells=Array(24).fill(7);
+  for(const reel of [0,2,4])cells[reel]=8;
+  for(const reel of [1,3,5])cells[6+reel]=9;
+  const result=scoreEgyptSymbolSet({cells,selectedIds:[8,9],bet:10,
+    payouts:{prices:[{symbol_id:8,percent_hundredths:1000},
+      {symbol_id:9,percent_hundredths:2000}],multipliers:[]},
+    minReelsById:{8:3,9:3},linePercentById:{8:1000,9:2000}});
+  assert.deepEqual(result.symbolWins.map(w=>w.perLine),[1,2]);
+  assert.deepEqual(result.symbolWins.map(w=>w.prize),[10,20]);
+  assert.equal(result.total,30);
+});
