@@ -1243,3 +1243,30 @@ header nav .header-user-balance{
   .slot-theme-egypt .slot-reels-ribbon{border-width:4px;border-radius:9px}
   .slot-theme-egypt .reel-column{border-width:1px}
 }
+
+/* Egyptian scarab bonus placeholder: separate from the first game's bonus. */
+.slot-theme-egypt .egypt-scatter-announcement{
+  position:absolute;inset:0;z-index:41;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center;
+  pointer-events:none;border:3px solid #f4c96a;border-radius:13px;
+  background:radial-gradient(ellipse at center,rgba(33,49,65,.94),rgba(14,13,25,.97) 72%);
+  box-shadow:inset 0 0 56px rgba(75,202,205,.3),0 0 30px rgba(244,201,106,.43);
+  animation:egypt-scatter-reveal .5s cubic-bezier(.18,.8,.24,1) both;
+}
+.slot-theme-egypt .egypt-scatter-announcement strong{
+  font-size:clamp(1.7rem,5vw,4rem);font-weight:1000;letter-spacing:.1em;
+  color:#ffe7a0;text-shadow:0 4px 4px #2a1505,0 0 24px #c49a3d;
+}
+.slot-theme-egypt .egypt-scatter-announcement span{
+  font-size:clamp(1.1rem,3vw,2.3rem);font-weight:900;color:#a8f4e8;
+  text-shadow:0 0 24px #149da3;
+}
+.slot-theme-egypt .egypt-scatter-announcement small{
+  font-size:clamp(.75rem,1.4vw,1rem);color:#f3e4c0;
+}
+@keyframes egypt-scatter-reveal{
+  from{opacity:0;transform:scale(.78)}to{opacity:1;transform:scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt .egypt-scatter-announcement{animation:none}
+}
