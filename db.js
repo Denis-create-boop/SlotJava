@@ -609,13 +609,28 @@ db.transaction(()=>{
   db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
 })();
 
+// Egypt uses a persistent randomly selected bonus symbol and per-symbol
+// 2/3-reel minimum, without changing the classic game payout system.
+if(!db.pragma('table_info(game_bonus_sessions)').some(column=>column.name==='selected_symbol_id')){
+  db.exec('ALTER TABLE game_bonus_sessions ADD COLUMN selected_symbol_id INTEGER');
+}
+db.exec(`CREATE TABLE IF NOT EXISTS egypt_symbol_bonus_rules (
+  symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
+  min_reels INTEGER NOT NULL DEFAULT 3 CHECK(min_reels IN (2,3))
+)`);
+// Historical Egypt configurations can contain more than one Scatter per reel.
+// Enforce exactly zero or one on every Egypt reel from now on.
+db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
+ weight_1=100,weight_2=0,weight_3=0,weight_4=0
+ WHERE game_id=(SELECT id FROM games WHERE slug='golden-seven')`).run();
+
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
   return {symbolId:symbol.symbol_id,rules:db.prepare('SELECT reel_index,chance_percent,max_symbols,weight_1,weight_2,weight_3,weight_4 FROM game_scatter_reels WHERE game_id=? ORDER BY reel_index').all(gameId)};
 }
 function getBonusSession(userId,gameId){
-  return db.prepare('SELECT remaining,multiplier,bonus_win,bet FROM game_bonus_sessions WHERE user_id=? AND game_id=?').get(userId,gameId)||null;
+  return db.prepare('SELECT remaining,multiplier,bonus_win,bet,selected_symbol_id FROM game_bonus_sessions WHERE user_id=? AND game_id=?').get(userId,gameId)||null;
 }
 function getLibraryImages(gameId){
   return db.prepare(`SELECT l.id,l.name,l.builtin_path,l.file_name FROM game_image_library l
