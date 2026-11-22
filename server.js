@@ -8,6 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
+const { SPACE_LINES,scoreSpaceLines,expandSpaceWild } = require('./space-rules');
 const { EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries } = require('./egypt-bonus');
 
 const app = express();
@@ -166,7 +167,7 @@ app.get('/',(req,res)=>{
     '<div class="games-grid">'+cards+'</div></section>',req);
 });
 const spinLimiter=rateLimit({windowMs:60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false});
-function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null){
+function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null,wildId=0){
   // Payout = stake * (symbol price % / 100) * matching occurrences
   //        * multiplier for the last consecutive reel. First 3 mandatory.
   const reelCount=Math.floor(cells.length/rows);
@@ -175,11 +176,12 @@ function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null){
   const wins=[];
   let total=0;
   for(const symbol of symbols){
+    if(symbol.id===wildId)continue;
     let reels=0,count=0;
     for(let col=0;col<reelCount;col++){
       let found=0;
       for(let row=0;row<rows;row++){
-        if(cells[row*reelCount+col]===symbol.id)found++;
+        if(cells[row*reelCount+col]===symbol.id||(wildId&&cells[row*reelCount+col]===wildId))found++;
       }
       if(!found)break;
       reels++;
@@ -209,8 +211,11 @@ function egyptSymbolWeights(gameId){
     FROM egypt_symbol_weights w JOIN game_symbols s ON s.id=w.symbol_id
     WHERE s.game_id=?`).all(gameId).map(row=>[row.symbol_id,row.weight]));
 }
+function wildSymbol(gameId){return db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(gameId)?.symbol_id||0;}
+function spacePaylines(gameId){return db.prepare('SELECT rows_json FROM space_paylines WHERE game_id=? ORDER BY position,id').all(gameId).map(row=>JSON.parse(row.rows_json));}
 function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const scatter=getScatterSettings(gameId);
+  const wildId=wildSymbol(gameId);
   const symbols=getSymbols(gameId).filter(symbol=>symbol.id!==scatter?.symbolId);
   const payouts=getPayouts(gameId);
   const game=gameById(gameId);
@@ -226,8 +231,9 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const lines=egyptPrices?egyptPaylines(gameId):null;
   const evaluate=board=>egyptPrices
     ?scoreEgyptBaseLines({cells:board,symbols,bet,payouts,
-        minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices,lines})
-    :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums);
+        minReelsById:Object.fromEntries(egyptMinimums),linePricesById:egyptPrices,lines,wildId})
+    :game?.slug==='lucky-stars'?scoreSpaceLines({cells:board,symbols,bet,payouts,lines:spacePaylines(gameId),wildId,scatterId:scatter?.symbolId||0})
+    :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums,wildId);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
   const weighted=egyptPrices?egyptSymbolWeights(gameId):null;
@@ -267,8 +273,9 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
         ?egyptWeightedPicker(others,weighted,n=>crypto.randomInt(n))
         :()=>others[crypto.randomInt(others.length)].id;
       const arranged=Array.from({length:rows*reelCount},otherChoose);
-      const line=egyptPrices?crypto.randomInt(lines.length):null;
-      const egyptPath=line===null?null:lines[line];
+      const activeLines=egyptPrices?lines:game?.slug==='lucky-stars'?spacePaylines(gameId):null;
+      const line=activeLines?.length?crypto.randomInt(activeLines.length):null;
+      const egyptPath=line===null?null:activeLines[line];
       for(let col=0;col<activeReels;col++)
         arranged[(egyptPath?egyptPath[col]:crypto.randomInt(rows))*reelCount+col]=rule.symbol_id;
       const scored=evaluate(arranged);
@@ -278,7 +285,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   // Scatter positions are placed only after normal board generation; this
   // decouples the free-spin trigger from regular winning-chain frequency.
   let scatterCount=0;
-  if(scatter&&layout.rows===4&&(layout.reels===5||layout.reels===6)){
+  if(scatter&&(layout.reels===5||layout.reels===6)){
     const placed=scatterOnBoard(cells,scatter.symbolId,scatter.rules,rows,reelCount,n=>crypto.randomInt(n));
     cells=placed.cells;scatterCount=placed.count;
     evaluation=evaluate(cells);
@@ -342,18 +349,18 @@ function firstGamePage(game,req){
   }).join('');
   const audio=['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
-  const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
+  const scatter=getScatterSettings(game.id);
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
   const egyptChain=game.slug==='golden-seven'&&bonus?getEgyptBonusChain(req.user.id,game.id):null;
   const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
   const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
-  const egyptLinesCount=game.slug==='golden-seven'?egyptPaylines(game.id).length:0;
+  const egyptLinesCount=game.slug==='golden-seven'?egyptPaylines(game.id).length:game.slug==='lucky-stars'?spacePaylines(game.id).length:0;
   const egyptScatterOdds=game.slug==='golden-seven'&&scatter
     ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
-  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-wild-id="'+wildSymbol(game.id)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
     '<div class="slot-loading-screen" id="slot-loading-screen" role="status" aria-live="polite">'+
       '<div class="slot-loading-panel"><span class="slot-loading-glyph" aria-hidden="true">✦</span>'+
       '<strong>ЗАГРУЗКА</strong>'+
@@ -379,7 +386,7 @@ function firstGamePage(game,req){
     (scatter?'<div class="slot-bonus-math" id="slot-bonus-math" hidden aria-live="polite"><span id="slot-bonus-math-caption">Выигрыш за спин</span><strong id="slot-bonus-math-base">0</strong><div id="slot-bonus-math-multiply" hidden><em>×</em><b id="slot-bonus-math-factor">2</b></div><div id="slot-bonus-math-result" hidden><small>Итого за спин</small><strong id="slot-bonus-math-total">0</strong></div></div>':'')+
     (scatter?'<div class="slot-bonus-finish" id="slot-bonus-finish" hidden><strong>БОНУС ЗАВЕРШЁН!</strong><span>Выигрыш за бонус: <b id="slot-bonus-finish-total">0</b></span><button type="button" id="slot-bonus-finish-close">Продолжить</button></div>':'')+
     '<div class="reel-columns">'+reels+'</div>'+
-    (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
+    (['golden-seven','lucky-stars'].includes(game.slug)?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
     (game.slug==='golden-seven'?'<div class="egypt-round-prize" id="egypt-round-prize" hidden role="status" aria-live="polite">'+
       '<span>ВЫИГРЫШ ЗА ВРАЩЕНИЕ</span><strong id="egypt-round-prize-value">—</strong>'+
       '<small>Всего за бонус: <b id="egypt-round-prize-cumulative">'+(bonus?.bonus_win||0)+'</b></small></div>':'')+    '</div>'+
@@ -451,7 +458,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const wallet=getWallet(req.user.id,game.id);
     const settings=getGameSettings(game.id);
     const layout=gameLayout(game);
-    const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
+    const scatter=getScatterSettings(game.id);
     const active=scatter?getBonusSession(req.user.id,game.id):null;
     if(active&&game.slug==='golden-seven'){
       const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
