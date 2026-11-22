@@ -2103,3 +2103,27 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
   body>.slot-big-win-overlay.is-egypt-mega::after,
   body>.slot-big-win-overlay.is-egypt-mega strong{animation:none!important}
 }
+
+
+/* Bonus symbol states:
+   - landed/unplayed: vivid golden frame as soon as its reel stops;
+   - currently paying: strongest gold;
+   - already paid: muted until next spin. */
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-landed:not(.is-egypt-focus):not(.is-egypt-inactive){
+  opacity:1!important;filter:none!important;
+  border:3px solid #ffe9a0!important;
+  background:radial-gradient(ellipse at 50% 43%,rgba(255,230,135,.92),rgba(247,175,44,.77) 50%,rgba(123,64,13,.6) 90%)!important;
+  box-shadow:inset 0 0 13px #fff1c3,0 0 14px #ffc44a,0 0 22px #ffac41a1!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-landed:not(.is-egypt-focus):not(.is-egypt-inactive) img{
+  filter:drop-shadow(0 1px 5px #6c3c16) drop-shadow(0 0 7px #fff5cd) brightness(1.12)!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-inactive{
+  opacity:.43!important;filter:grayscale(.46) brightness(.7)!important;
+  border:1px solid rgba(165,129,77,.48)!important;
+  background:linear-gradient(135deg,rgba(58,43,34,.33),rgba(32,23,34,.42))!important;
+  box-shadow:inset 0 0 7px #0007!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-inactive img{
+  filter:grayscale(.46) brightness(.68)!important;
+}
