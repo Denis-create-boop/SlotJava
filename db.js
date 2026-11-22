@@ -674,6 +674,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS egypt_line_prices (
   }
 }
 
+// Relative appearance frequencies for ordinary Egypt symbols on any reel.
+// A missing row means 100; 0 disables random appearances. SCATTER keeps
+// its independent per-reel trigger settings in game_scatter_reels.
+db.exec(`CREATE TABLE IF NOT EXISTS egypt_symbol_weights (
+  symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
+  weight INTEGER NOT NULL DEFAULT 100 CHECK(weight BETWEEN 0 AND 10000)
+)`);
+
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
