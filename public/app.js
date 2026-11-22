@@ -1207,7 +1207,7 @@
 
   async function paintEgyptLines(result){
     clearEgyptLines();
-    if(!result.lineWins?.length||!result.expandedReels?.length)return;
+    if(!result.lineWins?.length)return;
     // Use a dedicated canvas in document.body. It is explicitly positioned
     // above all reels and game backgrounds, avoiding SVG viewBox/CSS clipping.
     const canvas=document.createElement('canvas');
@@ -1222,7 +1222,7 @@
     canvas.height=Math.round(height*ratio);
     ctx.scale(ratio,ratio);
     const coords=columns.map(col=>col.querySelector('.reel-window').getBoundingClientRect());
-    for(const reel of result.expandedReels){
+    for(const reel of result.expandedReels||[]){
       if(Number.isInteger(reel)&&reel>=0&&reel<columns.length)
         columns[reel].classList.add('egypt-expanded-reel');
     }
@@ -1248,11 +1248,12 @@
         ctx.strokeStyle=win.line%2?'#ffe667':'#6df5ff';
         ctx.lineWidth=4;ctx.shadowColor='#ffce56';ctx.shadowBlur=15;ctx.stroke();
         ctx.shadowBlur=0;
-        label.textContent='ЛИНИЯ '+win.line+' / 10  ·  +'+result.perLine+' очков';
+        const linePrize=win.prize??result.perLine;
+        label.textContent='ЛИНИЯ '+win.line+' / 10  ·  +'+linePrize+' очков';
         label.style.left=Math.max(8,Math.min(width-260,coords[0].left+8))+'px';
         label.style.top=Math.max(10,coords[0].top-52)+'px';
-        message.textContent=(symbols.get(result.symbolId)?.name||'Символ')+
-          ': линия '+win.line+' из 10 · +'+result.perLine+' очков';
+        const name=symbols.get(win.symbolId??result.symbolId)?.name||'Символ';
+        message.textContent=name+': линия '+win.line+' из 10 · +'+linePrize+' очков';
         await delay(reducedMotion?140:420);
       }
     }finally{
@@ -1398,6 +1399,9 @@
         if(result.mode==='egypt-bonus'){
           stopSpinSound();
           await animateEgyptExpansion(result);
+        }else if(result.mode==='base'&&Array.isArray(result.wins)){
+          stopSpinSound();
+          await paintEgyptLines({lineWins:result.wins.filter(win=>win.prize>0)});
         }
       }else{
         const startingCells=result.mode==='egypt-bonus'&&
@@ -1436,7 +1440,10 @@
       message.textContent=result.total>0?tierText+': '+result.total+' тестовых очков!'
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
-      if(result.mode==='base')showBigWin(tier);
+      if(result.mode==='base'){
+        showBigWin(tier);
+        if(isEgypt&&tier==='mega')playEgyptMegaBoom();
+      }
       if(result.mode==='base'&&result.freeSpins>0){
         // Bonus activation ends autoplay immediately; free spins are manual.
         if(autoRunning)stopAutoplay('Автоигра завершена: выпала бонусная игра. Бесплатные вращения запускаются вручную.');
