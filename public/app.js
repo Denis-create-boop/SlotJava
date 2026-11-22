@@ -802,12 +802,19 @@
     const view=col.querySelector('.reel-window');
     const rowHeight=view.getBoundingClientRect().height/rowCount;
     const extra=16+index*3;
-    // The target items are at the top of the strip; the rest are filler.
-    // Sliding the continuous strip DOWN reveals the planned final symbols.
-    const strip=finalIds.concat(Array.from({length:extra},sample));
+    // Keep the ACTUAL four visible tile nodes as the tail of the moving
+    // ribbon. At the negative starting offset those same nodes occupy the
+    // exact screen positions they occupied before the player pressed SPIN.
+    // As the ribbon moves down, they leave naturally; new tiles follow them.
+    const oldTiles=Array.from(track.children).slice(0,rowCount);
+    const existing=oldTiles.length===rowCount
+      ?oldTiles:Array.from({length:rowCount},()=>makeTile(sample()));
+    const middle=Array.from({length:extra},sample);
+    const incoming=buildStrip(finalIds.concat(middle));
     track.style.transition='none';
-    track.replaceChildren(buildStrip(strip));
-    track.style.transform='translate3d(0,'+(-extra*rowHeight)+'px,0)';
+    track.replaceChildren(incoming,...existing);
+    const startY=-(extra+rowCount)*rowHeight;
+    track.style.transform='translate3d(0,'+startY+'px,0)';
     void track.offsetHeight;
     return new Promise(resolve=>{
       const delay=options.delay??index*160;
@@ -816,7 +823,10 @@
         track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
         track.style.transform='translate3d(0,0,0)';
         window.setTimeout(()=>{
-          showStatic(col,finalIds);
+          // The final symbols are already the first four DOM nodes. Retain
+          // those exact nodes instead of briefly replacing their images.
+          track.style.transition='none';
+          track.replaceChildren(...Array.from(track.children).slice(0,rowCount));
           resolve();
         },duration+50);
       },delay);
