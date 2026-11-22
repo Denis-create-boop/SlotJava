@@ -581,10 +581,11 @@
   // Server-selected final symbols and bonus odds are never changed.
   async function animateEgyptScatterSuspense(cells){
     let stoppedScatters=0;
+    const eligible=(root.dataset.egyptScatterEligible||'').split(',').map(value=>value==='1');
     const overlays=new Map();
     const startSuspense=(firstRemaining)=>{
       for(let index=firstRemaining;index<reelCount;index++){
-        if(overlays.has(index))continue;
+        if(!eligible[index]||overlays.has(index))continue;
         const column=columns[index],windowEl=column.querySelector('.reel-window');
         if(!windowEl)continue;
         const veil=document.createElement('div');
@@ -622,7 +623,8 @@
             col.classList.remove('egypt-suspense-reel');
           }
           if(target.includes(scatterId))stoppedScatters++;
-          if(stoppedScatters===2&&index<reelCount-1)startSuspense(index+1);
+          if(stoppedScatters===2&&eligible.some((canLand,reel)=>reel>index&&canLand))
+            startSuspense(index+1);
         });
       });
       await Promise.all(animations);
