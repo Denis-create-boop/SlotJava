@@ -120,9 +120,9 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-editable-paylines-v1"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=bet-plus-minus-v1"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-editable-paylines-v1" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=bet-plus-minus-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -394,7 +394,10 @@ function firstGamePage(game,req){
 
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
-    '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
+    '<div class="slot-bet-control">'+
+      '<button type="button" class="slot-bet-step" id="slot-bet-minus" aria-label="Уменьшить ставку" title="Уменьшить ставку">−</button>'+
+      '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
+      '<button type="button" class="slot-bet-step" id="slot-bet-plus" aria-label="Увеличить ставку" title="Увеличить ставку">+</button></div>'+
     '<div class="slot-meter">'+backgroundImage('win_panel','slot-meter-background')+'<span id="slot-win-caption">'+(game.slug==='golden-seven'&&bonusVisible?'За вращение':'Выигрыш')+'</span><strong id="slot-win">0</strong>'+(game.slug==='golden-seven'?'<small class="egypt-bonus-accumulated" id="egypt-bonus-accumulated"'+(bonusVisible?'':' hidden')+'>Всего за бонус: <b id="egypt-bonus-accumulated-total">'+(bonus?.bonus_win||0)+'</b></small>':'')+'</div></div>'+
     '<form id="slot-spin-form" method="post" action="/games/'+h(game.slug)+'/spin">'+csrfInput(req.session.csrf_token)+
     '<button id="slot-spin-button" class="spin-round" type="submit" aria-label="Вращать барабаны"><span class="spin-round-icon" aria-hidden="true">↻</span><span id="slot-spin-label">'+(bonusVisible?'БЕСПЛАТНО':'ВРАЩАТЬ')+'</span></button></form>'+
