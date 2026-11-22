@@ -186,6 +186,93 @@
       console.warn('[SlotJava] Egyptian image links missing in server-rendered definitions.');
     }
   }
+  // Load and decode images before revealing the game field. The overlay is
+  // server-rendered, so it appears immediately, before this script starts.
+  const loadingScreen=document.getElementById('slot-loading-screen');
+  const loadingInfo=document.getElementById('slot-loading-info');
+  const loadingFill=document.getElementById('slot-loading-fill');
+  const loadingCount=document.getElementById('slot-loading-count');
+  async function preloadGameImages(){
+    if(!loadingScreen)return;
+    const paths=new Set();
+    const include=url=>{
+      if(!url||url==='none'||url.startsWith('data:'))return;
+      try{
+        const full=new URL(url,window.location.href);
+        if(full.origin===window.location.origin)paths.add(full.href);
+      }catch(error){console.warn('Invalid game image URL:',url,error);}
+    };
+    for(const symbol of definitions)include(symbol.image);
+    root.querySelectorAll('img[src]').forEach(img=>include(img.getAttribute('src')));
+    // Also preload decorative images injected through CSS backgrounds.
+    // The computed styles include per-cell backgrounds set in the admin.
+    const nodes=[root,...root.querySelectorAll('*')];
+    for(const node of nodes){
+      const bg=window.getComputedStyle(node).backgroundImage;
+      if(!bg||bg==='none')continue;
+      const matches=bg.matchAll(/url\(["']?([^"')]+)["']?\)/g);
+      for(const match of matches)include(match[1]);
+    }
+    const urls=[...paths];
+    const total=urls.length;
+    if(!total){
+      loadingScreen.hidden=true;
+      root.removeAttribute('aria-busy');
+      return;
+    }
+    let done=0,failed=0,timedOut=false;
+    const update=()=>{
+      const percent=Math.round(done/total*100);
+      if(loadingFill)loadingFill.style.width=percent+'%';
+      if(loadingCount)loadingCount.textContent=percent+'%';
+      if(loadingInfo)loadingInfo.textContent='Изображений загружено: '+done+' из '+total;
+    };
+    update();
+    const tasks=urls.map(url=>new Promise(resolve=>{
+      const img=new Image();
+      let settled=false;
+      const finish=ok=>{
+        if(settled)return;
+        settled=true;
+        if(!ok)failed++;
+        done++;
+        update();
+        resolve();
+      };
+      img.onload=()=>{
+        if(typeof img.decode==='function'){
+          img.decode().then(()=>finish(true),()=>finish(false));
+        }else finish(true);
+      };
+      img.onerror=()=>finish(false);
+      img.src=url;
+      if(img.complete){
+        if(img.naturalWidth>0)img.onload();
+        else if(img.naturalWidth===0)img.onerror();
+      }
+    }));
+    // Broken or stalled assets must never leave an unclosable overlay.
+    await Promise.race([
+      Promise.all(tasks),
+      new Promise(resolve=>window.setTimeout(()=>{timedOut=true;resolve();},20000))
+    ]);
+    if(timedOut||failed){
+      console.warn('[SlotJava] Image preload incomplete', {failed,done,total,timedOut});
+      if(loadingInfo)loadingInfo.textContent='Некоторые изображения недоступны. Игра откроется.';
+      await new Promise(resolve=>window.setTimeout(resolve,900));
+    }
+    loadingScreen.classList.add('is-ready');
+    await new Promise(resolve=>window.setTimeout(resolve,300));
+    loadingScreen.hidden=true;
+    root.removeAttribute('aria-busy');
+  }
+  // Start asynchronously; regular game setup continues behind the overlay.
+  void preloadGameImages().catch(error=>{
+    console.error('[SlotJava] Image preload failed:',error);
+    if(loadingScreen)loadingScreen.hidden=true;
+    root.removeAttribute('aria-busy');
+  });
+
   const symbols=new Map(definitions.map(item=>[item.id,item]));
   const regularDefinitions=definitions.filter(item=>item.id!==scatterId);
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
