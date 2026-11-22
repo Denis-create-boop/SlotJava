@@ -260,8 +260,31 @@ function firstGamePage(game,req){
   const chosenImages=new Map(getSymbolImageLinks(game.id).map(item=>[
     item.symbol_id,item.builtin_path||'/game-library/'+game.id+'/'+item.image_id
   ]));
+  // Older Egyptian databases can have missing symbol-image links or obsolete
+  // symbols.svg#fragment references. Use the actual independent SVG files
+  // without overriding uploaded/custom selections or images deleted in admin.
+  const egyptDefaultKeys=new Map([
+    ['Фараон','pharaoh'],['Клеопатра','cleopatra'],['Анубис','anubis'],
+    ['Анкх','ankh'],['10','ten'],['J','j'],['Q','q'],['K','k'],['A','a'],
+    ['Скарабей','scarab'],['SCATTER','scarab']
+  ]);
+  const hiddenEgyptArt=game.slug==='golden-seven'
+    ?new Set(db.prepare('SELECT builtin_path FROM game_hidden_builtin_images WHERE game_id=?').all(game.id).map(row=>row.builtin_path))
+    :new Set();
+  const egyptDefaultArt=(symbol,selected)=>{
+    if(game.slug!=='golden-seven')return selected||'';
+    // Legacy sprite fragments cannot render independently in an img element.
+    const old=/^\/static\/images\/egypt\/symbols\.svg#([a-z]+)$/i.exec(selected||'');
+    const supported=new Set(['pharaoh','cleopatra','anubis','ankh','scarab','ten','j','q','k','a']);
+    const key=old&&supported.has(old[1])?old[1]:egyptDefaultKeys.get(symbol.name);
+    if(!key||(!old&&selected))return selected||'';
+    const replacement='/static/images/egypt/premium-'+key+'.svg';
+    return hiddenEgyptArt.has(replacement)?'':replacement;
+  };
   const symbols=getSymbols(game.id).map(symbol=>{
-    const image=chosenImages.get(symbol.id)||url('symbol_'+symbol.id)||'';
+    const assigned=chosenImages.get(symbol.id);
+    const uploaded=url('symbol_'+symbol.id);
+    const image=egyptDefaultArt(symbol,assigned||uploaded||'');
     return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
   }).join('');
   const audio=['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
