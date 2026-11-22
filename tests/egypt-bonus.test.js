@@ -159,40 +159,40 @@ test('unlimited retriggers do not duplicate a symbol after all were selected',()
   assert.equal(extra.next.free_spins,25);
 });
 
-test('Egypt admin bonus price is applied separately to each of 10 lines',()=>{
+test('Egypt uses the same price for all 10 bonus paylines',()=>{
   const cells=Array(24).fill(7);
   for(const reel of [0,2,4])cells[reel]=8;
   const result=scoreEgyptSymbolSet({
     cells,selectedIds:[8],bet:100,
-    payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3},linePercentById:{8:2500}
+    payouts:{prices:[{symbol_id:8,percent_hundredths:2500}],multipliers:[]},
+    minReelsById:{8:3}
   });
   assert.equal(result.symbolWins[0].perLine,25);
   assert.equal(result.symbolWins[0].lineWins.length,10);
   assert.equal(result.symbolWins[0].prize,250);
   assert.equal(result.total,250);
 });
-test('Two selected symbols have separate admin payouts and both earn ten lines',()=>{
+test('Two selected symbols use their shared per-symbol prices for ten lines',()=>{
   const cells=Array(24).fill(7);
   for(const reel of [0,2,4])cells[reel]=8;
   for(const reel of [1,3,5])cells[6+reel]=9;
   const result=scoreEgyptSymbolSet({
     cells,selectedIds:[8,9],bet:100,
-    payouts:{prices:[{symbol_id:8,percent_hundredths:1000},
-      {symbol_id:9,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3,9:3},linePercentById:{8:2500,9:500}
+    payouts:{prices:[{symbol_id:8,percent_hundredths:2500},
+      {symbol_id:9,percent_hundredths:500}],multipliers:[]},
+    minReelsById:{8:3,9:3}
   });
   assert.deepEqual(result.symbolWins.map(item=>item.perLine),[25,5]);
   assert.deepEqual(result.symbolWins.map(item=>item.prize),[250,50]);
   assert.equal(result.total,300);
 });
-test('Unset bonus line payout defaults to existing ordinary symbol price',()=>{
+test('Bonus always uses the ordinary symbol price',()=>{
   const cells=Array(24).fill(7);
   for(const reel of [0,2,4])cells[reel]=8;
   const result=scoreEgyptSymbolSet({
     cells,selectedIds:[8],bet:100,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3},linePercentById:{8:null}
+    minReelsById:{8:3}
   });
   assert.equal(result.symbolWins[0].perLine,10);
   assert.equal(result.total,100);
@@ -254,7 +254,7 @@ test('Egypt bonus uses configured 2–6 line coefficients for each chosen symbol
   const scored=scoreEgyptSymbolSet({
     cells,selectedIds:[8],bet:100,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3},linePercentById:{8:1000},
+    minReelsById:{8:3},
     lineMultipliersById:{'8:3':2500}
   });
   assert.equal(scored.symbolWins[0].perLine,25);
@@ -276,7 +276,7 @@ test('Each of ten Egyptian bonus lines pays individually: 1 point each equals 10
   cells[0]=8;cells[2]=8;cells[4]=8;
   const result=scoreEgyptSymbolSet({cells,selectedIds:[8],bet:10,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000}],multipliers:[]},
-    minReelsById:{8:3},linePercentById:{8:1000},
+    minReelsById:{8:3},
     lineMultipliersById:{'8:3':1000}});
   assert.equal(result.symbolWins[0].perLine,1);
   assert.equal(result.symbolWins[0].lineWins.length,10);
@@ -291,7 +291,7 @@ test('Egypt pays independently for multiple chosen symbols and ten lines each',(
   const result=scoreEgyptSymbolSet({cells,selectedIds:[8,9],bet:10,
     payouts:{prices:[{symbol_id:8,percent_hundredths:1000},
       {symbol_id:9,percent_hundredths:2000}],multipliers:[]},
-    minReelsById:{8:3,9:3},linePercentById:{8:1000,9:2000}});
+    minReelsById:{8:3,9:3}});
   assert.deepEqual(result.symbolWins.map(w=>w.perLine),[1,2]);
   assert.deepEqual(result.symbolWins.map(w=>w.prize),[10,20]);
   assert.equal(result.total,30);
