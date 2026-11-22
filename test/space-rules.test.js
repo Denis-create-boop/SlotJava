@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {SPACE_LINES,scoreSpaceLines,expandSpaceWild}=require('../space-rules');
+const {SPACE_LINES,scoreSpaceLines,expandSpaceWild,resolveSpaceWildBonus}=require('../space-rules');
 
 const symbols=[{id:1,name:'Crystal'},{id:2,name:'Meteor'},{id:9,name:'WILD'}];
 const payouts={
@@ -136,4 +136,43 @@ test('Cosmic five matching reels pays one direct x10, not multiplied per copy',(
       multipliers:[{symbol_id:1,matches:5,multiplier_milli:10000}]}});
   assert.equal(result.total,750);
   assert.equal(result.wins.length,1);
+});
+
+test('cascade: a winning first-reel Wild can activate the fourth and then fifth Wild',()=>{
+  const cells=Array(15).fill(2);
+  // First Wild is on reel 1 top; fourth and fifth Wilds are not on
+  // a paying line initially. Their turn comes only after earlier expansion.
+  cells[0]=9;cells[3+2*5]=9;cells[4+2*5]=9;
+  cells[1]=1;cells[2]=1;
+  const lines=[
+    [0,0,0,1,1], // initial 3-reel win uses Wild on first reel
+    [1,0,0,2,1], // first expansion opens line through fourth Wild
+    [1,0,0,1,2]  // fourth expansion opens line through fifth Wild
+  ];
+  const rules={minimums:[{symbol_id:1,min_reels:3}],
+    multipliers:[3,4,5].map(matches=>({
+      symbol_id:1,matches,multiplier_milli:matches*1000
+    }))};
+  const options={cells,symbols,bet:100,payouts,lines,wildId:9,scatterId:10,rules};
+  const original=scoreSpaceLines(options);
+  assert.equal(original.wins.length,1);
+  const result=resolveSpaceWildBonus(options);
+  assert.deepEqual(result.expansion.expandedReels,[0,3,4]);
+  assert.equal(result.expansion.cells[4],9);
+  assert.equal(result.expansion.cells[9],9);
+  assert.equal(result.scored.wins.length,3);
+  assert.equal(result.scored.total,1200);
+});
+test('cascade does not expand a Wild outside winning paylines',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=9;cells[1]=1;cells[2]=1;cells[14]=9;
+  const options={cells,symbols,bet:100,payouts,lines:[[0,0,0,1,1]],
+    wildId:9,scatterId:10,rules:{
+      minimums:[{symbol_id:1,min_reels:3}],
+      multipliers:[{symbol_id:1,matches:3,multiplier_milli:3000}]
+    }};
+  const result=resolveSpaceWildBonus(options);
+  assert.deepEqual(result.expansion.expandedReels,[0]);
+  assert.equal(result.expansion.cells[14],9);
+  assert.equal(result.expansion.cells[4],2);
 });
