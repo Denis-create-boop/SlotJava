@@ -2256,3 +2256,17 @@ transition:background .12s,box-shadow .12s}
 .payline-cell.is-selected{background:#6350928c;box-shadow:inset 0 0 18px #f8cf5370;color:#fff6b9}
 .payline-cell-symbol{pointer-events:none;opacity:.9}
 .payline-drawing .payout-grid{margin-top:3px}
+
+/* Cosmic Odyssey: separate background appears only during free spins. */
+.slot-theme-space>.slot-bonus-background{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:center;z-index:-1;pointer-events:none;
+  opacity:0;visibility:hidden;
+  transition:opacity .55s ease,visibility .55s;
+}
+.slot-theme-space.is-bonus-active>.slot-bonus-background{
+  opacity:1;visibility:visible;
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-space>.slot-bonus-background{transition:none}
+}
