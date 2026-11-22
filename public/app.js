@@ -861,6 +861,8 @@
   }
   // Egypt's bonus uses one persistent chosen symbol and ten fixed paylines.
   const egyptSelectedLabel=document.getElementById('egypt-selected-label');
+  const egyptSelectedPortrait=document.getElementById('egypt-selected-portrait');
+  const egyptSelectedName=document.getElementById('egypt-selected-name');
   const egyptPicker=document.getElementById('egypt-bonus-picker');
   const egyptPickerPortrait=document.getElementById('egypt-bonus-picker-portrait');
   const egyptPickerName=document.getElementById('egypt-bonus-picker-name');
@@ -875,7 +877,13 @@
     if(!egyptSelectedLabel)return;
     const item=symbols.get(egyptChosenId);
     egyptSelectedLabel.hidden=!bonusActive||!item;
-    if(item)egyptSelectedLabel.textContent='Бонусный символ: '+item.name+' · 10 линий';
+    if(item){
+      if(egyptSelectedName)egyptSelectedName.textContent=item.name;
+      if(egyptSelectedPortrait)egyptSelectedPortrait.replaceChildren(makeTile(item.id));
+    }else{
+      if(egyptSelectedPortrait)egyptSelectedPortrait.replaceChildren();
+      if(egyptSelectedName)egyptSelectedName.textContent='';
+    }
   }
   paintEgyptSelection();
   async function animateEgyptSelection(id){
@@ -903,7 +911,9 @@
     columns.forEach(col=>col.classList.remove('egypt-expanded-reel'));
   }
   async function animateEgyptExpansion(result){
-    if(!Array.isArray(result.expandedReels))return;
+    // The server sends expandedReels only for winning, positive-value lines.
+    if(!Array.isArray(result.expandedReels)||!result.expandedReels.length||
+      !Array.isArray(result.lineWins)||!result.lineWins.length||result.total<=0)return;
     for(const col of result.expandedReels){
       if(!Number.isInteger(col)||col<0||col>=reelCount)continue;
       const column=columns[col];
