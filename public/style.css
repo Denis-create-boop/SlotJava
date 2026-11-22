@@ -1817,3 +1817,31 @@ header nav .header-user-balance{
   opacity:1;vector-effect:non-scaling-stroke;
   filter:drop-shadow(0 0 4px rgba(255,176,40,.9));
 }
+
+
+/* Egyptian bonus: distinct single-spin award and accumulated bonus total. */
+.slot-theme-egypt .egypt-bonus-accumulated[hidden]{display:none!important}
+.slot-theme-egypt .egypt-bonus-accumulated{
+  display:block;width:100%;text-align:center;
+  font-size:clamp(.68rem,1vw,.82rem);
+  line-height:1.2;color:#ffe0a3;font-weight:800;
+  padding-top:2px;
+}
+.slot-theme-egypt .egypt-bonus-accumulated b{
+  color:#fff1b2;font-size:1.18em;font-variant-numeric:tabular-nums;
+}
+.slot-theme-egypt.is-bonus-active #slot-win{
+  color:#fff0af;text-shadow:0 0 12px #ffb447;
+  font-variant-numeric:tabular-nums;
+}
+.slot-theme-egypt #slot-win.egypt-spin-win-pop{
+  animation:egypt-spin-win-pop .75s ease-out both;
+}
+@keyframes egypt-spin-win-pop{
+  0%{transform:scale(.85);opacity:.5;filter:brightness(1)}
+  35%{transform:scale(1.28);opacity:1;filter:brightness(1.45)}
+  100%{transform:scale(1);opacity:1;filter:brightness(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt #slot-win.egypt-spin-win-pop{animation:none}
+}
