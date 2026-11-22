@@ -356,7 +356,7 @@ function firstGamePage(game,req){
   const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
   const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
   const egyptLinesCount=game.slug==='golden-seven'?egyptPaylines(game.id).length:game.slug==='lucky-stars'?spacePaylines(game.id).length:0;
-  const egyptScatterOdds=game.slug==='golden-seven'&&scatter
+  const egyptScatterOdds=['golden-seven','lucky-stars'].includes(game.slug)&&scatter
     ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
@@ -512,7 +512,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         balance:nextBalance,bet:active.bet,winTier:tier};
     }
     if(active&&game.slug==='golden-seven'){
-      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId&&symbol.id!==wildSymbol(game.id));
+      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
       if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
       const weights=egyptSymbolWeights(game.id);
       const enabled=regular.filter(symbol=>symbol.id!==wildSymbol(game.id)&&(weights[symbol.id]??100)>0);
@@ -724,7 +724,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     }
     return {...spin,mode:'base',total:payout,balance:updatedBalance,bet:wallet.bet,
       winTier,freeSpins,egyptTrigger,selectedSymbolId:selectedEgypt,
-      bonusMultiplier:freeSpins?(game.slug==='golden-seven'?1:2):null,
+      bonusMultiplier:freeSpins?(['golden-seven','lucky-stars'].includes(game.slug)?1:2):null,
       bonusWin:freeSpins?0:null,remaining:freeSpins};
   })();
   res.set('Cache-Control','no-store');
