@@ -205,9 +205,10 @@
   const egyptPlayingIds=new Set((root.dataset.egyptSymbols||'').split(',')
     .map(Number).filter(Number.isSafeInteger));
   let egyptFocusedSymbolId=0;
+  let egyptReelsHighlightReady=false;
   function setEgyptFocus(id=0){
     egyptFocusedSymbolId=id;
-    const presenting=bonusActive&&id>0;
+    const presenting=bonusActive&&egyptReelsHighlightReady;
     for(const tile of root.querySelectorAll('.reel-window .ribbon-tile')){
       const tileId=Number(tile.dataset.symbolId);
       const active=presenting&&egyptPlayingIds.has(tileId);
@@ -676,9 +677,9 @@
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
     tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
-      (isEgypt&&bonusActive&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
-      (isEgypt&&bonusActive&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
-      (isEgypt&&bonusActive&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'');
+      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
+      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
+      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -1362,7 +1363,10 @@
       return;
     }
     spinning=true;
-    if(isEgypt)setEgyptFocus(0); // all reel symbols retain their original appearance while spinning
+    if(isEgypt){
+      egyptReelsHighlightReady=false; // regular, full-color symbols during spinning
+      setEgyptFocus(0);
+    }
     clearWinningGlow();
     clearBonusLocks();
     if(isEgypt){
@@ -1415,6 +1419,9 @@
         await animateEgyptScatterSuspense(result.cells);
         if(result.mode==='egypt-bonus'){
           stopSpinSound();
+          egyptReelsHighlightReady=true;
+          paintEgyptSelection(); // ALL selected symbols glow upon landing
+          await delay(reducedMotion?100:320);
           await animateEgyptExpansion(result);
         }else if(result.mode==='base'&&Array.isArray(result.wins)){
           stopSpinSound();
@@ -1468,6 +1475,7 @@
         if(isEgypt){
           await animateEgyptSelection(Number(result.selectedSymbolId));
           updateBonus(true,result.freeSpins,1,0);
+          egyptReelsHighlightReady=true;
           setEgyptCounters({played:0,playedTotal:0,remainingTotal:result.freeSpins,
             currentTotal:result.freeSpins,seriesNumber:1,
             retriggerCount:0,pendingBonuses:0});
