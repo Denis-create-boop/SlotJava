@@ -59,8 +59,10 @@
     if(bonusTop)bonusTop.hidden=!active;
     if(bonusStats)bonusStats.hidden=!active;
     if(egyptGamesBadge)egyptGamesBadge.hidden=!active;
-    if(isEgypt&&winCaption)winCaption.textContent=active?'Выигрыш бонуса':'Выигрыш';
-    if(isEgypt&&active)winDisplay.textContent=String(total);
+    if(root.classList.contains('slot-theme-egypt')&&winCaption)
+      winCaption.textContent=active?'Выигрыш бонуса':'Выигрыш';
+    if(root.classList.contains('slot-theme-egypt')&&active)
+      winDisplay.textContent=String(total);
     if(bonusMultiplier)bonusMultiplier.textContent='×'+multiplier;
     if(bonusRemaining)bonusRemaining.textContent=String(remaining);
     if(bonusTotal)bonusTotal.textContent=String(total);
