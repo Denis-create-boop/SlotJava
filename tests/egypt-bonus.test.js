@@ -232,8 +232,10 @@ test('Egypt base supports two-reel lines with an independent x2 coefficient',()=
     bet:100,payouts,lineMultipliersById:{'8:2':1500}};
   assert.equal(scoreEgyptBaseLines({...base,minReelsById:{8:3}}).total,0);
   const eligible=scoreEgyptBaseLines({...base,minReelsById:{8:2}});
-  assert.equal(eligible.total,30);
-  assert.equal(eligible.wins[0].reels,2);
+  // Row 0 on reels 1 and 2 is shared by two of the ten fixed paths.
+  assert.equal(eligible.total,60);
+  assert.equal(eligible.wins.length,2);
+  assert.ok(eligible.wins.every(win=>win.reels===2&&win.prize===30));
 });
 test('Egypt base caps payouts to ten line paths and uses exact match count',()=>{
   const cells=Array(24).fill(8);
