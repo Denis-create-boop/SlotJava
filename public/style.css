@@ -1413,3 +1413,68 @@ header nav .header-user-balance{
   .slot-theme-egypt .egypt-suspense-strip{animation:none}
   .slot-theme-egypt .egypt-suspense-strip{transform:translateY(0)}
 }
+
+
+/* Egyptian selected bonus symbol: persistent framed portrait above the HUD. */
+.slot-theme-egypt .egypt-selected-label{
+  display:flex;align-items:center;justify-content:center;gap:15px;
+  width:max-content;max-width:100%;min-height:112px;
+  margin:4px auto;padding:10px 20px 10px 10px;
+  background:linear-gradient(135deg,#39231c 0%,#1c1321 65%,#4b2e19 100%);
+  border:3px ridge #f4c45e;border-radius:16px;
+  box-shadow:inset 0 0 0 2px #6a4825,0 0 20px #f3ac4177;
+  color:#ffe7ab;
+}
+.slot-theme-egypt .egypt-selected-portrait{
+  width:88px;height:88px;flex:none;
+  background:radial-gradient(ellipse,#49321d,#19111e);
+  border:3px solid #ffe3a1;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 0 0 10px #000a,0 0 15px #f3bc6370;
+  overflow:hidden;
+}
+.slot-theme-egypt .egypt-selected-portrait .ribbon-tile{
+  width:100%;height:100%;min-height:0;padding:5px;
+  display:flex;align-items:center;justify-content:center;border:0;
+}
+.slot-theme-egypt .egypt-selected-portrait img{width:100%;height:100%;object-fit:contain}
+.slot-theme-egypt .egypt-selected-portrait .ribbon-symbol-fallback{
+  font-size:.85rem;line-height:1.1;text-align:center;overflow-wrap:anywhere;
+}
+.slot-theme-egypt .egypt-selected-info{
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.slot-theme-egypt .egypt-selected-info small{
+  font-size:.68rem;letter-spacing:.075em;color:#e6bb75;font-weight:900;
+}
+.slot-theme-egypt .egypt-selected-info strong{
+  font-size:clamp(1.15rem,2vw,1.5rem);font-weight:950;color:#fff1c3;
+}
+.slot-theme-egypt .egypt-selected-info span{font-size:.82rem;color:#e3cb9e}
+@media(max-width:520px){
+  .slot-theme-egypt .egypt-selected-label{padding:7px;gap:9px;min-height:80px}
+  .slot-theme-egypt .egypt-selected-portrait{width:65px;height:65px}
+}
+
+/* The SCATTER anticipation reel decelerates and fades, never cuts away. */
+.slot-theme-egypt .egypt-suspense-strip{
+  animation-duration:.39s;
+  transition:filter 650ms ease-out,opacity 400ms ease-out;
+}
+.slot-theme-egypt .egypt-suspense-veil{
+  transition:opacity 400ms ease-out,background-color 650ms ease-out;
+}
+.slot-theme-egypt .egypt-suspense-veil.is-slowing .egypt-suspense-strip{
+  animation-duration:1.1s;
+  filter:brightness(1.08) saturate(1.05);
+}
+.slot-theme-egypt .egypt-suspense-veil.is-fading{
+  opacity:0;
+}
+.slot-theme-egypt .reel-column.egypt-suspense-ending{
+  animation-duration:.55s;
+  transition:box-shadow 600ms ease-out,filter 600ms ease-out;
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt .egypt-suspense-strip{animation:none}
+}
