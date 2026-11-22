@@ -839,6 +839,33 @@
   }
 
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // One request per spin. Quick stop only short-circuits the reel animation;
+  // the already-authoritative server result and all payout handling remain.
+  let quickStopRequested=false;
+  let reelMotionActive=false;
+  const finishReelAnimations=new Set();
+  function quickStopReels(){
+    if(!spinning||quickStopRequested)return;
+    quickStopRequested=true;
+    reelMotionActive=false;
+    button.textContent='ОСТАНОВКА…';
+    button.setAttribute('aria-label','Остановка барабанов');
+    stopSpinSound();
+    for(const finish of Array.from(finishReelAnimations))finish();
+  }
+  function setSpinButton(spinningNow){
+    if(spinningNow){
+      button.disabled=false;
+      button.setAttribute('aria-label','Остановить вращение барабанов');
+      if(spinLabel)spinLabel.textContent='СТОП';
+      button.classList.add('is-spin-stoppable');
+    }else{
+      button.disabled=false;
+      button.setAttribute('aria-label','Вращать барабаны');
+      if(spinLabel)spinLabel.textContent=bonusActive?'БЕСПЛАТНО':'ВРАЩАТЬ';
+      button.classList.remove('is-spin-stoppable');
+    }
+  }
   function animateColumn(col,index,finalIds,options={}){
     if(reducedMotion){
       showStatic(col,finalIds);
@@ -865,16 +892,26 @@
     return new Promise(resolve=>{
       const delay=options.delay??index*160;
       const duration=options.duration??(1400+index*170);
-      window.setTimeout(()=>{
+      let startTimer=null,endTimer=null,completed=false;
+      const finish=()=>{
+        if(completed)return;
+        completed=true;
+        if(startTimer!==null)window.clearTimeout(startTimer);
+        if(endTimer!==null)window.clearTimeout(endTimer);
+        finishReelAnimations.delete(finish);
+        // Skip the transition and show the EXACT server-selected cells.
+        track.style.transition='none';
+        track.style.transform='translate3d(0,0,0)';
+        track.replaceChildren(...Array.from(track.children).slice(0,rowCount));
+        resolve();
+      };
+      finishReelAnimations.add(finish);
+      if(quickStopRequested){finish();return;}
+      startTimer=window.setTimeout(()=>{
+        if(quickStopRequested){finish();return;}
         track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
         track.style.transform='translate3d(0,0,0)';
-        window.setTimeout(()=>{
-          // The final symbols are already the first four DOM nodes. Retain
-          // those exact nodes instead of briefly replacing their images.
-          track.style.transition='none';
-          track.replaceChildren(...Array.from(track.children).slice(0,rowCount));
-          resolve();
-        },duration+50);
+        endTimer=window.setTimeout(finish,duration+50);
       },delay);
     });
   }
@@ -883,6 +920,13 @@
   // when the second SCATTER is approaching its stop. This changes ONLY the
   // visual schedule: winning odds and the final cells never change.
   async function animateEgyptScatterSuspense(cells){
+    reelMotionActive=true;
+    if(quickStopRequested){
+      columns.forEach((col,index)=>showStatic(col,
+        Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index])));
+      reelMotionActive=false;
+      return;
+    }
     const eligible=(root.dataset.egyptScatterEligible||'').split(',').map(v=>v==='1');
     const scatterReels=columns.map((_,reel)=>reel)
       .filter(reel=>Array.from({length:rowCount},(_,row)=>cells[row*reelCount+reel]).includes(scatterId));
@@ -896,6 +940,7 @@
       duration:1750+index*230+(anticipation&&index>secondScatter?1350:0)
     }));
     const startSuspense=()=>{
+      if(quickStopRequested)return;
       for(const index of waitingReels){
         if(overlays.has(index))continue;
         const col=columns[index],view=col.querySelector('.reel-window');
@@ -929,7 +974,7 @@
       // symbols. Only the translucent fire overlay fades out.
       columns[index].classList.add('egypt-suspense-ending');
       veil.classList.add('is-fading');
-      await new Promise(resolve=>window.setTimeout(resolve,380));
+      if(!quickStopRequested)await new Promise(resolve=>window.setTimeout(resolve,380));
       veil.remove();
       overlays.delete(index);
       columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
@@ -953,6 +998,7 @@
         veil.remove();
         columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
       }
+      reelMotionActive=false;
     }
   }
 
