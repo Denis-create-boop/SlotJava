@@ -49,7 +49,42 @@ function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
   return {total,lineWins,expandedReels,matchedReels,perLine,
     percentHundredths:price,multiplierMilli:milli};
 }
+// Evaluate each persistent selected symbol independently on the ORIGINAL
+// settled board. This avoids one expanding symbol erasing another or a SCATTER.
+// Display expansions sequentially; the payout is the sum across selected
+// symbols and all ten lines, irrespective of adjacent reel positions.
+function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={}}){
+  if(!Array.isArray(cells)||cells.length!==24)throw Error('Egypt requires a 6x4 board.');
+  const distinct=[...new Set(selectedIds)];
+  const symbolWins=[];
+  let total=0;
+  for(const symbolId of distinct){
+    const minimum=Number(minReelsById[symbolId])===2?2:3;
+    const landedReels=Array.from({length:6},(_,reel)=>reel).filter(reel=>
+      Array.from({length:4},(_,row)=>cells[row*6+reel]).includes(symbolId));
+    const price=payouts.prices.find(row=>row.symbol_id===symbolId)?.percent_hundredths||0;
+    const milli=payouts.multipliers.find(row=>row.symbol_id===symbolId&&row.reel_count===landedReels.length)?.multiplier_milli??1000;
+    const perLine=landedReels.length>=minimum&&price>0&&milli>0
+      ?Math.round(bet*price*milli/10000000):0;
+    const qualified=landedReels.length>=minimum&&perLine>0;
+    const prize=qualified?perLine*EGYPT_LINES.length:0;
+    total+=prize;
+    if(!Number.isSafeInteger(total)||total<0)throw Error('Egypt bonus prize overflow.');
+    symbolWins.push({symbolId,landedReels,expandedReels:qualified?landedReels:[],
+      matchedReels:landedReels.length,minReels:minimum,
+      lineWins:qualified?EGYPT_LINES.map((rows,i)=>({line:i+1,rows,reels:landedReels})):[],
+      perLine,prize});
+  }
+  return {total,symbolWins};
+}
+// Choose only a never-before-selected symbol. When all symbols have already
+// been chosen, further retriggers still run without duplicating any symbol.
+function chooseNewEgyptSymbol(symbols,selectedIds,randomInt){
+  const used=new Set(selectedIds);
+  const available=symbols.filter(item=>!used.has(item.id));
+  return available.length?available[randomInt(available.length)].id:null;
+}
 function egyptFreeSpinsFor(scatterCount){
   return scatterCount>=6?25:scatterCount===5?20:scatterCount===4?15:scatterCount===3?10:0;
 }
-module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor};
+module.exports={EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol};
