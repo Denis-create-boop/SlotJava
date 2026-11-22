@@ -837,7 +837,7 @@
     const overlays=new Map();
     const plans=columns.map((_,index)=>({
       delay:index*220,
-      duration:1750+index*230+(anticipation&&index>secondScatter?900:0)
+      duration:1750+index*230+(anticipation&&index>secondScatter?1350:0)
     }));
     const startSuspense=()=>{
       for(const index of waitingReels){
@@ -847,11 +847,9 @@
         const veil=document.createElement('div');
         veil.className='egypt-suspense-veil';
         veil.setAttribute('aria-hidden','true');
-        const strip=document.createElement('div');
-        strip.className='egypt-suspense-strip';
-        const preview=Array.from({length:rowCount},()=>sample());
-        for(const id of preview.concat(preview))strip.append(makeTile(id));
-        veil.append(strip);
+        // No duplicate/fake symbol strip: the real animated reel below this
+        // translucent fire veil already contains the FINAL server-settled
+        // symbols and eases into their exact landing positions.
         view.append(veil);
         col.classList.add('egypt-suspense-reel');
         overlays.set(index,veil);
@@ -871,12 +869,11 @@
     const stopSuspense=async(index)=>{
       const veil=overlays.get(index);
       if(!veil)return;
-      // Reduce speed and brightness before showing the determined symbols.
-      veil.classList.add('is-slowing');
+      // The actual reel has just settled naturally into the planned
+      // symbols. Only the translucent fire overlay fades out.
       columns[index].classList.add('egypt-suspense-ending');
-      await new Promise(resolve=>window.setTimeout(resolve,650));
       veil.classList.add('is-fading');
-      await new Promise(resolve=>window.setTimeout(resolve,400));
+      await new Promise(resolve=>window.setTimeout(resolve,380));
       veil.remove();
       overlays.delete(index);
       columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
