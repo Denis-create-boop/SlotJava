@@ -2162,3 +2162,33 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
 @media(max-width:600px){
   .egypt-line-editor .payout-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Bet display with left/right step controls, without changing the HUD height. */
+.slot-bet-control{
+  display:grid;grid-template-columns:minmax(24px,30px) minmax(0,1fr) minmax(24px,30px);
+  gap:4px;align-items:stretch;min-width:0;height:100%;
+}
+.slot-bet-control>.slot-bet-button{
+  width:100%;min-width:0;height:100%;margin:0;
+  padding-inline:2px;
+}
+.slot-bet-step{
+  display:flex;align-items:center;justify-content:center;
+  min-width:0;padding:0;
+  font:900 clamp(1.25rem,2vw,1.75rem)/1 inherit;
+  color:#ffe7ad;
+  border:1px solid rgba(238,190,91,.74);border-radius:10px;
+  background:linear-gradient(155deg,#564026,#251a26);
+  box-shadow:inset 0 1px 6px #ffe29d30,0 2px 6px #0007;
+  cursor:pointer;
+}
+.slot-bet-step:hover:not(:disabled){
+  color:white;background:linear-gradient(155deg,#886027,#3c2734);
+  box-shadow:0 0 13px #fbbf625a;
+}
+.slot-bet-step:disabled{cursor:not-allowed;opacity:.35}
+@media(max-width:520px){
+  .slot-bet-control{grid-template-columns:22px minmax(0,1fr) 22px;gap:2px}
+  .slot-bet-step{border-radius:6px;font-size:1.2rem}
+}
