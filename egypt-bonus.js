@@ -117,6 +117,33 @@ function scoreEgyptBaseLines({cells,symbols,bet,payouts,minReelsById={},linePric
   }
   return {total,wins};
 }
+// In Egyptian free spins a Wild may land ONLY on reels with no currently
+// selected bonus symbol. Preserve the landed selected symbols and Scatters;
+// replace conflicting Wild cells with an ordinary non-Wild symbol, chosen
+// using the game's existing relative symbol weights.
+function excludeEgyptWildOnSelectedReels({cells,selectedIds,wildId,reels=6,rows=4,chooseOrdinary}){
+  if(!Array.isArray(cells)||cells.length!==reels*rows)
+    throw Error('Invalid Egyptian bonus board.');
+  const result=cells.slice();
+  if(!wildId||!selectedIds?.length||!result.includes(wildId))return result;
+  if(typeof chooseOrdinary!=='function')throw Error('Missing ordinary symbol picker.');
+  const selected=new Set(selectedIds.filter(id=>id!==wildId));
+  for(let reel=0;reel<reels;reel++){
+    if(!Array.from({length:rows},(_,row)=>result[row*reels+reel])
+      .some(id=>selected.has(id)))continue;
+    for(let row=0;row<rows;row++){
+      const cell=row*reels+reel;
+      if(result[cell]===wildId){
+        const substitute=chooseOrdinary();
+        if(!Number.isSafeInteger(substitute)||substitute===wildId)
+          throw Error('Ordinary picker must not return Wild.');
+        result[cell]=substitute;
+      }
+    }
+  }
+  return result;
+}
+
 // Evaluate each persistent selected symbol independently on the ORIGINAL
 // settled board. This avoids one expanding symbol erasing another or a SCATTER.
 // Display expansions sequentially; the payout is the sum across selected
@@ -167,4 +194,4 @@ function nextEgyptBonusSeries({remaining,queue,selectedIds,symbols,randomInt}){
 function egyptFreeSpinsFor(scatterCount){
   return scatterCount>=6?25:scatterCount===5?20:scatterCount===4?15:scatterCount===3?10:0;
 }
-module.exports={EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,scoreEgyptBaseLines,egyptLinePrize,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol,nextEgyptBonusSeries};
+module.exports={EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,scoreEgyptBaseLines,egyptLinePrize,egyptFreeSpinsFor,scoreEgyptSymbolSet,excludeEgyptWildOnSelectedReels,chooseNewEgyptSymbol,nextEgyptBonusSeries};
