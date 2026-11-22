@@ -206,6 +206,7 @@
     .map(Number).filter(Number.isSafeInteger));
   let egyptFocusedSymbolId=0;
   let egyptReelsHighlightReady=false;
+  const egyptPlayedSymbolIds=new Set();
   function setEgyptFocus(id=0){
     egyptFocusedSymbolId=id;
     const presenting=bonusActive&&egyptReelsHighlightReady;
@@ -214,7 +215,8 @@
       const active=presenting&&egyptPlayingIds.has(tileId);
       tile.classList.toggle('is-egypt-bonus-symbol',active);
       tile.classList.toggle('is-egypt-focus',active&&tileId===id);
-      tile.classList.toggle('is-egypt-inactive',active&&id>0&&tileId!==id);
+      tile.classList.toggle('is-egypt-inactive',active&&egyptPlayedSymbolIds.has(tileId)&&tileId!==id);
+      tile.classList.toggle('is-egypt-landed',active&&!egyptPlayedSymbolIds.has(tileId)&&tileId!==id);
     }
   }
   const egyptStarterArt=new Set([
@@ -746,7 +748,8 @@
     tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
       (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'')+
       (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptFocusedSymbolId===id?' is-egypt-focus':'')+
-      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptFocusedSymbolId>0&&egyptPlayingIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'');
+      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayedSymbolIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-inactive':'')+
+      (isEgypt&&bonusActive&&egyptReelsHighlightReady&&egyptPlayingIds.has(id)&&!egyptPlayedSymbolIds.has(id)&&egyptFocusedSymbolId!==id?' is-egypt-landed':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -879,8 +882,10 @@
         // bonus symbol on THAT reel. Other reels may still be spinning.
         if(isEgypt&&bonusActive){
           for(const tile of col.querySelectorAll('.reel-track .ribbon-tile')){
-            if(egyptPlayingIds.has(Number(tile.dataset.symbolId)))
-              tile.classList.add('is-egypt-bonus-symbol');
+            if(egyptPlayingIds.has(Number(tile.dataset.symbolId))){
+              tile.classList.add('is-egypt-bonus-symbol','is-egypt-landed');
+              tile.classList.remove('is-egypt-inactive','is-egypt-focus');
+            }
           }
         }
         if(overlays.has(index))await stopSuspense(index);
@@ -1290,11 +1295,13 @@
       message.textContent=name+': '+item.lineWins.length+' линий × '+item.perLine+
         ' очков = +'+item.prize+' очков.';
       await delay(reducedMotion?150:900);
+      egyptPlayedSymbolIds.add(item.symbolId);
       resetBoard();
+      setEgyptFocus(0); // completed symbol dims; all yet-to-play symbols remain gold
       await delay(reducedMotion?80:350);
     }
     resetBoard();
-    paintEgyptSelection();
+    paintEgyptSelection(); // keep completed symbols muted until the next spin
   }
 
   async function paintEgyptLines(result){
@@ -1439,6 +1446,7 @@
     }
     spinning=true;
     if(isEgypt){
+      egyptPlayedSymbolIds.clear(); // every new bonus spin resets which symbols have played
       egyptReelsHighlightReady=false; // regular, full-color symbols during spinning
       setEgyptFocus(0);
     }
