@@ -460,8 +460,59 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const layout=gameLayout(game);
     const scatter=getScatterSettings(game.id);
     const active=scatter?getBonusSession(req.user.id,game.id):null;
+    if(active&&game.slug==='lucky-stars'){
+      const wildId=wildSymbol(game.id);
+      const generated=generateSpin(game.id,settings?.win_frequency??25,active.bet,layout);
+      if(generated.error)return generated;
+      const preExpansionCells=generated.cells.slice();
+      const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId);
+      const symbols=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+      const scored=scoreSpaceLines({cells:expansion.cells,symbols,bet:active.bet,
+        payouts:getPayouts(game.id),lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId});
+      const accumulated=active.bonus_win+scored.total;
+      if(!Number.isSafeInteger(accumulated)||accumulated<0)
+        return {error:'Превышен размер бонусного выигрыша.'};
+      const retriggerSpins=egyptFreeSpinsFor(generated.scatterCount);
+      if(retriggerSpins){
+        const seq=db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM space_bonus_pending WHERE user_id=? AND game_id=?')
+          .get(req.user.id,game.id).seq;
+        db.prepare('INSERT INTO space_bonus_pending(user_id,game_id,seq,spins) VALUES(?,?,?,?)')
+          .run(req.user.id,game.id,seq,retriggerSpins);
+      }
+      let remaining=active.remaining-1,completedBonus=false;
+      let nextBalance=wallet.balance;
+      if(remaining===0){
+        const next=db.prepare('SELECT seq,spins FROM space_bonus_pending WHERE user_id=? AND game_id=? ORDER BY seq LIMIT 1')
+          .get(req.user.id,game.id);
+        if(next){
+          remaining=next.spins;
+          db.prepare('DELETE FROM space_bonus_pending WHERE user_id=? AND game_id=? AND seq=?')
+            .run(req.user.id,game.id,next.seq);
+        }else{
+          completedBonus=true;
+          nextBalance=wallet.balance+accumulated;
+          if(!Number.isSafeInteger(nextBalance)||nextBalance<0)
+            return {error:'Превышен допустимый баланс.'};
+          db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?').run(nextBalance,req.user.id);
+          db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?').run(req.user.id,game.id);
+        }
+      }
+      if(!completedBonus)db.prepare('UPDATE game_bonus_sessions SET remaining=?,bonus_win=? WHERE user_id=? AND game_id=?')
+        .run(remaining,accumulated,req.user.id,game.id);
+      const bigThreshold=settings?.big_win_multiplier_milli??5000;
+      const megaThreshold=settings?.mega_win_multiplier_milli??15000;
+      const tier=scored.total*1000>=active.bet*megaThreshold?'mega'
+        :scored.total*1000>=active.bet*bigThreshold?'big':scored.total>0?'normal':'none';
+      return {mode:'space-bonus',cells:expansion.cells,preExpansionCells,
+        expandedReels:expansion.expandedReels,wins:scored.wins,
+        total:scored.total,baseWin:scored.total,bonusRoundWin:scored.total,
+        bonusWin:accumulated,remaining,completedBonus,
+        scatterCount:generated.scatterCount,retriggerSpins,
+        bonusMultiplier:1,nextMultiplier:1,
+        balance:nextBalance,bet:active.bet,winTier:tier};
+    }
     if(active&&game.slug==='golden-seven'){
-      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId&&symbol.id!==wildSymbol(game.id));
       if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
       const weights=egyptSymbolWeights(game.id);
       const enabled=regular.filter(symbol=>(weights[symbol.id]??100)>0);
@@ -500,7 +551,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         .map(row=>[row.symbol_id+':'+row.matches,row.percent_millionths]));
       const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
         selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),
-        minReelsById:minimum,linePricesById:linePrices,lines:egyptPaylines(game.id)});
+        minReelsById:minimum,linePricesById:linePrices,lines:egyptPaylines(game.id),wildId:wildSymbol(game.id)});
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
@@ -587,7 +638,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const round=playBonusRound({
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
-        randomInt:n=>crypto.randomInt(n),scoreBoard,
+        randomInt:n=>crypto.randomInt(n),scoreBoard:(...args)=>scoreBoard(...args,wildSymbol(game.id)),
         scatterId:scatter.symbolId,scatterRules:scatter.rules
       });
       // Scatter raises the multiplier immediately during this free spin,
@@ -653,11 +704,11 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
       :payout>0?'normal':'none';
     const egyptTrigger=game.slug==='golden-seven'&&spin.scatterCount>=3;
-    const freeSpins=scatter?(game.slug==='golden-seven'?egyptFreeSpinsFor(spin.scatterCount):freeSpinsFor(spin.scatterCount)):0;
+    const freeSpins=scatter?(['golden-seven','lucky-stars'].includes(game.slug)?egyptFreeSpinsFor(spin.scatterCount):freeSpinsFor(spin.scatterCount)):0;
     let selectedEgypt=0;
     if(freeSpins){
       if(game.slug==='golden-seven'){
-        const options=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+        const options=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId&&symbol.id!==wildSymbol(game.id));
         const weights=egyptSymbolWeights(game.id);
         const eligible=options.filter(symbol=>(weights[symbol.id]??100)>0);
         if(!eligible.length)return {error:'Нет символов Египта с положительным весом.'};
