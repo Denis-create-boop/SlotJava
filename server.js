@@ -435,11 +435,13 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         regular[crypto.randomInt(regular.length)].id);
       const scatterPlacement=scatterOnBoard(initialBoard,scatter.symbolId,scatter.rules,
         layout.rows,layout.reels,n=>crypto.randomInt(n));
-      const minRows=db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
+      const minRows=db.prepare(`SELECT symbol_id,min_reels,line_percent_hundredths FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(game.id);
       const minimum=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.min_reels]));
+      const linePercent=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.line_percent_hundredths]));
       const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
-        selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),minReelsById:minimum});
+        selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),
+        minReelsById:minimum,linePercentById:linePercent});
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
