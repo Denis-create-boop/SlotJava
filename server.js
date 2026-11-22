@@ -9,7 +9,7 @@ const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
 const { SPACE_LINES,scoreSpaceLines,resolveSpaceWildBonus } = require('./space-rules');
-const { EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries } = require('./egypt-bonus');
+const { EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries,excludeEgyptWildOnSelectedReels } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -581,6 +581,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const enabled=regular.filter(symbol=>symbol.id!==wildSymbol(game.id)&&(weights[symbol.id]??100)>0);
       if(!enabled.length)return {error:'У всех символов Египта вес 0. Укажите хотя бы один положительный вес в админке.'};
       const choose=egyptWeightedPicker(regular.filter(symbol=>(weights[symbol.id]??100)>0),weights,n=>crypto.randomInt(n));
+      const chooseOrdinary=egyptWeightedPicker(enabled,weights,n=>crypto.randomInt(n));
       let chain=getEgyptBonusChain(req.user.id,game.id);
       if(!chain){
         // Migrate in-progress bonuses from older releases without forfeiting
@@ -605,6 +606,12 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const initialBoard=Array.from({length:layout.rows*layout.reels},choose);
       const scatterPlacement=scatterOnBoard(initialBoard,scatter.symbolId,scatter.rules,
         layout.rows,layout.reels,n=>crypto.randomInt(n));
+      // Disallow a Wild on a reel already showing any of the active bonus
+      // symbols. All other reels can still land Wild normally.
+      scatterPlacement.cells=excludeEgyptWildOnSelectedReels({
+        cells:scatterPlacement.cells,selectedIds:selected,wildId:wildSymbol(game.id),
+        reels:layout.reels,rows:layout.rows,chooseOrdinary
+      });
       const minRows=db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(game.id);
       const minimum=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.min_reels]));
