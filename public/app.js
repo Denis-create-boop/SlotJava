@@ -1207,6 +1207,22 @@
     await delay(1250);
     if(bonusPlus)bonusPlus.classList.remove('is-pop');
   }
+  async function animateCosmicMultiplierAdvance(current,next){
+    if(!bonusMultiplier||next<=current)return;
+    bonusMultiplier.textContent='×'+next;
+    bonusMultiplier.classList.remove('space-multiplier-level-up');
+    void bonusMultiplier.offsetWidth;
+    bonusMultiplier.classList.add('space-multiplier-level-up');
+    if(bonusPlus){
+      bonusPlus.textContent='+'+(next-current)+' ЗА ВРАЩЕНИЕ';
+      bonusPlus.classList.remove('is-pop');
+      void bonusPlus.offsetWidth;
+      bonusPlus.classList.add('is-pop');
+    }
+    await delay(reducedMotion?100:950);
+    bonusMultiplier.classList.remove('space-multiplier-level-up');
+    if(bonusPlus)bonusPlus.classList.remove('is-pop');
+  }
   const egyptRetriggerOverlay=document.getElementById('egypt-retrigger-announcement');
   const egyptRetriggerAward=document.getElementById('egypt-retrigger-award');
   const egyptRetriggerDetails=document.getElementById('egypt-retrigger-details');
@@ -1745,17 +1761,29 @@
             ' бесплатных вращений. Начальный множитель ×2!';
         }
       }else if(result.mode==='space-bonus'){
-        updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
+        const xBefore=Number(result.bonusMultiplier)||1;
+        const xAfter=Number(result.nextMultiplier)||xBefore+1;
+        // The finished spin pays with X-before. Show the new multiplier only
+        // AFTER the reel stopped, and visibly announce +1 even on zero wins.
+        updateBonus(true,result.remaining||0,xBefore,result.bonusWin||0);
         winDisplay.textContent=result.total>0?'+'+result.total:'';
+        message.textContent=result.total>0
+          ?'Выигрыш: '+result.baseWin+' × '+xBefore+' = '+result.bonusRoundWin+'.'
+          :'Вращение завершено. Множитель повышается на +1!';
+        await animateCosmicMultiplierAdvance(xBefore,xAfter);
         if(result.retriggerSpins){
           message.textContent='SCATTER! Новая бонусная серия: +'+result.retriggerSpins+' вращений.';
           await delay(reducedMotion?200:1100);
         }
-        if(result.completedBonus&&bonusFinish){
-          bonusFinishTotal.textContent=String(result.bonusWin);
-          bonusFinish.hidden=false;
+        if(result.completedBonus){
+          updateBonus(false,0,xAfter,result.bonusWin||0);
+          if(bonusFinish){
+            bonusFinishTotal.textContent=String(result.bonusWin);
+            bonusFinish.hidden=false;
+          }
           message.textContent='Космический бонус завершён. Всего выиграно '+result.bonusWin+' очков.';
         }else{
+          updateBonus(true,result.remaining||0,xAfter,result.bonusWin||0);
           message.textContent=result.total>0
             ?'Бонус: +'+result.total+' очков. Всего: '+result.bonusWin+'. Осталось: '+result.remaining+'.'
             :'Осталось бесплатных вращений: '+result.remaining+'.';
