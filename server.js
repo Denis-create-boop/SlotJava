@@ -414,6 +414,11 @@ function firstGamePage(game,req){
       '<strong>ВЫ ВЫИГРАЛИ БОНУСНУЮ ИГРУ!</strong><b id="egypt-retrigger-award">+10</b>'+
       '<span>БЕСПЛАТНЫХ ВРАЩЕНИЙ</span>'+
       '<small id="egypt-retrigger-details"></small></div></div>':'')+
+    (game.slug==='lucky-stars'?'<div class="space-retrigger-announcement" id="space-retrigger-announcement" hidden role="status" aria-live="assertive">'+
+      '<div class="space-retrigger-content"><strong>SCATTER ×3+</strong>'+
+      '<span>ЕЩЁ БЕСПЛАТНЫЕ ВРАЩЕНИЯ!</span>'+
+      '<b id="space-retrigger-award">+10</b>'+
+      '<small id="space-retrigger-details"></small></div></div>':'')+
     '<div class="slot-insufficient-overlay" id="slot-insufficient-overlay" hidden role="alert"><strong>НЕДОСТАТОЧНО ДЕНЕЖНЫХ СРЕДСТВ</strong><span>Пополните баланс тестовых очков для продолжения игры</span></div>'+
     (scatter?'<div class="slot-bonus-intro" id="slot-bonus-intro" hidden aria-live="polite"><strong>SCATTER!</strong><span>БОНУСНАЯ ИГРА</span><b><em id="slot-bonus-intro-count">10</em> бесплатных вращений</b><small>'+(game.slug==='golden-seven'?'Сейчас выберем символ для '+egyptLinesCount+' линий':'Начальный множитель ×2')+'</small></div>':'')+
     (scatter?'<div class="slot-bonus-math" id="slot-bonus-math" hidden aria-live="polite"><span id="slot-bonus-math-caption">Выигрыш за спин</span><strong id="slot-bonus-math-base">0</strong><div id="slot-bonus-math-multiply" hidden><em>×</em><b id="slot-bonus-math-factor">2</b></div><div id="slot-bonus-math-result" hidden><small>Итого за спин</small><strong id="slot-bonus-math-total">0</strong></div></div>':'')+
@@ -548,10 +553,13 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const megaThreshold=settings?.mega_win_multiplier_milli??15000;
       const tier=bonusRoundWin*1000>=active.bet*megaThreshold?'mega'
         :bonusRoundWin*1000>=active.bet*bigThreshold?'big':bonusRoundWin>0?'normal':'none';
+      const pendingSpins=db.prepare('SELECT COALESCE(SUM(spins),0) AS total FROM space_bonus_pending WHERE user_id=? AND game_id=?')
+        .get(req.user.id,game.id).total;
       return {mode:'space-bonus',cells:expansion.cells,preExpansionCells,
         expandedReels:expansion.expandedReels,wins:scored.wins,
         total:bonusRoundWin,baseWin:scored.total,bonusRoundWin,
-        bonusWin:accumulated,remaining,completedBonus,
+        bonusWin:accumulated,remaining,remainingTotal:remaining+pendingSpins,
+        pendingSpins,completedBonus,
         scatterCount:generated.scatterCount,retriggerSpins,
         bonusMultiplier:currentMultiplier,nextMultiplier,
         balance:nextBalance,bet:active.bet,winTier:tier};
