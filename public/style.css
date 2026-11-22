@@ -2438,3 +2438,31 @@ body:has(.slot-game.slot-theme-space)>header{
 .space-background-diagnostic small{color:#c7d5fa;overflow-wrap:anywhere}
 .space-background-diagnostic button{width:100%}
 @media(max-width:600px){.space-background-diagnostic-grid{grid-template-columns:1fr}}
+
+/* Cosmic Odyssey: the multiplier rises by one after EVERY free spin.
+   The glow is attached to the number only, not to the reel layout. */
+.slot-theme-space #slot-bonus-multiplier.space-multiplier-level-up{
+  animation:space-multiplier-step .9s cubic-bezier(.2,.7,.2,1) both;
+  transform-origin:center center;
+}
+.slot-theme-space #slot-bonus-plus.is-pop{
+  color:#fff0a5;
+  text-shadow:0 0 12px #ffe06a,0 0 24px #ec81ff;
+  animation:space-multiplier-plus .95s ease-out both;
+}
+@keyframes space-multiplier-step{
+  0%{filter:brightness(1);scale:1}
+  22%{filter:brightness(1.9) drop-shadow(0 0 16px #ffbc36);scale:1.4}
+  55%{filter:brightness(1.45) drop-shadow(0 0 13px #ae5bff);scale:1.16}
+  100%{filter:brightness(1);scale:1}
+}
+@keyframes space-multiplier-plus{
+  0%{opacity:0;translate:0 12px;scale:.65}
+  25%{opacity:1;translate:0 -9px;scale:1.25}
+  75%{opacity:1;translate:0 -18px;scale:1}
+  100%{opacity:0;translate:0 -32px;scale:.85}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-space #slot-bonus-multiplier.space-multiplier-level-up,
+  .slot-theme-space #slot-bonus-plus.is-pop{animation:none}
+}
