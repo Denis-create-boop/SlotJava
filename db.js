@@ -755,43 +755,6 @@ db.exec(`CREATE TABLE IF NOT EXISTS egypt_paylines (
   }
 }
 
-// Cosmic Odyssey: a symbol pays stake × the coefficient for exactly N
-// consecutive reels on a payline. Independent of copies and unit prices.
-db.exec(`CREATE TABLE IF NOT EXISTS space_symbol_rules (
-  symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
-  min_reels INTEGER NOT NULL DEFAULT 3 CHECK(min_reels IN (2,3))
-);
-CREATE TABLE IF NOT EXISTS space_symbol_multipliers (
-  symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
-  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 5),
-  multiplier_milli INTEGER NOT NULL DEFAULT 0 CHECK(multiplier_milli BETWEEN 0 AND 1000000),
-  PRIMARY KEY(symbol_id,matches)
-)`);
-{
-  const space=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
-  if(space){
-    const ordinary=db.prepare(`SELECT s.id FROM game_symbols s WHERE s.game_id=?
-      AND NOT EXISTS(SELECT 1 FROM game_wild_symbols w WHERE w.symbol_id=s.id)
-      AND NOT EXISTS(SELECT 1 FROM game_scatter_symbols sc WHERE sc.symbol_id=s.id)`).all(space.id);
-    const insRule=db.prepare('INSERT OR IGNORE INTO space_symbol_rules(symbol_id,min_reels) VALUES(?,3)');
-    const insPay=db.prepare('INSERT OR IGNORE INTO space_symbol_multipliers(symbol_id,matches,multiplier_milli) VALUES(?,?,?)');
-    const unit=db.prepare('SELECT percent_hundredths FROM symbol_unit_prices WHERE symbol_id=?');
-    const reel=db.prepare('SELECT multiplier_milli FROM symbol_reel_multipliers WHERE symbol_id=? AND reel_count=?');
-    db.transaction(()=>{
-      for(const symbol of ordinary){
-        insRule.run(symbol.id);
-        const price=unit.get(symbol.id)?.percent_hundredths||0;
-        for(let count=2;count<=5;count++){
-          const ratio=reel.get(symbol.id,count)?.multiplier_milli??1000;
-          // One-off migration preserves pre-existing 3..5 payouts approximately,
-          // but never overwrites admin-edited new coefficients.
-          const milli=count===2?0:Math.min(1000000,Math.round(count*price*ratio/10000));
-          insPay.run(symbol.id,count,milli);
-        }
-      }
-    })();
-  }
-}
 // Space: editable paylines and Scatter configuration; idempotent migration.
 db.exec(`CREATE TABLE IF NOT EXISTS space_paylines (
   id INTEGER PRIMARY KEY,
@@ -861,6 +824,43 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
         db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
       })();
     }
+  }
+}
+// Cosmic Odyssey: a symbol pays stake × the coefficient for exactly N
+// consecutive reels on a payline. Independent of copies and unit prices.
+db.exec(`CREATE TABLE IF NOT EXISTS space_symbol_rules (
+  symbol_id INTEGER PRIMARY KEY REFERENCES game_symbols(id) ON DELETE CASCADE,
+  min_reels INTEGER NOT NULL DEFAULT 3 CHECK(min_reels IN (2,3))
+);
+CREATE TABLE IF NOT EXISTS space_symbol_multipliers (
+  symbol_id INTEGER NOT NULL REFERENCES game_symbols(id) ON DELETE CASCADE,
+  matches INTEGER NOT NULL CHECK(matches BETWEEN 2 AND 5),
+  multiplier_milli INTEGER NOT NULL DEFAULT 0 CHECK(multiplier_milli BETWEEN 0 AND 1000000),
+  PRIMARY KEY(symbol_id,matches)
+)`);
+{
+  const space=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
+  if(space){
+    const ordinary=db.prepare(`SELECT s.id FROM game_symbols s WHERE s.game_id=?
+      AND NOT EXISTS(SELECT 1 FROM game_wild_symbols w WHERE w.symbol_id=s.id)
+      AND NOT EXISTS(SELECT 1 FROM game_scatter_symbols sc WHERE sc.symbol_id=s.id)`).all(space.id);
+    const insRule=db.prepare('INSERT OR IGNORE INTO space_symbol_rules(symbol_id,min_reels) VALUES(?,3)');
+    const insPay=db.prepare('INSERT OR IGNORE INTO space_symbol_multipliers(symbol_id,matches,multiplier_milli) VALUES(?,?,?)');
+    const unit=db.prepare('SELECT percent_hundredths FROM symbol_unit_prices WHERE symbol_id=?');
+    const reel=db.prepare('SELECT multiplier_milli FROM symbol_reel_multipliers WHERE symbol_id=? AND reel_count=?');
+    db.transaction(()=>{
+      for(const symbol of ordinary){
+        insRule.run(symbol.id);
+        const price=unit.get(symbol.id)?.percent_hundredths||0;
+        for(let count=2;count<=5;count++){
+          const ratio=reel.get(symbol.id,count)?.multiplier_milli??1000;
+          // One-off migration preserves pre-existing 3..5 payouts approximately,
+          // but never overwrites admin-edited new coefficients.
+          const milli=count===2?0:Math.min(1000000,Math.round(count*price*ratio/10000));
+          insPay.run(symbol.id,count,milli);
+        }
+      }
+    })();
   }
 }
 // Built-in Cosmic Odyssey art is registered once and remains editable in the image library.
