@@ -682,6 +682,30 @@ db.exec(`CREATE TABLE IF NOT EXISTS egypt_symbol_weights (
   weight INTEGER NOT NULL DEFAULT 100 CHECK(weight BETWEEN 0 AND 10000)
 )`);
 
+// Editable Egypt paylines: one row per reel, 0..3, each line crosses six
+// reels. Seed the original ten once; never replace admin edits on restart.
+db.exec(`CREATE TABLE IF NOT EXISTS egypt_paylines (
+  id INTEGER PRIMARY KEY,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  rows_json TEXT NOT NULL,
+  UNIQUE(game_id,position)
+)`);
+{
+  const game=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(game){
+    const defaults=[[0,0,0,0,0,0],[1,1,1,1,1,1],
+      [2,2,2,2,2,2],[3,3,3,3,3,3],[0,1,2,3,2,1],
+      [3,2,1,0,1,2],[0,0,1,1,2,2],[3,3,2,2,1,1],
+      [1,0,1,2,3,2],[2,3,2,1,0,1]];
+    const has=db.prepare('SELECT COUNT(*) AS n FROM egypt_paylines WHERE game_id=?').get(game.id).n;
+    if(!has){
+      const insert=db.prepare('INSERT INTO egypt_paylines(game_id,position,rows_json) VALUES(?,?,?)');
+      db.transaction(()=>defaults.forEach((rows,index)=>insert.run(game.id,index+1,JSON.stringify(rows))))();
+    }
+  }
+}
+
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
