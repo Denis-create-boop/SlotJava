@@ -1345,7 +1345,8 @@
     document.body.append(label);
     try{
       for(const win of result.lineWins){
-        const rows=egyptPaths[win.line-1];
+        const rows=Array.isArray(win.rows)&&win.rows.length===reelCount
+          ?win.rows:egyptPaths[win.line-1];
         if(!rows)continue;
         ctx.clearRect(0,0,width,height);
         ctx.beginPath();
@@ -1359,11 +1360,12 @@
         ctx.lineWidth=4;ctx.shadowColor='#ffce56';ctx.shadowBlur=15;ctx.stroke();
         ctx.shadowBlur=0;
         const linePrize=win.prize??result.perLine;
-        label.textContent='ЛИНИЯ '+win.line+' / 10  ·  +'+linePrize+' очков';
+        const linesCount=Number(root.dataset.egyptLineCount)||egyptPaths.length;
+        label.textContent='ЛИНИЯ '+win.line+' / '+linesCount+'  ·  +'+linePrize+' очков';
         label.style.left=Math.max(8,Math.min(width-260,coords[0].left+8))+'px';
         label.style.top=Math.max(10,coords[0].top-52)+'px';
         const name=symbols.get(win.symbolId??result.symbolId)?.name||'Символ';
-        message.textContent=name+': линия '+win.line+' из 10 · +'+linePrize+' очков';
+        message.textContent=name+': линия '+win.line+' из '+linesCount+' · +'+linePrize+' очков';
         await delay(reducedMotion?140:420);
       }
     }finally{
