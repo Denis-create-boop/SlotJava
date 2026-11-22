@@ -20,6 +20,7 @@ function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,randomInt}){
   if(!symbols.some(symbol=>symbol.id===selectedId))throw Error('Egypt bonus symbol is missing.');
   if(typeof randomInt!=='function')throw Error('Missing random number generator.');
   const board=Array.from({length:reels*rows},()=>symbols[randomInt(symbols.length)].id);
+  const initialCells=board.slice();
   const expandedReels=[];
   for(let reel=0;reel<reels;reel++){
     if(Array.from({length:rows},(_,row)=>board[row*reels+reel]).includes(selectedId)){
@@ -27,7 +28,7 @@ function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,randomInt}){
       for(let row=0;row<rows;row++)board[row*reels+reel]=selectedId;
     }
   }
-  return {cells:board,expandedReels};
+  return {cells:board,initialCells,expandedReels};
 }
 
 function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
