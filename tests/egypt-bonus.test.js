@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,chooseNewEgyptSymbol,nextEgyptBonusSeries}=require('../egypt-bonus');
+const {EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptWeightedPicker,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,chooseNewEgyptSymbol,nextEgyptBonusSeries}=require('../egypt-bonus');
 const {scatterOnBoard,freeSpinsFor}=require('../slot-bonus');
 
 test('Egypt uses ten distinct six-reel paylines over four rows',()=>{
@@ -321,4 +321,18 @@ test('Zero direct price overrides legacy price and disables matching payout',()=
  const base=scoreEgyptBaseLines({cells,symbols:[{id:8,name:'Ankh'}],bet:100,payouts,
    linePricesById:{'8:6':0}});
  assert.equal(base.total,0);
+});
+
+test('Egypt per-reel weighted draw favors higher weights on every reel',()=>{
+  let n=0;
+  const pick=egyptWeightedPicker([{id:1},{id:2},{id:3}],{1:1,2:3,3:0},
+    max=>(n++)%max);
+  assert.deepEqual(Array.from({length:8},pick),[1,2,2,2,1,2,2,2]);
+});
+test('Egypt zero weight prevents random appearance and unset weight defaults to 100',()=>{
+  const pick=egyptWeightedPicker([{id:1},{id:2}],{1:0},max=>max-1);
+  assert.equal(pick(),2);
+});
+test('Egypt requires at least one symbol with a positive appearance weight',()=>{
+  assert.throws(()=>egyptWeightedPicker([{id:1},{id:2}],{1:0,2:0},max=>0));
 });
