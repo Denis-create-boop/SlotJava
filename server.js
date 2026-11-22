@@ -304,7 +304,11 @@ function firstGamePage(game,req){
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
   const selectedEgypt=game.slug==='golden-seven'?(bonus?.selected_symbol_id||0):0;
-  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'">'+
+  const egyptScatterOdds=game.slug==='golden-seven'&&scatter
+    ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
+      rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
+    :'';
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
