@@ -203,8 +203,6 @@
     if(submit)submit.disabled=true;
     updateBetSteps();
     try{
-      const token=betForm.querySelector('input[name="_csrf"]')||
-        betForm.querySelector('input[name="csrf_token"]');
       // Reuse the existing form data including the CSRF token, but explicitly
       // send the target bet even when changing it with the side buttons.
       const body=new URLSearchParams(new FormData(betForm));
@@ -242,7 +240,7 @@
       if(next!==undefined)saveBet(next);
     });
   }
-  updateBetSteps();
+  // Initialize after the spin/autoplay state declarations below.
 
   const columns=Array.from(root.querySelectorAll('.reel-column'));
   const reelCount=columns.length;
@@ -1495,6 +1493,7 @@
     autoStop.addEventListener('click',()=>stopAutoplay('Автоигра остановлена пользователем.'));
   }
   let spinning=false;
+  updateBetSteps();
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(spinning||!definitions.length)return;
