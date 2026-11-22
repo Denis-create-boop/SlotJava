@@ -512,9 +512,20 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       // Identify winning Wild cells BEFORE expansion. A Wild that isn't on a
       // paid line must remain a normal small symbol, not trigger reel expansion.
       const originalScore=scoreSpaceLines({cells:preExpansionCells,...scoring});
-      const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId,originalScore.wins);
-      const scored=expansion.expandedReels.length
+      let expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId,originalScore.wins);
+      let scored=expansion.expandedReels.length
         ?scoreSpaceLines({cells:expansion.cells,...scoring}):originalScore;
+      // Cascading expansion: as winning Wilds grow, they may complete new
+      // paylines which include another ORIGINAL Wild (e.g. on reel 5).
+      // Re-evaluate and expand those reels until no further Wild qualifies.
+      // Only cells that were Wild in the original spin may initiate growth.
+      for(let attempt=0;attempt<5;attempt++){
+        const next=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId,
+          scored.wins,expansion.expandedReels);
+        if(next.expandedReels.length===expansion.expandedReels.length)break;
+        expansion=next;
+        scored=scoreSpaceLines({cells:expansion.cells,...scoring});
+      }
       // Apply the current X to this spin, then increment it by one.
       const currentMultiplier=cosmicBonusMultiplier(req.user.id,game.id);
       const nextMultiplier=Math.min(1000000,currentMultiplier+1);
