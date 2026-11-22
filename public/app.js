@@ -829,6 +829,20 @@
     if(egyptLinesOverlay){egyptLinesOverlay.hidden=true;egyptLinesOverlay.replaceChildren();}
     columns.forEach(col=>col.classList.remove('egypt-expanded-reel'));
   }
+  async function animateEgyptExpansion(result){
+    if(!Array.isArray(result.expandedReels))return;
+    for(const col of result.expandedReels){
+      if(!Number.isInteger(col)||col<0||col>=reelCount)continue;
+      const column=columns[col];
+      column.classList.remove('egypt-expanding-reel');
+      showStatic(column,Array(rowCount).fill(result.selectedSymbolId));
+      void column.offsetWidth;
+      column.classList.add('egypt-expanding-reel');
+      play('win_sound');
+      await delay(330);
+    }
+    columns.forEach(col=>col.classList.remove('egypt-expanding-reel'));
+  }
   function paintEgyptLines(result){
     clearEgyptLines();
     if(!Array.isArray(result.expandedReels))return;
@@ -975,11 +989,18 @@
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
         await animateBonusSteps(result.steps);
       }else{
+        const startingCells=result.mode==='egypt-bonus'&&
+          Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
+          ?result.preExpansionCells:result.cells;
         const animations=columns.map((col,index)=>{
-          const target=Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index]);
+          const target=Array.from({length:rowCount},(_,row)=>startingCells[row*reelCount+index]);
           return animateColumn(col,index,target);
         });
         await Promise.all(animations);
+        if(result.mode==='egypt-bonus'){
+          stopSpinSound();
+          await animateEgyptExpansion(result);
+        }
       }
       stopSpinSound();
       if(result.mode!=='egypt-bonus'){
