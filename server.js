@@ -121,7 +121,7 @@ function layout(title,body,user,csrf,balanceLabel) {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-layout-fix-20261122"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке</footer><script src="/static/app.js" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-art-check-3" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -285,7 +285,10 @@ function firstGamePage(game,req){
     const assigned=chosenImages.get(symbol.id);
     const uploaded=url('symbol_'+symbol.id);
     const image=egyptDefaultArt(symbol,assigned||uploaded||'');
-    return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'"></span>';
+    const key=game.slug==='golden-seven'?egyptDefaultKeys.get(symbol.name):null;
+    const defaultImage=key?'/static/images/egypt/premium-'+key+'.svg':'';
+    const allowedDefault=defaultImage&&!hiddenEgyptArt.has(defaultImage)?defaultImage:'';
+    return '<span data-symbol-def data-symbol-id="'+symbol.id+'" data-name="'+h(symbol.name)+'" data-image="'+h(image)+'" data-default-image="'+h(allowedDefault)+'"></span>';
   }).join('');
   const audio=['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].map(key=>url(key)?'<audio preload="none" data-sound="'+key+'" src="'+h(url(key))+'"></audio>':'').join('');
   const wallet=getWallet(req.user.id,game.id);
