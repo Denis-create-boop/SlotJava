@@ -106,7 +106,10 @@
   let useUploadedMusic=false;
   try {
     soundEnabled=window.localStorage.getItem('slotjava-sound')!=='off';
-    useUploadedMusic=window.localStorage.getItem('slotjava-use-uploaded-music')==='yes';
+    // Uploaded soundtrack should be active by default once available.
+    // An explicit user opt-out still takes priority.
+    const uploadedMusicPreference=window.localStorage.getItem('slotjava-use-uploaded-music');
+    useUploadedMusic=uploadedMusicPreference!=='no' && (uploadedMusicPreference==='yes'||!!root.querySelector('[data-sound="music"], [data-sound="bonus_music"]'));
   } catch {}
   if(uploadedMusicToggle){
     uploadedMusicToggle.checked=useUploadedMusic;
