@@ -66,7 +66,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   const menuGroups=[
     {key:'appearance',label:'Управление фонами',items:['background','reels','cells','panels','library']},
     {key:'sounds',label:'Управление звуками',items:['audio']},
-    {key:'gameplay',label:'Настройки игры',items:['symbols','frequency','scatter']},
+    {key:'gameplay',label:'Настройки игры',items:['symbols','lines','frequency','scatter']},
     {key:'general',label:'Общие настройки',items:['name','menu-labels']}
   ];
   const defaultMenuLabel='Названия кнопок';
@@ -236,7 +236,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: одна таблица выплат для обычной и бонусной игры. Задайте самостоятельную цену за 2, 3, 4, 5 и 6 совпавших барабанов. В обычной игре совпадения подряд слева направо на одной из 10 линий. В бонусе выбранный символ расширяется и совпавшие барабаны могут быть несоседними. Каждая выигрышная линия оплачивается отдельно.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
         (game.slug==='golden-seven'?'':'<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>')+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все 10 линий — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Пример: ставка 100, за 3 совпавших символа указан множитель ×2 — это 200 очков за одну выигрышную линию. Если сыграли все настроенные линии — всего 2000 очков. ×0 отключает выплату за соответствующее количество символов.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
         '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">'+(game.slug==='golden-seven'?'Сохранить выплаты за 2–6 символов':'Сохранить цену и множители')+'</button></form>')+
         (isScatter?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
@@ -250,6 +250,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ['audio','Музыка и звуки','Музыка, вращение и выигрыш','music'],
       ['library','Папка изображений','Загрузка и хранение картинок','folder'],
       ['symbols','Символы и коэффициенты','Символы и таблица выплат','star'],
+      ...(game.slug==='golden-seven'?[['lines','Линии выигрыша','Добавить, изменить или удалить линии','columns']]:[]),
       ['frequency','Частота и размеры выигрыша','Вероятность и пороги крупного выигрыша','percent']
       ,...(scatter?[['scatter','Бонусная игра SCATTER','Шанс и лимит Scatter на каждом барабане','star']]:[]),
       ['menu-labels',defaultMenuLabel,'Переименование разделов и кнопок','image']
@@ -324,16 +325,43 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
       '<button class="primary" type="submit">Добавить в папку</button></form>'+
       '<div class="library-images">'+libraryCards+'</div></section>';
-    const egyptLinePreview=game.slug==='golden-seven'
-      ?'<div class="egypt-lines-gallery">'+EGYPT_LINES.map((rows,index)=>{
-        const points=rows.map((row,col)=>(30+col*60)+','+(25+row*45)).join(' ');
-        return '<div class="egypt-line-card"><strong>Линия '+(index+1)+'</strong>'+
-          '<svg viewBox="0 0 360 185" role="img" aria-label="Линия '+(index+1)+'">'+
-          Array.from({length:6},(_,col)=>'<line x1="'+(30+col*60)+'" y1="8" x2="'+(30+col*60)+'" y2="172" stroke="#8d7450" stroke-width="1"/>').join('')+
-          '<polyline points="'+points+'" fill="none" stroke="#ffd775" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'+
-          rows.map((row,col)=>'<circle cx="'+(30+col*60)+'" cy="'+(25+row*45)+'" r="6" fill="#fff2ad"/>').join('')+
-          '</svg></div>';
-      }).join('')+'</div>':'';
+    const egyptLineEntries=game.slug==='golden-seven'
+      ?db.prepare('SELECT id,position,rows_json FROM egypt_paylines WHERE game_id=? ORDER BY position,id')
+          .all(id).map(row=>({id:row.id,rows:JSON.parse(row.rows_json)})):[];
+    const linePreview=(rows,index)=>'<div class="egypt-line-card"><strong>Линия '+(index+1)+'</strong>'+
+      '<svg viewBox="0 0 360 185" role="img" aria-label="Линия '+(index+1)+'">'+
+      Array.from({length:6},(_,col)=>'<line x1="'+(30+col*60)+'" y1="8" x2="'+(30+col*60)+'" y2="172" stroke="#8d7450" stroke-width="1"/>').join('')+
+      '<polyline points="'+rows.map((row,col)=>(30+col*60)+','+(25+row*45)).join(' ')+
+        '" fill="none" stroke="#ffd775" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'+
+      rows.map((row,col)=>'<circle cx="'+(30+col*60)+'" cy="'+(25+row*45)+'" r="6" fill="#fff2ad"/>').join('')+
+      '</svg></div>';
+    const egyptLinePreview='<div class="egypt-lines-gallery">'+
+      egyptLineEntries.map((item,index)=>linePreview(item.rows,index)).join('')+'</div>';
+    const lineFields=(rows)=>'<div class="payout-grid">'+Array.from({length:6},(_,index)=>
+      '<label>Барабан '+(index+1)+
+      '<select name="row_'+(index+1)+'" required>'+
+      Array.from({length:4},(_,row)=>
+        '<option value="'+(row+1)+'"'+(rows[index]===row?' selected':'')+'>Строка '+(row+1)+'</option>').join('')+
+      '</select></label>').join('')+'</div>';
+    if(activeTab==='lines'&&game.slug==='golden-seven'){
+      const editor=egyptLineEntries.map((item,index)=>
+        '<div class="egypt-line-editor"><h3>Линия '+(index+1)+'</h3>'+
+        linePreview(item.rows,index)+
+        '<form method="post" action="/admin/games/'+id+'/egypt-lines/'+item.id+'/save">'+csrf+
+        lineFields(item.rows)+
+        '<button class="primary" type="submit">Сохранить линию</button></form>'+
+        (egyptLineEntries.length>1?
+          '<form method="post" action="/admin/games/'+id+'/egypt-lines/'+item.id+'/delete">'+csrf+
+          '<button type="submit" class="danger-action">Удалить линию</button></form>':'')+
+        '</div>').join('');
+      panel=panelStart('Линии выигрыша Египта')+
+        '<p class="hint">Линия проходит через одну ячейку каждого из шести барабанов. Выбери строку (от 1 — верхняя до 4 — нижняя) для каждого барабана. Эти линии действуют в обычной и бонусной игре. Выплата начисляется за каждую сыгравшую линию отдельно. Допускается от 1 до 50 различных линий.</p>'+
+        '<div class="egypt-line-editors">'+editor+'</div>'+
+        '<h3>Добавить линию</h3>'+
+        '<form method="post" action="/admin/games/'+id+'/egypt-lines/add">'+csrf+
+        lineFields([0,0,0,0,0,0])+
+        '<button class="primary" type="submit">Добавить линию</button></form></section>';
+    }
     if(activeTab==='scatter'&&scatter){
       const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
       const inputs=Array.from({length:layout.reels},(_,i)=>{
@@ -358,7 +386,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
           ?'Задайте шанс SCATTER отдельно для каждого из шести барабанов. На одном барабане может быть только один SCATTER.'
           :'Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.')+'</p>'+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20, 6 — 25. Максимум один SCATTER на барабан. Перед бонусом случайно выбирается символ. Он расширяется на весь барабан, где выпал, и выигрывает на 10 линиях при наличии на 2 или 3 любых барабанах (по настройке символа). Множителя первой игры здесь нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
-        (game.slug==='golden-seven'?'<h3>Десять линий бонусной игры</h3>'+egyptLinePreview+
+        (game.slug==='golden-seven'?'<h3>Линии бонусной игры ('+egyptLineEntries.length+')</h3>'+egyptLinePreview+
           '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому любая из этих 10 линий учитывает все такие барабаны, даже несоседние.</p>':'')+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
@@ -394,6 +422,53 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     res.redirect(sectionUrl(id,'menu-labels')+'&saved=1');
   });
   app.get('/admin/games/:id',adminOnly,(req,res)=>show(req,res));
+  function egyptLineInput(req){
+    const fields=Array.from({length:6},(_,i)=>req.body?.['row_'+(i+1)]);
+    return fields.every(value=>typeof value==='string'&&/^[1-4]$/.test(value))
+      ?fields.map(value=>Number(value)-1):null;
+  }
+  function egyptLinesGame(req){
+    const id=gameId(req),game=id?gameById(id):null;
+    return game?.slug==='golden-seven'?id:null;
+  }
+  app.post('/admin/games/:id/egypt-lines/add',adminOnly,postGuard,(req,res)=>{
+    const id=egyptLinesGame(req);
+    if(!id)return res.sendStatus(404);
+    const rows=egyptLineInput(req);
+    if(!rows)return show(req,res,'Выберите строку от 1 до 4 на каждом барабане.',true,'lines');
+    const entries=db.prepare('SELECT rows_json FROM egypt_paylines WHERE game_id=?').all(id);
+    if(entries.length>=50)return show(req,res,'Максимум 50 линий.',true,'lines');
+    const json=JSON.stringify(rows);
+    if(entries.some(item=>item.rows_json===json))
+      return show(req,res,'Такая линия уже существует.',true,'lines');
+    const position=db.prepare('SELECT COALESCE(MAX(position),0)+1 AS n FROM egypt_paylines WHERE game_id=?').get(id).n;
+    db.prepare('INSERT INTO egypt_paylines(game_id,position,rows_json) VALUES(?,?,?)').run(id,position,json);
+    res.redirect(sectionUrl(id,'lines')+'&saved=1');
+  });
+  app.post('/admin/games/:id/egypt-lines/:lineId/save',adminOnly,postGuard,(req,res)=>{
+    const id=egyptLinesGame(req),lineId=Number(req.params.lineId);
+    if(!id||!Number.isSafeInteger(lineId)||lineId<1)return res.sendStatus(404);
+    const own=db.prepare('SELECT id FROM egypt_paylines WHERE id=? AND game_id=?').get(lineId,id);
+    if(!own)return res.sendStatus(404);
+    const rows=egyptLineInput(req);
+    if(!rows)return show(req,res,'Выберите строку от 1 до 4 на каждом барабане.',true,'lines');
+    const json=JSON.stringify(rows);
+    const duplicate=db.prepare('SELECT id FROM egypt_paylines WHERE game_id=? AND rows_json=? AND id!=?').get(id,json,lineId);
+    if(duplicate)return show(req,res,'Такая линия уже существует.',true,'lines');
+    db.prepare('UPDATE egypt_paylines SET rows_json=? WHERE id=? AND game_id=?').run(json,lineId,id);
+    res.redirect(sectionUrl(id,'lines')+'&saved=1');
+  });
+  app.post('/admin/games/:id/egypt-lines/:lineId/delete',adminOnly,postGuard,(req,res)=>{
+    const id=egyptLinesGame(req),lineId=Number(req.params.lineId);
+    if(!id||!Number.isSafeInteger(lineId)||lineId<1)return res.sendStatus(404);
+    const deleted=db.transaction(()=>{
+      const count=db.prepare('SELECT COUNT(*) AS n FROM egypt_paylines WHERE game_id=?').get(id).n;
+      if(count<=1)return false;
+      return db.prepare('DELETE FROM egypt_paylines WHERE id=? AND game_id=?').run(lineId,id).changes>0;
+    })();
+    if(!deleted)return show(req,res,'Нельзя удалить последнюю линию или линия не найдена.',true,'lines');
+    res.redirect(sectionUrl(id,'lines')+'&saved=1');
+  });
   app.post('/admin/games/:id/scatter',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
     if(!game||!['slot-classic','golden-seven'].includes(game.slug)||!getScatterSettings(id))return res.sendStatus(404);
