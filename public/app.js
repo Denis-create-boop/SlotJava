@@ -786,6 +786,67 @@
     bonusIntro.classList.remove('is-showing');
     scatterTiles.forEach(tile=>tile.classList.remove('scatter-celebrate'));
   }
+  // Egypt's bonus uses one persistent chosen symbol and ten fixed paylines.
+  const egyptSelectedLabel=document.getElementById('egypt-selected-label');
+  const egyptPicker=document.getElementById('egypt-bonus-picker');
+  const egyptPickerPortrait=document.getElementById('egypt-bonus-picker-portrait');
+  const egyptPickerName=document.getElementById('egypt-bonus-picker-name');
+  const egyptLinesOverlay=document.getElementById('egypt-payline-overlay');
+  const egyptPaths=[
+    [0,0,0,0,0,0],[1,1,1,1,1,1],[2,2,2,2,2,2],[3,3,3,3,3,3],
+    [0,1,2,3,2,1],[3,2,1,0,1,2],[0,0,1,1,2,2],[3,3,2,2,1,1],
+    [1,0,1,2,3,2],[2,3,2,1,0,1]
+  ];
+  let egyptChosenId=Number(root.dataset.egyptSelected)||0;
+  function paintEgyptSelection(){
+    if(!egyptSelectedLabel)return;
+    const item=symbols.get(egyptChosenId);
+    egyptSelectedLabel.hidden=!bonusActive||!item;
+    if(item)egyptSelectedLabel.textContent='Бонусный символ: '+item.name+' · 10 линий';
+  }
+  paintEgyptSelection();
+  async function animateEgyptSelection(id){
+    if(!egyptPicker||!egyptPickerPortrait||!egyptPickerName)return;
+    const pool=regularDefinitions;
+    if(!pool.length)return;
+    egyptPicker.hidden=false;
+    const render=item=>{
+      egyptPickerPortrait.replaceChildren(makeTile(item.id));
+      egyptPickerName.textContent=item.name;
+    };
+    // Fast but readable changes: ~90 ms, then slow into the chosen symbol.
+    for(let frame=0;frame<27&&!reducedMotion;frame++){
+      render(pool[frame%pool.length]);
+      await delay(frame<19?90:120+(frame-19)*17);
+    }
+    render(symbols.get(id)||pool[0]);
+    await delay(1100);
+    egyptPicker.hidden=true;
+    egyptChosenId=id;
+    paintEgyptSelection();
+  }
+  function clearEgyptLines(){
+    if(egyptLinesOverlay){egyptLinesOverlay.hidden=true;egyptLinesOverlay.replaceChildren();}
+    columns.forEach(col=>col.classList.remove('egypt-expanded-reel'));
+  }
+  function paintEgyptLines(result){
+    clearEgyptLines();
+    if(!Array.isArray(result.expandedReels))return;
+    for(const col of result.expandedReels){
+      if(Number.isInteger(col)&&col>=0&&col<reelCount)
+        columns[col].classList.add('egypt-expanded-reel');
+    }
+    if(!egyptLinesOverlay||!Array.isArray(result.lineWins)||!result.lineWins.length)return;
+    for(const line of result.lineWins){
+      const rows=egyptPaths[line.line-1];
+      if(!rows)continue;
+      const path=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+      path.setAttribute('points',rows.map((row,col)=>(50+col*100)+','+(50+row*100)).join(' '));
+      path.setAttribute('class','egypt-payline egypt-payline-'+line.line);
+      egyptLinesOverlay.append(path);
+    }
+    egyptLinesOverlay.hidden=false;
+  }
   // Autoplay always uses the existing server-validated spin endpoint.
   // Counts paid spins only; bonus/free spins do not consume the selected quota.
   const autoCount=document.getElementById('slot-auto-count');
@@ -872,6 +933,7 @@
     spinning=true;
     clearWinningGlow();
     clearBonusLocks();
+    if(isEgypt)clearEgyptLines();
     hideBigWin();
     button.disabled=true;
     settingsButton.disabled=true;
@@ -920,14 +982,18 @@
         await Promise.all(animations);
       }
       stopSpinSound();
-      highlightWinningSymbols(result.mode==='bonus'
-        ?(Array.isArray(result.wins)?result.wins.filter(win=>win.prize>0):[])
-        :(Array.isArray(result.wins)?result.wins:[]));
+      if(result.mode!=='egypt-bonus'){
+        highlightWinningSymbols(result.mode==='bonus'
+          ?(Array.isArray(result.wins)?result.wins.filter(win=>win.prize>0):[])
+          :(Array.isArray(result.wins)?result.wins:[]));
+      }else{
+        paintEgyptLines(result);
+      }
       if(result.mode==='bonus'&&result.steps?.length)
         applyBonusLocks(result.steps[result.steps.length-1].frozenCells);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
-      winDisplay.textContent=result.mode==='bonus'&&result.total===0?'—':String(result.total);
+      winDisplay.textContent=result.mode!=='base'&&result.total===0?'—':String(result.total);
       const tier=['none','normal','big','mega'].includes(result.winTier)?result.winTier:'none';
       const tierText=tier==='mega'?'Очень крупный выигрыш':tier==='big'?'Крупный выигрыш':'Выигрыш';
       const matches=Array.isArray(result.wins)?result.wins:[];
@@ -935,26 +1001,37 @@
         :matches.length?'Есть совпадения, но выплата за них равна нулю. Проверьте цены символов в админке.'
         :'Без выигрыша. Попробуйте ещё.';
       if(result.mode!=='bonus')showBigWin(tier);
-      if(result.mode==='base'&&result.egyptTrigger){
-        // Visual trigger only. Egypt bonus rules and payouts are intentionally
-        // not borrowed from the classic game until they are configured.
-        const field=root.querySelector('.slot-reels-ribbon');
-        const announcement=document.createElement('div');
-        announcement.className='egypt-scatter-announcement';
-        announcement.innerHTML='<strong>СКАРАБЕИ!</strong><span>БОНУС ОТКРЫТ</span><small>Правила бонусной игры появятся позже</small>';
-        if(field)field.append(announcement);
-        play('bonus_sound');
-        message.textContent='Выпало '+result.scatterCount+' скарабеев! Бонусный символ активирован. Механика бонуса ещё настраивается.';
-        await delay(2200);
-        announcement.remove();
-      }
       if(result.mode==='base'&&result.freeSpins>0){
         // Bonus activation ends autoplay immediately; free spins are manual.
         if(autoRunning)stopAutoplay('Автоигра завершена: выпала бонусная игра. Бесплатные вращения запускаются вручную.');
         await celebrateScatter(result.scatterCount,result.freeSpins);
-        updateBonus(true,result.freeSpins,2,0);
-        message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
-          ' бесплатных вращений. Начальный множитель ×2!';
+        if(isEgypt){
+          await animateEgyptSelection(Number(result.selectedSymbolId));
+          updateBonus(true,result.freeSpins,1,0);
+          paintEgyptSelection();
+          message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
+        }else{
+          updateBonus(true,result.freeSpins,2,0);
+          message.textContent='SCATTER ×'+result.scatterCount+'! '+result.freeSpins+
+            ' бесплатных вращений. Начальный множитель ×2!';
+        }
+      }else if(result.mode==='egypt-bonus'){
+        egyptChosenId=Number(result.selectedSymbolId)||egyptChosenId;
+        const qualified=Array.isArray(result.lineWins)?result.lineWins.length:0;
+        message.textContent=qualified
+          ?'Египет: '+result.matchedReels+' барабанов, '+qualified+' линий, выигрыш '+result.total+' очков.'
+          :'Египет: '+result.matchedReels+' барабанов, нужно минимум '+result.minReels+'.';
+        if(qualified)await delay(2300);
+        if(result.total>0)showBigWin(tier);
+        updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
+        paintEgyptSelection();
+        if(result.completedBonus&&bonusFinish){
+          bonusFinishTotal.textContent=String(result.bonusWin);
+          bonusFinish.hidden=false;
+          message.textContent='Бонус Египта завершён! Всего '+result.bonusWin+' очков за 10 линий.';
+        }else{
+          message.textContent+=' Осталось бесплатных вращений: '+result.remaining+'.';
+        }
       }else if(result.mode==='bonus'){
         // The tier is based on the final multiplied award, supplied by the server.
         // Announce a large bonus win first, and only then reveal its calculation.
