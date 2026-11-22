@@ -1546,3 +1546,54 @@ header nav .header-user-balance{
   .slot-theme-egypt .egypt-symbol-strip-item{min-width:56px;flex-basis:56px}
   .slot-theme-egypt .egypt-symbol-strip-item small{font-size:.6rem}
 }
+
+
+/* Game image preloader: shown immediately in server-rendered HTML, while all
+   required symbols, decorations and backgrounds decode behind the curtain. */
+.slot-loading-screen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+  background:radial-gradient(ellipse at 50% 40%,#3f2a22 0%,#1b1620 52%,#0c1017 100%);
+  opacity:1;
+  transition:opacity 300ms ease-in-out;
+}
+.slot-loading-screen[hidden]{display:none!important}
+.slot-loading-screen.is-ready{opacity:0;pointer-events:none}
+.slot-loading-panel{
+  width:min(100%,430px);
+  display:flex;flex-direction:column;align-items:center;gap:15px;
+  padding:clamp(24px,6vw,44px);
+  color:#ffe9bc;text-align:center;
+  border:2px solid #d9ae62;border-radius:24px;
+  background:linear-gradient(145deg,#392823,#1f1922 55%,#30201b);
+  box-shadow:0 0 48px #e9a64142,inset 0 0 24px #ffdf8152,0 22px 50px #0008;
+}
+.slot-loading-glyph{
+  font-size:clamp(3rem,10vw,5rem);
+  line-height:1;color:#ffe2a1;
+  text-shadow:0 0 25px #ffb548,0 0 50px #f5a532;
+  animation:slot-loading-pulse 1.4s ease-in-out infinite alternate;
+}
+.slot-loading-panel>strong{font-size:clamp(1.3rem,4vw,1.9rem);letter-spacing:.13em}
+.slot-loading-panel>span:not(.slot-loading-glyph){font-size:.93rem;color:#f0cd93}
+.slot-loading-progress{
+  width:100%;height:13px;overflow:hidden;
+  background:#120f19;border:1px solid #c79f52;border-radius:999px;
+  box-shadow:inset 0 2px 8px #0009;
+}
+#slot-loading-fill{
+  width:0%;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,#95602d,#ffd874,#ffab38);
+  box-shadow:0 0 12px #e8a94e;
+  transition:width 140ms linear;
+}
+#slot-loading-count{font-variant-numeric:tabular-nums;font-weight:800}
+@keyframes slot-loading-pulse{
+  from{transform:scale(.95);filter:brightness(.85)}
+  to{transform:scale(1.08);filter:brightness(1.2)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-loading-glyph{animation:none}
+  .slot-loading-screen,#slot-loading-fill{transition:none}
+}
