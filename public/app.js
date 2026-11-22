@@ -861,7 +861,17 @@
     const track=col.querySelector('.reel-track');
     const view=col.querySelector('.reel-window');
     const rowHeight=view.getBoundingClientRect().height/rowCount;
-    const extra=16+index*3;
+    // A suspense reel needs a longer REAL symbol strip so it can spin at
+    // constant high speed until its own turn to brake. Later reels get more
+    // tiles rather than stretching a short animation over more seconds.
+    const suspense=options.suspense;
+    const accelAt=suspense?.accelerateAt??0;
+    const brakeAt=suspense?.brakeAt??0;
+    const delay=options.delay??index*160;
+    const cruiseCells=suspense?Math.max(6,Math.ceil((accelAt-delay)*.0055)):0;
+    const fastCells=suspense?Math.max(6,Math.ceil((brakeAt-accelAt)*.014)):0;
+    const brakeCells=suspense?6:0;
+    const extra=suspense?cruiseCells+fastCells+brakeCells-rowCount:16+index*3;
     // Keep the ACTUAL four visible tile nodes as the tail of the moving
     // ribbon. At the negative starting offset those same nodes occupy the
     // exact screen positions they occupied before the player pressed SPIN.
@@ -880,7 +890,6 @@
     track.style.transform='translate3d(0,'+startY+'px,0)';
     void track.offsetHeight;
     return new Promise(resolve=>{
-      const delay=options.delay??index*160;
       const duration=options.duration??(1400+index*170);
       let startTimer=null,endTimer=null,completed=false,motion=null;
       const finish=()=>{
@@ -900,17 +909,18 @@
       if(quickStopRequested){finish();return;}
       startTimer=window.setTimeout(()=>{
         if(quickStopRequested){finish();return;}
-        if(Number.isFinite(options.anticipationStart)&&typeof track.animate==='function'){
-          // Actual reel tiles: cruise before the second Scatter, accelerate
-          // sharply while glowing, then brake to the server-selected cells.
-          const accelerationAt=Math.max(.05,Math.min(.78,options.anticipationStart/duration));
-          const fastEnd=Math.min(.93,accelerationAt+.17);
-          const position=fraction=>'translate3d(0,'+(startY*fraction)+'px,0)';
+        if(suspense&&typeof track.animate==='function'){
+          // All waiting reels accelerate at the SAME moment. The first one
+          // starts braking while the others still travel at identical FAST
+          // speed; the next brakes only after the previous reel has stopped.
+          const accelerateOffset=(accelAt-delay)/duration;
+          const brakeOffset=(brakeAt-delay)/duration;
+          const at=cells=>'translate3d(0,'+(-cells*rowHeight)+'px,0)';
           motion=track.animate([
-            {offset:0,transform:position(1),easing:'linear'},
-            {offset:accelerationAt,transform:position(.57),easing:'linear'},
-            {offset:fastEnd,transform:position(.08),easing:'cubic-bezier(.16,.66,.13,1)'},
-            {offset:1,transform:position(0)}
+            {offset:0,transform:at(cruiseCells+fastCells+brakeCells),easing:'linear'},
+            {offset:accelerateOffset,transform:at(fastCells+brakeCells),easing:'linear'},
+            {offset:brakeOffset,transform:at(brakeCells),easing:'cubic-bezier(.12,.72,.18,1)'},
+            {offset:1,transform:at(0)}
           ],{duration,fill:'forwards',easing:'linear'});
         }else{
           track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
@@ -1020,13 +1030,20 @@
     const baseDuration=index=>1450+index*170;
     const secondStop=suspense?baseDelay(second)+baseDuration(second)+50:0;
     const overlays=new Map();
+    const accelerateAt=secondStop+70;
+    const brakingDuration=950;
+    const firstBrakeAt=accelerateAt+1250;
     const plans=columns.map((_,index)=>{
       const delay=baseDelay(index);
       if(!suspense||index<=second)return {delay,duration:baseDuration(index)};
-      // Each remaining reel keeps moving after the second Scatter is visible.
-      // Their finishing times remain strictly staggered left to right.
-      const finishAt=secondStop+2450+(index-second-1)*650;
-      return {delay,duration:finishAt-delay,anticipationStart:Math.max(0,secondStop-delay)};
+      const turn=index-second-1;
+      // Critical: next reel does not BEGIN braking until the previous one
+      // is completely stopped. Others keep their same accelerated velocity.
+      const brakeAt=firstBrakeAt+turn*(brakingDuration+160);
+      return {
+        delay,duration:brakeAt-delay+brakingDuration,
+        suspense:{accelerateAt,brakeAt}
+      };
     });
     const lightRemaining=()=>{
       if(quickStopRequested)return;
