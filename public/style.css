@@ -2523,3 +2523,36 @@ body:has(.slot-game.slot-theme-space)>header{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-space .space-retrigger-announcement.is-showing{animation:none}
 }
+
+/* Cosmic two-SCATTER anticipation: only still-moving reels glow. */
+.slot-theme-space .reel-column.space-scatter-anticipation-reel{
+  z-index:8;
+  border-color:#fff1ae;
+  box-shadow:0 0 10px #ffe07c,0 0 24px #ffad31,0 0 38px #b84cf9,
+    inset 0 0 20px #ffce6077;
+  animation:space-scatter-reel-glow .28s ease-in-out infinite alternate;
+}
+.slot-theme-space .space-scatter-suspense-glow{
+  position:absolute;inset:0;z-index:8;pointer-events:none;
+  border:3px solid #ffe58e;border-radius:9px;
+  box-shadow:inset 0 0 22px #ffad3588,0 0 24px #e45af7a8;
+  background:linear-gradient(90deg,#fef2b51e,transparent 35%,#e36cff29);
+  animation:space-scatter-veil-pulse .24s ease-in-out infinite alternate;
+  transition:opacity .3s ease-out;
+}
+.slot-theme-space .space-scatter-suspense-glow.is-finishing{opacity:0}
+.slot-theme-space .reel-column.space-scatter-anticipation-stopping{
+  animation:none;transition:box-shadow .25s ease-out;
+}
+@keyframes space-scatter-reel-glow{
+  from{filter:brightness(1.03);border-color:#e6a0ff}
+  to{filter:brightness(1.38);border-color:#fff0a2}
+}
+@keyframes space-scatter-veil-pulse{
+  from{opacity:.62}
+  to{opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-space .reel-column.space-scatter-anticipation-reel,
+  .slot-theme-space .space-scatter-suspense-glow{animation:none}
+}
