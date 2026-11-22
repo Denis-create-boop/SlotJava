@@ -539,7 +539,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!game||game.slug!=='golden-seven'||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
     if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
     const raw=req.body?.weight;
-    if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,4})$/.test(raw)||Number(raw)>10000)
+    if(typeof raw!=='string'||!/^(?:0|[1-9][0-9]{0,3}|10000)$/.test(raw)||Number(raw)>10000)
       return show(req,res,'Вес должен быть целым числом от 0 до 10000.',true,'symbols');
     const weight=Number(raw);
     const current=db.prepare(`SELECT COUNT(*) AS n FROM game_symbols s
