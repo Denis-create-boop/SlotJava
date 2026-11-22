@@ -172,6 +172,7 @@
   const regularDefinitions=definitions.filter(item=>item.id!==scatterId);
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
   const classicSounds=root.classList.contains('slot-theme-classic')||root.dataset.scatterId!=='0';
+  const egyptSounds=root.classList.contains('slot-theme-egypt');
   let audioContext=null;
   let ambientMusicTimer=null;
   let ambientStep=0;
@@ -204,7 +205,31 @@
   }
   // Original rock stingers for the classic slot; do not affect uploaded sound assets.
   function playGeneratedSound(name){
-    if(!classicSounds||!soundEnabled||name==='music')return;
+    if((!classicSounds&&!egyptSounds)||!soundEnabled||name==='music')return;
+    if(egyptSounds){
+      const ctx=getAudioContext();
+      if(!ctx)return;
+      const t=ctx.currentTime+.01;
+      const hit=(hz,at,duration,level=.07,wave='triangle')=>{
+        const osc=ctx.createOscillator(),gain=ctx.createGain(),filter=ctx.createBiquadFilter();
+        osc.type=wave;osc.frequency.value=hz;
+        filter.type='lowpass';filter.frequency.value=1400;
+        gain.gain.setValueAtTime(.0001,at);
+        gain.gain.exponentialRampToValueAtTime(level,at+.012);
+        gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        osc.connect(filter).connect(gain).connect(ctx.destination);
+        osc.start(at);osc.stop(at+duration+.01);
+      };
+      if(name==='bonus_sound'){
+        [0,.14,.28,.42,.56,.7].forEach((offset,i)=>hit(i%2?145:98,t+offset,.18,.065,'sawtooth'));
+        [220,261.63,329.63,440].forEach((hz,i)=>hit(hz,t+.45+i*.15,.45,.045));
+      }else if(name==='win_sound'||name==='big_win_sound'||name==='mega_win_sound'){
+        const extended=name==='mega_win_sound'?5:name==='big_win_sound'?4:3;
+        [220,261.63,329.63,440,523.25].slice(0,extended).forEach((hz,i)=>hit(hz,t+i*.14,i===extended-1?.7:.26,.045));
+        hit(110,t,.22,.075);
+      }else{hit(123.47,t,.15,.055);hit(185,t+.12,.18,.05);}
+      return;
+    }
     try{
       const ctx=getAudioContext();
       if(!ctx)return;
@@ -316,6 +341,51 @@
     }
     if(music&&!music.paused)music.pause();
     if(bonusMusic&&!bonusMusic.paused)bonusMusic.pause();
+    if(egyptSounds){
+      if(ambientMusicTimer!==null)return;
+      const ctx=getAudioContext();if(!ctx)return;
+      if(!ambientGain){
+        ambientGain=ctx.createGain();
+        ambientGain.gain.value=0;
+        ambientGain.connect(ctx.destination);
+      }
+      updateMusicVolume();
+      // Original temple soundtrack: pentatonic reed, plucked strings and low frame drum.
+      const note=(hz,at,duration,volume,wave='triangle',cutoff=1300)=>{
+        const osc=ctx.createOscillator(),gain=ctx.createGain(),filter=ctx.createBiquadFilter();
+        osc.type=wave;osc.frequency.setValueAtTime(hz,at);
+        filter.type='lowpass';filter.frequency.value=cutoff;
+        gain.gain.setValueAtTime(.0001,at);
+        gain.gain.linearRampToValueAtTime(volume,at+.035);
+        gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        osc.connect(filter).connect(gain).connect(ambientGain);
+        osc.start(at);osc.stop(at+duration+.03);
+      };
+      const phrases=[
+        [293.66,349.23,392,440,392,349.23],
+        [261.63,293.66,349.23,392,349.23,293.66],
+        [220,261.63,293.66,349.23,293.66,261.63],
+        [246.94,293.66,349.23,392,349.23,293.66]
+      ];
+      const playTemple=()=>{
+        if(!soundEnabled)return;
+        const t=ctx.currentTime+.05,melody=phrases[ambientStep%phrases.length];
+        const bass=[73.42,65.41,55,61.74][ambientStep%4];
+        note(bass,t,3.8,.065,'sine',260);
+        melody.forEach((hz,i)=>{
+          note(hz,t+i*.58,.48,.037,'triangle',1250);
+          if(i%2===0)note(hz/2,t+i*.58,.3,.022,'sawtooth',450);
+        });
+        [0,.9,1.8,2.7].forEach((offset,i)=>{
+          note(90,t+offset,.18,i===0?.085:.06,'sine',180);
+          if(i===1||i===3)note(170,t+offset+.14,.12,.026,'triangle',550);
+        });
+        ambientStep++;
+      };
+      playTemple();
+      ambientMusicTimer=window.setInterval(playTemple,3800);
+      return;
+    }
     if(!classicSounds||ambientMusicTimer!==null)return;
     // Updated built-in soundtrack: dark minor-key bass, chords and guitar.
     // Audio starts after user interaction; sounds are synthesized, not borrowed.
