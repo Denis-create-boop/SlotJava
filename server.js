@@ -8,7 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
-const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,nextEgyptBonusSeries } = require('./egypt-bonus');
+const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -209,13 +209,22 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
     ?new Map(db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(gameId)
         .map(rule=>[rule.symbol_id,rule.min_reels])):null;
+  const egyptMultipliers=game?.slug==='golden-seven'
+    ?Object.fromEntries(db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
+        FROM egypt_line_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+        WHERE s.game_id=?`).all(gameId)
+        .map(rule=>[rule.symbol_id+':'+rule.matches,rule.multiplier_milli])):null;
+  const evaluate=board=>egyptMultipliers
+    ?scoreEgyptBaseLines({cells:board,symbols,bet,payouts,
+        minReelsById:Object.fromEntries(egyptMinimums),lineMultipliersById:egyptMultipliers})
+    :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
   const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
   const wantWin=crypto.randomInt(100)<winFrequency;
-  let cells=randomBoard(),evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
+  let cells=randomBoard(),evaluation=evaluate(cells);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
-    cells=randomBoard();evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
+    cells=randomBoard();evaluation=evaluate(cells);
   }
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
@@ -225,11 +234,13 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
       const others=symbols.filter(item=>item.id!==rule.symbol_id);
       const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
       const activeReels=minReels+crypto.randomInt(reelCount-minReels+1);
-      if((reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
+      if((egyptMultipliers?.[rule.symbol_id+':'+activeReels]??reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
       const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
+      const line=egyptMultipliers?crypto.randomInt(10):null;
+      const egyptPath=line===null?null:require('./egypt-bonus').EGYPT_LINES[line];
       for(let col=0;col<activeReels;col++)
-        arranged[crypto.randomInt(rows)*reelCount+col]=rule.symbol_id;
-      const scored=scoreBoard(arranged,symbols,payouts,bet,rows,egyptMinimums);
+        arranged[(egyptPath?egyptPath[col]:crypto.randomInt(rows))*reelCount+col]=rule.symbol_id;
+      const scored=evaluate(arranged);
       if(scored.total>0){cells=arranged;evaluation=scored;}
     }
   }
@@ -239,7 +250,7 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   if(scatter&&layout.rows===4&&(layout.reels===5||layout.reels===6)){
     const placed=scatterOnBoard(cells,scatter.symbolId,scatter.rules,rows,reelCount,n=>crypto.randomInt(n));
     cells=placed.cells;scatterCount=placed.count;
-    evaluation=scoreBoard(cells,symbols,payouts,bet,rows,egyptMinimums);
+    evaluation=evaluate(cells);
   }
   return {cells,total:evaluation.total,wins:evaluation.wins,win:evaluation.total>0,scatterCount};
 }
@@ -438,9 +449,14 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(game.id);
       const minimum=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.min_reels]));
       const linePercent=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.line_percent_hundredths]));
+      const lineMultipliers=Object.fromEntries(db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
+        FROM egypt_line_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+        WHERE s.game_id=?`).all(game.id)
+        .map(row=>[row.symbol_id+':'+row.matches,row.multiplier_milli]));
       const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
         selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),
-        minReelsById:minimum,linePercentById:linePercent});
+        minReelsById:minimum,linePercentById:linePercent,
+        lineMultipliersById:lineMultipliers});
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
