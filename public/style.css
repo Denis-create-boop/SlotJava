@@ -1845,3 +1845,83 @@ header nav .header-user-balance{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt #slot-win.egypt-spin-win-pop{animation:none}
 }
+
+
+/* Egypt bonus lines are drawn in a body-level top overlay: no reel or
+   decorative-frame clipping can hide them. Each of ten lines is shown alone. */
+body>.egypt-payline-overlay{
+  position:fixed!important;
+  inset:0!important;
+  display:block;
+  width:100vw!important;height:100vh!important;
+  z-index:2147483000!important;
+  overflow:visible;
+  pointer-events:none;
+  background:transparent;
+  filter:drop-shadow(0 0 8px rgba(255,196,46,.95));
+}
+body>.egypt-payline-overlay[hidden]{display:none!important}
+body>.egypt-payline-overlay .egypt-payline-count{
+  fill:#fff5b7;
+  stroke:#25141a;
+  stroke-width:3px;
+  paint-order:stroke fill;
+  font-size:19px;
+  font-weight:1000;
+  letter-spacing:.04em;
+  filter:drop-shadow(0 0 5px #ffb831);
+}
+.slot-theme-egypt .egypt-round-prize[hidden]{display:none!important}
+.slot-theme-egypt .egypt-round-prize{
+  width:min(100%,330px);
+  margin:5px auto 0;
+  padding:7px 15px;
+  text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  border:2px solid #ffdb6e;border-radius:11px;
+  color:#fff0bf;
+  background:linear-gradient(130deg,#4b301b,#251726 54%,#50321c);
+  box-shadow:inset 0 0 11px #ffc85a3b,0 0 15px #ffb13c6b;
+}
+.slot-theme-egypt .egypt-round-prize>span{
+  font-size:.74rem;letter-spacing:.09em;font-weight:900;
+}
+.slot-theme-egypt .egypt-round-prize>strong{
+  font-size:clamp(1.5rem,2.5vw,2rem);
+  line-height:1.12;color:#ffeb9f;
+  text-shadow:0 0 12px #ffa627;
+  font-variant-numeric:tabular-nums;
+}
+.slot-theme-egypt .egypt-round-prize>small{font-size:.75rem;color:#ffe7b9}
+.slot-theme-egypt .egypt-round-prize.is-revealing{
+  animation:egypt-round-reveal .5s ease-out both;
+}
+@keyframes egypt-round-reveal{
+  0%{opacity:.5;transform:scale(.88)}
+  65%{opacity:1;transform:scale(1.05)}
+  100%{opacity:1;transform:scale(1)}
+}
+/* An unmistakably rich gold backing behind every active symbol. */
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol{
+  border:3px solid #ffe68a!important;
+  background:radial-gradient(ellipse at 48% 42%,rgba(255,223,118,.85) 0%,rgba(242,166,38,.66) 46%,rgba(116,58,10,.55) 80%)!important;
+  box-shadow:inset 0 0 12px #fff1b9,0 0 14px #ffcb43,0 0 21px #e79020b5!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol img{
+  filter:drop-shadow(0 2px 6px #4e220d) drop-shadow(0 0 5px #fff5c5) brightness(1.18)!important;
+}
+.slot-theme-egypt .egypt-symbol-strip-item.is-active{
+  border:3px solid #fff3ae!important;
+  background:radial-gradient(ellipse at 50% 45%,#f2be57 0%,#b97b2f 55%,#5d391c 100%)!important;
+  box-shadow:0 0 15px #ffc34e,0 0 27px #ffe6998c,inset 0 0 14px #fff1baaa!important;
+  opacity:1;filter:none;
+}
+.slot-theme-egypt .egypt-symbol-strip-item.is-active img{
+  filter:drop-shadow(0 1px 5px #5a2b0e) brightness(1.12);
+}
+.slot-theme-egypt .egypt-symbol-strip-item.is-active small{
+  color:#21110d;font-weight:1000;text-shadow:0 1px 0 #ffe9b5;
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-egypt .egypt-round-prize.is-revealing{animation:none}
+}
