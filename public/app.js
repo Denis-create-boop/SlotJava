@@ -164,6 +164,10 @@
   const reelCount=columns.length;
   const rowCount=Number(root.dataset.rows)||4;
   const isEgypt=root.classList.contains('slot-theme-egypt');
+  // All symbols selected in the current Egyptian bonus are visibly framed
+  // on their reel tiles (not just in the legend above the game).
+  const egyptPlayingIds=new Set((root.dataset.egyptSymbols||'').split(',')
+    .map(Number).filter(Number.isSafeInteger));
   const egyptStarterArt=new Set([
     'Фараон','Клеопатра','Анубис','Анкх','10','J','Q','K','A','Скарабей','SCATTER'
   ]);
@@ -596,7 +600,8 @@
   function makeTile(id){
     const symbol=symbols.get(id);
     const tile=document.createElement('div');
-    tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'');
+    tile.className='ribbon-tile'+(id===scatterId?' is-scatter':'')+
+      (isEgypt&&bonusActive&&egyptPlayingIds.has(id)?' is-egypt-bonus-symbol':'');
     tile.dataset.symbolId=String(id);
     tile.setAttribute('aria-label',symbol?.name||'Символ '+id);
     if(symbol?.image){
@@ -926,6 +931,29 @@
     await delay(1250);
     if(bonusPlus)bonusPlus.classList.remove('is-pop');
   }
+  const egyptRetriggerOverlay=document.getElementById('egypt-retrigger-announcement');
+  const egyptRetriggerAward=document.getElementById('egypt-retrigger-award');
+  const egyptRetriggerDetails=document.getElementById('egypt-retrigger-details');
+  async function announceEgyptRetrigger(result){
+    if(!result.retriggerSpins)return;
+    if(egyptRetriggerOverlay){
+      egyptRetriggerAward.textContent='+'+result.retriggerSpins;
+      egyptRetriggerDetails.textContent=result.scatterCount+' SCATTER · Ретриггер №'+
+        result.retriggerCount+' · В очереди бонусов: '+result.pendingBonuses;
+      egyptRetriggerOverlay.hidden=false;
+      egyptRetriggerOverlay.classList.remove('is-showing');
+      void egyptRetriggerOverlay.offsetWidth;
+      egyptRetriggerOverlay.classList.add('is-showing');
+    }
+    message.textContent='РЕТРИГГЕР! +'+result.retriggerSpins+
+      ' бесплатных вращений. Следующая бонусная серия в очереди.';
+    play('bonus_sound');
+    await delay(reducedMotion?1300:2750);
+    if(egyptRetriggerOverlay){
+      egyptRetriggerOverlay.hidden=true;
+      egyptRetriggerOverlay.classList.remove('is-showing');
+    }
+  }
   const bonusIntro=document.getElementById('slot-bonus-intro');
   const bonusIntroCount=document.getElementById('slot-bonus-intro-count');
   async function celebrateScatter(count,freeSpins){
@@ -987,6 +1015,12 @@
   }
   function paintEgyptSelection(focusId=0){
     if(!isEgypt)return;
+    egyptPlayingIds.clear();
+    for(const id of egyptActiveIds)egyptPlayingIds.add(id);
+    for(const tile of root.querySelectorAll('.reel-window .ribbon-tile')){
+      tile.classList.toggle('is-egypt-bonus-symbol',bonusActive&&
+        egyptPlayingIds.has(Number(tile.dataset.symbolId)));
+    }
     if(egyptSymbolStrip)egyptSymbolStrip.hidden=!bonusActive;
     if(egyptSymbolStripItems){
       const tiles=regularDefinitions.map(symbol=>{
@@ -1068,31 +1102,37 @@
         play('win_sound');
         await delay(250);
       }
-      paintEgyptLines(item);
-      await delay(1000);
+      await paintEgyptLines(item);
+      await delay(650);
       clearEgyptLines();
       columns.forEach((col,index)=>showStatic(col,
         Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index])));
     }
     paintEgyptSelection();
   }
-  function paintEgyptLines(result){
+  async function paintEgyptLines(result){
     clearEgyptLines();
-    if(!Array.isArray(result.expandedReels))return;
-    for(const col of result.expandedReels){
-      if(Number.isInteger(col)&&col>=0&&col<reelCount)
-        columns[col].classList.add('egypt-expanded-reel');
+    if(!Array.isArray(result.expandedReels)||!result.lineWins?.length)return;
+    for(const reel of result.expandedReels){
+      if(Number.isInteger(reel)&&reel>=0&&reel<reelCount)
+        columns[reel].classList.add('egypt-expanded-reel');
     }
-    if(!egyptLinesOverlay||!Array.isArray(result.lineWins)||!result.lineWins.length)return;
+    if(!egyptLinesOverlay)return;
+    egyptLinesOverlay.hidden=false;
+    // Reveal all ten paylines separately. Keep previous lines on screen,
+    // with an interval of ~300 ms so the player can follow each one.
     for(const line of result.lineWins){
       const rows=egyptPaths[line.line-1];
       if(!rows)continue;
       const path=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-      path.setAttribute('points',rows.map((row,col)=>(50+col*100)+','+(50+row*100)).join(' '));
-      path.setAttribute('class','egypt-payline egypt-payline-'+line.line);
+      path.setAttribute('points',rows.map((row,col)=>
+        (50+col*100)+','+(50+row*100)).join(' '));
+      path.setAttribute('class','egypt-payline egypt-payline-'+line.line+' is-drawing');
       egyptLinesOverlay.append(path);
+      message.textContent=(symbols.get(result.symbolId)?.name||'Символ')+
+        ': линия '+line.line+' из 10 · '+result.perLine+' очков за линию';
+      await delay(reducedMotion?70:300);
     }
-    egyptLinesOverlay.hidden=false;
   }
   // Autoplay always uses the existing server-validated spin endpoint.
   // Counts paid spins only; bonus/free spins do not consume the selected quota.
@@ -1221,8 +1261,14 @@
       if(autoRunning)paintAutoplay();
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
         await animateBonusSteps(result.steps);
-      }else if(isEgypt&&result.mode==='base'){
+      }else if(isEgypt&&(result.mode==='base'||result.mode==='egypt-bonus')){
+        // Bonus SCATTER can retrigger. It needs the same two-SCATTER
+        // anticipation as a normal Egyptian spin.
         await animateEgyptScatterSuspense(result.cells);
+        if(result.mode==='egypt-bonus'){
+          stopSpinSound();
+          await animateEgyptExpansion(result);
+        }
       }else{
         const startingCells=result.mode==='egypt-bonus'&&
           Array.isArray(result.preExpansionCells)&&result.preExpansionCells.length===rowCount*reelCount
@@ -1278,13 +1324,7 @@
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
         setEgyptCounters(result);
         paintEgyptSelection();
-        if(result.retriggerSpins){
-          message.textContent='РЕТРИГГЕР! '+result.scatterCount+' SCATTER — ещё '+result.retriggerSpins+
-            ' бесплатных вращений! Всего ретриггеров: '+result.retriggerCount+
-            '. В очереди '+result.pendingBonuses+'.';
-          play('bonus_sound');
-          await delay(1700);
-        }
+        if(result.retriggerSpins)await announceEgyptRetrigger(result);
         if(result.transition){
           clearEgyptLines();
           message.textContent='Бонусная серия №'+result.seriesNumber+
