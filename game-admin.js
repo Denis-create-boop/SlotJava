@@ -171,6 +171,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       multipliersBySymbol.get(row.symbol_id).set(row.reel_count,row.multiplier_milli);
     }
     const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
+    const egyptWildId=game.slug==='golden-seven'
+      ?db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(id)?.symbol_id||0:0;
     const libraryCards=libraryImages.map(image=>{
       const src=libraryUrl(id,image);
       const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length+
@@ -188,6 +190,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
         (game.slug==='lucky-stars'?quickAssign(['space_bonus_background','Фон космической бонуски']):'')+
         (game.slug==='lucky-stars'?quickAssign(['space_expanding_wild','На весь барабан WILD']):'')+
+        (egyptWildId?'<form method="post" action="/admin/games/'+id+'/symbols/'+egyptWildId+'/image">'+csrf+
+          '<input type="hidden" name="image_id" value="'+image.id+'">'+
+          '<button type="submit"'+(linked.get(egyptWildId)===image.id?' disabled':'')+'>'+
+          (linked.get(egyptWildId)===image.id?'WILD Египет ✓':'Назначить WILD Египта')+'</button></form>':'')+
         '</div>'+
         '<form method="post" action="/admin/games/'+id+'/library/'+image.id+'/replace" enctype="multipart/form-data">'+csrf+
           '<label class="asset-upload-label">Заменить картинку<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
@@ -386,6 +392,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Сохранить настройки</button></form></section>';
     if(activeTab==='library')panel=panelStart('Папка изображений игры')+
       '<p class="hint">Картинки сохраняются в библиотеке именно этой игры. После загрузки их можно выбирать для символов. PNG, JPG, WEBP, GIF до 5 МБ.</p>'+
+      (egyptWildId?'<p class="hint"><strong>WILD Египта:</strong> в папке есть картинка-заглушка «WILD — Египет». Откройте её и нажмите «Заменить картинку», чтобы загрузить собственную — она сразу появится на барабанах и у символа WILD. Если добавите другую картинку в папку, нажмите на её карточке «Назначить WILD Египта».</p>':'')+
       '<form class="library-upload" method="post" action="/admin/games/'+id+'/library?tab=library" enctype="multipart/form-data">'+csrf+
       '<label>Название картинки<input name="name" maxlength="80" required placeholder="Например: Череп"></label>'+
       '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
@@ -466,6 +473,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
+      (egyptWildId?'<p class="hint"><strong>WILD Египта</strong> находится в этом списке символов. Его картинка выбирается из папки изображений и показывается на барабанах. Своей цены у WILD нет — он подменяет обычный символ и оплачивается по его таблице. <a href="/admin/games/'+id+'?tab=library">Открыть папку изображений для загрузки WILD →</a></p>':'')+
       '<p class="hint">'+(game.slug==='lucky-stars'?'Для каждого символа выберите начало выплат — от 2 или от 3 барабанов — и установите отдельный множитель ставки за 2, 3, 4 и 5 подряд совпавших символов на линии.':game.slug==='golden-seven'?'Установите множитель ставки для 2–6 символов на линии и относительный вес их выпадения. Линии можно создавать и редактировать отдельно в разделе «Линии выигрыша».':'Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.')+'</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
