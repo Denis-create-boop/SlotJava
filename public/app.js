@@ -45,6 +45,8 @@
   const egyptGamesBadge=document.getElementById('egypt-bonus-games');
   const egyptGamesCount=document.getElementById('egypt-bonus-games-count');
   const winCaption=document.getElementById('slot-win-caption');
+  const egyptAccumulated=document.getElementById('egypt-bonus-accumulated');
+  const egyptAccumulatedTotal=document.getElementById('egypt-bonus-accumulated-total');
   const bonusPlus=document.getElementById('slot-bonus-plus');
   const bonusFinish=document.getElementById('slot-bonus-finish');
   const bonusFinishTotal=document.getElementById('slot-bonus-finish-total');
@@ -59,10 +61,11 @@
     if(bonusTop)bonusTop.hidden=!active;
     if(bonusStats)bonusStats.hidden=!active;
     if(egyptGamesBadge)egyptGamesBadge.hidden=!active;
-    if(root.classList.contains('slot-theme-egypt')&&winCaption)
-      winCaption.textContent=active?'Выигрыш бонуса':'Выигрыш';
-    if(root.classList.contains('slot-theme-egypt')&&active)
-      winDisplay.textContent=String(total);
+    if(root.classList.contains('slot-theme-egypt')){
+      if(winCaption)winCaption.textContent=active?'За вращение':'Выигрыш';
+      if(egyptAccumulated)egyptAccumulated.hidden=!active;
+      if(egyptAccumulatedTotal)egyptAccumulatedTotal.textContent=String(total);
+    }
     if(bonusMultiplier)bonusMultiplier.textContent='×'+multiplier;
     if(bonusRemaining)bonusRemaining.textContent=String(remaining);
     if(bonusTotal)bonusTotal.textContent=String(total);
@@ -953,8 +956,8 @@
       void egyptRetriggerOverlay.offsetWidth;
       egyptRetriggerOverlay.classList.add('is-showing');
     }
-    message.textContent='РЕТРИГГЕР! +'+result.retriggerSpins+
-      ' бесплатных вращений. Следующая бонусная серия в очереди.';
+    message.textContent='Вы выиграли ещё одну бонусную игру! +'+result.retriggerSpins+
+      ' бесплатных вращений. Продолжайте текущую бонусную игру.';
     play('bonus_sound');
     await delay(reducedMotion?1300:2750);
     if(egyptRetriggerOverlay){
@@ -1320,6 +1323,12 @@
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=result.mode!=='base'&&result.total===0?'—':String(result.total);
+      if(result.mode==='egypt-bonus'){
+        winDisplay.textContent=result.total>0?'+'+result.total:'—';
+        winDisplay.classList.remove('egypt-spin-win-pop');
+        void winDisplay.offsetWidth;
+        if(result.total>0)winDisplay.classList.add('egypt-spin-win-pop');
+      }
       const tier=['none','normal','big','mega'].includes(result.winTier)?result.winTier:'none';
       const tierText=tier==='mega'?'Очень крупный выигрыш':tier==='big'?'Крупный выигрыш':'Выигрыш';
       const matches=Array.isArray(result.wins)?result.wins:[];
@@ -1338,6 +1347,7 @@
             currentTotal:result.freeSpins,seriesNumber:1,
             retriggerCount:0,pendingBonuses:0});
           paintEgyptSelection();
+          winDisplay.textContent='—';
           message.textContent='Египет: '+result.freeSpins+' бесплатных вращений. Выбран '+(symbols.get(egyptChosenId)?.name||'символ')+'.';
         }else{
           updateBonus(true,result.freeSpins,2,0);
@@ -1348,6 +1358,9 @@
         egyptActiveIds=(result.selectedSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
         if(egyptActiveIds.length)egyptChosenId=egyptActiveIds[egyptActiveIds.length-1];
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
+        // updateBonus only updates the cumulative prize; the main win meter
+        // always displays the current spin award, including zero as a dash.
+        winDisplay.textContent=result.total>0?'+'+result.total:'—';
         setEgyptCounters(result);
         paintEgyptSelection();
         if(result.retriggerSpins)await announceEgyptRetrigger(result);
