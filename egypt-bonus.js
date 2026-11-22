@@ -15,20 +15,19 @@ const EGYPT_LINES=Object.freeze([
   [2,3,2,1,0,1],
 ].map(line=>Object.freeze(line)));
 
-function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,randomInt}){
-  if(reels!==6||rows!==4)throw Error('Egypt bonus requires 6 reels and 4 rows.');
+function egyptBonusBoard({symbols,selectedId,reels=6,rows=4,minReels=3,randomInt}){
+  if(reels!==6||rows!==4||![2,3].includes(minReels))throw Error('Egypt bonus requires six reels, four rows and a minimum of two or three reels.');
   if(!symbols.some(symbol=>symbol.id===selectedId))throw Error('Egypt bonus symbol is missing.');
   if(typeof randomInt!=='function')throw Error('Missing random number generator.');
   const board=Array.from({length:reels*rows},()=>symbols[randomInt(symbols.length)].id);
   const initialCells=board.slice();
-  const expandedReels=[];
-  for(let reel=0;reel<reels;reel++){
-    if(Array.from({length:rows},(_,row)=>board[row*reels+reel]).includes(selectedId)){
-      expandedReels.push(reel);
-      for(let row=0;row<rows;row++)board[row*reels+reel]=selectedId;
-    }
-  }
-  return {cells:board,initialCells,expandedReels};
+  const landedReels=Array.from({length:reels},(_,reel)=>reel)
+    .filter(reel=>Array.from({length:rows},(_,row)=>board[row*reels+reel]).includes(selectedId));
+  // Expand only when the chosen symbol qualifies for a winning line.
+  const expandedReels=landedReels.length>=minReels?landedReels:[];
+  for(const reel of expandedReels)
+    for(let row=0;row<rows;row++)board[row*reels+reel]=selectedId;
+  return {cells:board,initialCells,expandedReels,landedReels};
 }
 
 function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
