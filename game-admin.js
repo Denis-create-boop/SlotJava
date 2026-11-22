@@ -16,7 +16,8 @@ const assetTypes={
   reels_background:{label:'Общий фон игрового поля',kind:'image'},
   bet_panel:{label:'Фон панели ставок',kind:'image'},
   win_panel:{label:'Фон панели выигрыша',kind:'image'},
-  music:{label:'Фоновая музыка',kind:'audio'},
+  music:{label:'Фоновая музыка (обычная игра)',kind:'audio'},
+  bonus_music:{label:'Музыка бонусной игры (только «Дорога в АД»)',kind:'audio'},
   spin_sound:{label:'Звук вращения барабанов',kind:'audio'},
   win_sound:{label:'Звук выигрыша',kind:'audio'},
   big_win_sound:{label:'Звук крупного выигрыша',kind:'audio'},
@@ -98,7 +99,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
-    if(['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].includes(key))return 'audio';
+    if(['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'].includes(key))return 'audio';
     if(/^symbol_\d+$/.test(key))return 'symbols';
     return 'overview';
   }
@@ -257,7 +258,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       rowsFor(['bet_panel','win_panel'])+'</div></section>';
     if(activeTab==='audio')panel=panelStart('Музыка и звуки')+
       '<p class="hint">Загрузите музыку, звуки вращения, выигрыша и фанфары SCATTER. Для Первой игры музыка и фанфары также доступны по умолчанию без загрузки файлов. Форматы MP3, OGG, WAV до 12 МБ. Звуки зависят от коэффициента итогового выигрыша.</p>'+
-      '<div class="asset-settings-grid">'+rowsFor(['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'])+'</div></section>';
+      '<div class="asset-settings-grid">'+rowsFor(game.slug==='slot-classic'?['music','bonus_music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound']:['music','spin_sound','win_sound','big_win_sound','mega_win_sound','bonus_sound'])+'</div></section>';
     if(activeTab==='frequency')panel=panelStart('Частота и размеры выигрышей')+
       '<p class="hint">Целевой процент выигрышных вращений от 0 до 100. Это не RTP и не доля возвращаемых ставок. При отсутствии положительных коэффициентов выигрышей не будет.</p>'+
       '<form class="win-setting-form" method="post" action="/admin/games/'+id+'/settings?tab=frequency">'+csrf+
