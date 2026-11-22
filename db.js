@@ -506,6 +506,8 @@ if(firstGame){
     for(let i=1;i<=5;i++)addRule.run(firstGame.id,i,12,1);
   })();
 }
+// Egyptian starter artwork and scatters are installed without touching the other games.
+require('./egypt-setup')(db);
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
