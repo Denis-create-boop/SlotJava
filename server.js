@@ -8,7 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
-const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol } = require('./egypt-bonus');
+const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,nextEgyptBonusSeries } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -451,22 +451,24 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       let playedSeries=playedCurrent,nextRemaining=remaining,balanceAfter=wallet.balance;
       const queue=db.prepare(`SELECT queue_order,free_spins,scatter_count FROM egypt_bonus_pending
         WHERE user_id=? AND game_id=? ORDER BY queue_order`).all(req.user.id,game.id);
-      if(remaining===0&&queue.length){
+      const nextState=nextEgyptBonusSeries({remaining,queue,selectedIds:selected,
+        symbols:regular,randomInt:n=>crypto.randomInt(n)});
+      if(nextState.kind==='transition'){
         // First series ends silently; all winnings stay pending. Next series
         // starts with one extra never-used symbol, if any are left to choose.
-        const next=queue[0];
+        const next=nextState.next;
         db.prepare(`DELETE FROM egypt_bonus_pending
           WHERE user_id=? AND game_id=? AND queue_order=?`)
           .run(req.user.id,game.id,next.queue_order);
-        const added=chooseNewEgyptSymbol(regular,selected,n=>crypto.randomInt(n));
-        if(added!==null)selectedNow.push(added);
+        const added=nextState.newSymbolId;
+        selectedNow=nextState.selectedIds;
         nextRemaining=next.free_spins;
         currentTotal=next.free_spins;
         playedSeries=0;
         seriesNumber++;
         transition={newSymbolId:added,freeSpins:next.free_spins,
           seriesNumber,scatterCount:next.scatter_count};
-      }else if(remaining===0){
+      }else if(nextState.kind==='complete'){
         // Only the FINAL bonus in the full retrigger chain credits the wallet.
         balanceAfter+=accumulated;
         if(!Number.isSafeInteger(balanceAfter)||balanceAfter<0)
