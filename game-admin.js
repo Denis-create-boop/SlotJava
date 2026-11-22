@@ -3,6 +3,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const multer = require('multer');
 const { gameLayout } = require('./game-layout');
+const { EGYPT_LINES } = require('./egypt-bonus');
 
 const uploadsDir=path.join(__dirname,'data','game-uploads');
 fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
@@ -299,6 +300,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<label>Файл<input type="file" name="asset" accept="image/png,image/jpeg,image/webp,image/gif" required></label>'+
       '<button class="primary" type="submit">Добавить в папку</button></form>'+
       '<div class="library-images">'+libraryCards+'</div></section>';
+    const egyptLinePreview=game.slug==='golden-seven'
+      ?'<div class="egypt-lines-gallery">'+EGYPT_LINES.map((rows,index)=>{
+        const points=rows.map((row,col)=>(30+col*60)+','+(25+row*45)).join(' ');
+        return '<div class="egypt-line-card"><strong>Линия '+(index+1)+'</strong>'+
+          '<svg viewBox="0 0 360 185" role="img" aria-label="Линия '+(index+1)+'">'+
+          Array.from({length:6},(_,col)=>'<line x1="'+(30+col*60)+'" y1="8" x2="'+(30+col*60)+'" y2="172" stroke="#8d7450" stroke-width="1"/>').join('')+
+          '<polyline points="'+points+'" fill="none" stroke="#ffd775" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'+
+          rows.map((row,col)=>'<circle cx="'+(30+col*60)+'" cy="'+(25+row*45)+'" r="6" fill="#fff2ad"/>').join('')+
+          '</svg></div>';
+      }).join('')+'</div>':'';
     if(activeTab==='scatter'&&scatter){
       const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
       const inputs=Array.from({length:layout.reels},(_,i)=>{
@@ -321,6 +332,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       panel=panelStart('Настройки бонусной игры SCATTER')+
         '<p class="hint">Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.</p>'+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 или 6 — 20. Максимум один SCATTER на барабан. Перед бонусом случайно выбирается символ. Он расширяется на весь барабан, где выпал, и выигрывает на 10 линиях при наличии на 2 или 3 любых барабанах (по настройке символа). Множителя первой игры здесь нет.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
+        (game.slug==='golden-seven'?'<h3>Десять линий бонусной игры</h3>'+egyptLinePreview+
+          '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому любая из этих 10 линий учитывает все такие барабаны, даже несоседние.</p>':'')+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
