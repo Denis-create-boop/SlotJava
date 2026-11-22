@@ -188,8 +188,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '</div>';
     }).join('');
     const egyptBonusRules=new Map(game.slug==='golden-seven'
-      ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels,
-          r.line_percent_hundredths
+      ?db.prepare(`SELECT s.id AS symbol_id,COALESCE(r.min_reels,3) AS min_reels
         FROM game_symbols s LEFT JOIN egypt_symbol_bonus_rules r ON r.symbol_id=s.id
         WHERE s.game_id=?`).all(id).map(row=>[row.symbol_id,row]):[]);
     const symbolItems=symbols.map(symbol=>{
@@ -222,16 +221,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<option value="2"'+(egyptBonusRules.get(symbol.id)?.min_reels===2?' selected':'')+'>2 барабанов</option>'+
         '<option value="3"'+(egyptBonusRules.get(symbol.id)?.min_reels!==2?' selected':'')+'>3 барабанов</option>'+
         '</select></label>'+
-        '<label>Выплата ЗА ОДНУ бонусную линию, % от ставки'+
-        '<input type="number" name="line_percent" min="0" max="10000" step="0.01" '+
-        'value="'+((egyptBonusRules.get(symbol.id)?.line_percent_hundredths??unitPrices.get(symbol.id)??0)/100).toFixed(2)+'" required></label>'+
-        '<p class="hint">10 линий. Ставка 100, выплата 10% и коэффициент ×2 за три барабана = 20 очков за линию, всего 200. Коэффициенты для 2–6 символов настраиваются ниже в этом же символе.</p>'+
-        '<button class="primary" type="submit">Сохранить бонусные выплаты</button></form>':'')+
+        '<p class="hint">Для обычной игры и бонуса действует одна таблица выплат ниже. Различается только правило совпадений: подряд слева направо в обычной игре и на любых барабанах с расширением в бонусе. Все 10 выигрышных линий оплачиваются отдельно.</p>'+
+        '<button class="primary" type="submit">Сохранить минимум совпадений</button></form>':'')+
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
         '<p class="hint">'+(game.slug==='golden-seven'?'Египет: вся игра рассчитывается по 10 линиям. В обычной игре совпадения считаются подряд с первого барабана на каждой линии. В бонусе выбранный символ расширяется и платит по тем же десяти линиям, даже если барабаны не соседние. Для 2, 3, 4, 5 и 6 совпадений задаётся отдельный коэффициент. Минимум 2 или 3 устанавливается выше.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
         '<label>'+(game.slug==='golden-seven'?'Цена одной выигрышной линии, % от ставки':'Цена одного символа, % от ставки')+
         '<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Например, ставка 100, цена линии 10%, 3 символа на линии, ×2 = 20 очков за эту линию. По 10 линиям выплаты суммируются. Для двух символов установленный минимум должен быть 2; ×0 отключает соответствующую длину. Бонус имеет отдельную цену линии, но использует эти же коэффициенты.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Например, ставка 100, цена линии 10%, 3 символа на линии, ×2 = 20 очков за эту линию. По 10 линиям выплаты суммируются. Для двух символов установленный минимум должен быть 2; ×0 отключает соответствующую длину. В бонусе используются та же цена линии и те же коэффициенты.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
         '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">Сохранить цену и множители</button></form>')+
         (isScatter?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
@@ -459,13 +455,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(getScatterSettings(id)?.symbolId===symbolId)return res.sendStatus(403);
     const minimum=Number(req.body?.min_reels);
     if(![2,3].includes(minimum))return show(req,res,'Укажите 2 или 3 барабана.',true,'symbols');
-    const raw=req.body?.line_percent;
-    if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,2})?$/.test(raw)||Number(raw)>10000)
-      return show(req,res,'Выплата за одну линию должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
-    const linePercent=Math.round(Number(raw)*100);
-    db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels,line_percent_hundredths) VALUES(?,?,?)
-      ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels,
-      line_percent_hundredths=excluded.line_percent_hundredths`).run(symbolId,minimum,linePercent);
+    db.prepare(`INSERT INTO egypt_symbol_bonus_rules(symbol_id,min_reels) VALUES(?,?)
+      ON CONFLICT(symbol_id) DO UPDATE SET min_reels=excluded.min_reels`).run(symbolId,minimum);
     res.redirect(sectionUrl(id,'symbols')+'&saved=1');
   });
   app.post('/admin/games/:id/library',adminOnly,upload.single('asset'),postGuard,(req,res)=>{
