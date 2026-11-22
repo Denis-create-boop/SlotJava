@@ -2236,3 +2236,23 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
  to{opacity:1;transform:scaleY(1)}
 }
 @media(prefers-reduced-motion:reduce){.slot-theme-space .space-expanded-wild{animation:none}}
+
+/* Shared admin payline editor: each cell is a clickable row/reel choice. */
+.payline-drawing{margin:12px 0 20px;display:grid;gap:12px}
+.payline-draw-board{--line-cols:5;position:relative;display:grid;
+grid-template-columns:repeat(var(--line-cols),minmax(0,1fr));
+border:2px solid #8e76b9;border-radius:14px;overflow:hidden;
+background:radial-gradient(circle at 50% 40%,#293f73,#10162c);
+isolation:isolate;touch-action:pan-y}
+.payline-drawing[data-reels="6"] .payline-draw-board{--line-cols:6}
+.payline-draw-overlay{position:absolute;inset:0;width:100%;height:100%;
+z-index:2;pointer-events:none;overflow:visible;filter:drop-shadow(0 0 7px #ffd05a)}
+.payline-cell{position:relative;min-height:clamp(46px,6vw,76px);padding:5px;
+border:1px solid #ffffff25;border-radius:0;background:#16274b6e;
+color:#a9cff6;font-size:30px;line-height:1;cursor:crosshair;
+display:flex;justify-content:center;align-items:center;z-index:1;
+transition:background .12s,box-shadow .12s}
+.payline-cell:hover,.payline-cell:focus-visible{background:#7653ae8c;outline:2px solid #fff0ad;outline-offset:-3px}
+.payline-cell.is-selected{background:#6350928c;box-shadow:inset 0 0 18px #f8cf5370;color:#fff6b9}
+.payline-cell-symbol{pointer-events:none;opacity:.9}
+.payline-drawing .payout-grid{margin-top:3px}
