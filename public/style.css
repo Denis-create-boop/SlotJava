@@ -2144,3 +2144,21 @@ body>.slot-big-win-overlay.is-egypt-mega strong{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt>.slot-bonus-background{transition:none}
 }
+
+
+/* Editable Egyptian winning-line paths in the administrator panel. */
+.egypt-line-editors{display:grid;gap:16px;margin-block:14px}
+.egypt-line-editor{
+  display:grid;gap:9px;padding:14px 16px;border:1px solid #665340;
+  border-radius:12px;background:rgba(42,33,41,.43)
+}
+.egypt-line-editor h3{margin:0;color:#ffe3a0}
+.egypt-line-editor .egypt-line-card{max-width:400px}
+.egypt-line-editor .egypt-line-card svg{width:100%;height:auto}
+.egypt-line-editor .payout-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.egypt-line-editor form{display:grid;gap:9px;justify-items:start}
+.egypt-line-editor select{min-width:0;width:100%}
+.egypt-line-editor .danger-action{margin-top:0}
+@media(max-width:600px){
+  .egypt-line-editor .payout-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
