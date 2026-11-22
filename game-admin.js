@@ -155,6 +155,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const symbols=getSymbols(id);
     const payouts=getPayouts(id);
     const unitPrices=new Map(payouts.prices.map(row=>[row.symbol_id,row.percent_hundredths]));
+    const egyptLineMultipliers=game.slug==='golden-seven'
+      ?new Map(db.prepare(`SELECT m.symbol_id,m.matches,m.multiplier_milli
+          FROM egypt_line_multipliers m JOIN game_symbols s ON s.id=m.symbol_id
+          WHERE s.game_id=?`).all(id)
+          .map(row=>[row.symbol_id+':'+row.matches,row.multiplier_milli]))
+      :new Map();
     const multipliersBySymbol=new Map();
     for(const row of payouts.multipliers){
       if(!multipliersBySymbol.has(row.symbol_id))multipliersBySymbol.set(row.symbol_id,new Map());
@@ -190,10 +196,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const isScatter=scatter&&symbol.id===scatter.symbolId;
       const unitPrice=((unitPrices.get(symbol.id)||0)/100).toFixed(2);
       const multipliers=multipliersBySymbol.get(symbol.id)||new Map();
-      const reelInputs=Array.from({length:layout.reels-2},(_,i)=>{
-        const reel=i+3;
-        return '<label class="payout-input">Цепочка до барабана №'+reel+', ×'+
-          '<input type="number" min="0" max="1000" step="0.001" name="r_'+reel+'" value="'+((multipliers.get(reel)??1000)/1000).toFixed(3)+'" required></label>';
+      const reelInputs=Array.from({length:game.slug==='golden-seven'?5:layout.reels-2},(_,i)=>{
+        const reel=i+(game.slug==='golden-seven'?2:3);
+        const ratio=game.slug==='golden-seven'
+          ?(egyptLineMultipliers.get(symbol.id+':'+reel)??multipliers.get(reel)??1000)
+          :(multipliers.get(reel)??1000);
+        const label=game.slug==='golden-seven'
+          ?'На линии '+reel+' символов подряд, ×'
+          :'Цепочка до барабана №'+reel+', ×';
+        return '<label class="payout-input">'+label+
+          '<input type="number" min="0" max="1000" step="0.001" name="r_'+reel+'" value="'+(ratio/1000).toFixed(3)+'" required></label>';
       }).join('');
       const selected=linked.get(symbol.id)||0;
       const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
@@ -213,12 +225,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<label>Выплата ЗА ОДНУ бонусную линию, % от ставки'+
         '<input type="number" name="line_percent" min="0" max="10000" step="0.01" '+
         'value="'+((egyptBonusRules.get(symbol.id)?.line_percent_hundredths??unitPrices.get(symbol.id)??0)/100).toFixed(2)+'" required></label>'+
-        '<p class="hint">10 линий. Например: ставка 100, выплата 10% за линию = 10 очков на каждой линии, всего 100 очков. Множитель количества барабанов из обычной игры применяется также в бонусе.</p>'+
+        '<p class="hint">10 линий. Ставка 100, выплата 10% и коэффициент ×2 за три барабана = 20 очков за линию, всего 200. Коэффициенты для 2–6 символов настраиваются ниже в этом же символе.</p>'+
         '<button class="primary" type="submit">Сохранить бонусные выплаты</button></form>':'')+
         (isScatter?'<p class="hint"><strong>SCATTER</strong> запускает бесплатные вращения, но не оплачивается как обычная цепочка. Вероятности и лимиты задаются в разделе «Бонусная игра».</p>':'<form class="symbol-prices-form" method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/payouts">'+csrf+
-        '<p class="hint">'+(game.slug==='golden-seven'?'Обычная игра Египта: символ выигрывает с первых двух либо трёх соседних барабанов слева направо — смотрите выбранный порог ниже. Для двух барабанов применяется множитель ×1, для трёх и более — настройки цепочки. В бонусе выбранный символ расширяется и считается по 10 линиям на любых барабанах.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
-        '<label>Цена одного символа, % от ставки<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
-        '<p class="hint">Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.</p>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Египет: вся игра рассчитывается по 10 линиям. В обычной игре совпадения считаются подряд с первого барабана на каждой линии. В бонусе выбранный символ расширяется и платит по тем же десяти линиям, даже если барабаны не соседние. Для 2, 3, 4, 5 и 6 совпадений задаётся отдельный коэффициент. Минимум 2 или 3 устанавливается выше.':'Цена одного символа — процент от ставки. Выигрыш начинается, если символ есть на каждом из барабанов 1, 2 и 3. Считаются все его копии в непрерывной цепочке слева направо. На результат дополнительно умножается только коэффициент последнего барабана цепочки, не все коэффициенты сразу.')+'</p>'+
+        '<label>'+(game.slug==='golden-seven'?'Цена одной выигрышной линии, % от ставки':'Цена одного символа, % от ставки')+
+        '<input type="number" min="0" max="10000" step="0.01" name="unit_percent" value="'+unitPrice+'" required></label>'+
+        '<p class="hint">'+(game.slug==='golden-seven'?'Например, ставка 100, цена линии 10%, 3 символа на линии, ×2 = 20 очков за эту линию. По 10 линиям выплаты суммируются. Для двух символов установленный минимум должен быть 2; ×0 отключает соответствующую длину. Бонус имеет отдельную цену линии, но использует эти же коэффициенты.':'Например, ставка 20, цена символа 10%, 6 символов на первых трёх барабанах, ×3 = 20 × 10% × 6 × 3 = 36 очков. При цепочке до барабана №4 используется только его множитель. ×0 отключает выплату для этой длины цепочки.')+'</p>'+
         '<div class="payout-grid">'+reelInputs+'</div><button class="primary" type="submit">Сохранить цену и множители</button></form>')+
         (isScatter?'':'<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/delete">'+csrf+
         '<button type="submit" class="danger-action">Удалить символ</button></form>')+'</details>';
@@ -540,7 +553,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       return show(req,res,'Цена одного символа должна быть от 0 до 10000% с точностью до 0.01%.',true,'symbols');
     const unit=Math.round(Number(percentage)*100);
     const entries=[];
-    for(let reel=3;reel<=gameLayout(game).reels;reel++){
+    for(let reel=game.slug==='golden-seven'?2:3;reel<=gameLayout(game).reels;reel++){
       const raw=req.body?.['r_'+reel];
       if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,3})?$/.test(raw)||Number(raw)>1000)
         return show(req,res,'Множитель барабана должен быть от ×0 до ×1000 с точностью до 0.001.',true,'symbols');
@@ -550,9 +563,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       ON CONFLICT(symbol_id) DO UPDATE SET percent_hundredths=excluded.percent_hundredths`);
     const putReel=db.prepare(`INSERT INTO symbol_reel_multipliers(symbol_id,reel_count,multiplier_milli) VALUES(?,?,?)
       ON CONFLICT(symbol_id,reel_count) DO UPDATE SET multiplier_milli=excluded.multiplier_milli`);
+    const putEgyptLine=db.prepare(`INSERT INTO egypt_line_multipliers(symbol_id,matches,multiplier_milli) VALUES(?,?,?)
+      ON CONFLICT(symbol_id,matches) DO UPDATE SET multiplier_milli=excluded.multiplier_milli`);
     db.transaction(()=>{
       putPrice.run(symbolId,unit);
-      for(const [reel,ratio] of entries)putReel.run(symbolId,reel,ratio);
+      for(const [reel,ratio] of entries){
+        if(game.slug==='golden-seven'){
+          putEgyptLine.run(symbolId,reel,ratio);
+          if(reel>=3)putReel.run(symbolId,reel,ratio);
+        }else putReel.run(symbolId,reel,ratio);
+      }
     })();
     res.redirect(sectionUrl(id,'symbols'));
   });
