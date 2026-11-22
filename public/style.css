@@ -1976,3 +1976,30 @@ body>.egypt-line-award{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-egypt .slot-reels.slot-reels-ribbon>.egypt-round-prize.is-revealing{animation:none;transform:translateX(-50%)}
 }
+
+
+/* During an Egyptian multi-symbol bonus payout, only the symbol currently
+   being evaluated remains brilliantly gold; the other selected bonus symbols
+   dim slightly until their own payout presentation begins. */
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-inactive{
+  opacity:.40!important;
+  filter:grayscale(.45) brightness(.66)!important;
+  background:linear-gradient(130deg,rgba(57,42,30,.35),rgba(27,23,32,.55))!important;
+  border-color:#746143!important;
+  box-shadow:inset 0 0 8px #0007!important;
+  transition:opacity .22s ease,filter .22s ease;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-inactive img{
+  filter:grayscale(.45) brightness(.7)!important;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-focus{
+  opacity:1!important;
+  filter:none!important;
+  background:radial-gradient(ellipse at 48% 42%,rgba(255,239,148,.98) 0%,rgba(255,181,39,.84) 48%,rgba(151,79,15,.61) 85%)!important;
+  border:3px solid #fff1b7!important;
+  box-shadow:inset 0 0 15px #fff7ce,0 0 19px #ffcc51,0 0 29px #ffa620a8!important;
+  transition:opacity .22s ease,filter .22s ease;
+}
+.slot-theme-egypt.is-bonus-active .reel-window .ribbon-tile.is-egypt-bonus-symbol.is-egypt-focus img{
+  filter:drop-shadow(0 1px 4px #66340b) drop-shadow(0 0 9px #fff8d4) brightness(1.24)!important;
+}
