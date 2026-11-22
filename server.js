@@ -221,12 +221,23 @@ function spaceRules(gameId){
     WHERE s.game_id=?`).all(gameId);
   return {minimums,multipliers};
 }
+function cosmicVisibleSymbols(gameId){
+  // Consistent with the admin: only currently available library artwork
+  // can produce a normal Cosmic reel symbol.
+  const linked=new Set(getSymbolImageLinks(gameId).map(row=>row.symbol_id));
+  return getSymbols(gameId).filter(symbol=>linked.has(symbol.id));
+}
+function cosmicBonusMultiplier(userId,gameId){
+  return db.prepare('SELECT value FROM space_bonus_multipliers WHERE user_id=? AND game_id=?')
+    .get(userId,gameId)?.value||1;
+}
 function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const scatter=getScatterSettings(gameId);
   const wildId=wildSymbol(gameId);
-  const symbols=getSymbols(gameId).filter(symbol=>symbol.id!==scatter?.symbolId);
-  const payouts=getPayouts(gameId);
   const game=gameById(gameId);
+  const symbols=(game?.slug==='lucky-stars'?cosmicVisibleSymbols(gameId):getSymbols(gameId))
+    .filter(symbol=>symbol.id!==scatter?.symbolId);
+  const payouts=getPayouts(gameId);
   const egyptMinimums=game?.slug==='golden-seven'
     ?new Map(db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
         WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(gameId)
@@ -359,7 +370,7 @@ function firstGamePage(game,req){
     const replacement='/static/images/egypt/premium-'+key+'.svg';
     return hiddenEgyptArt.has(replacement)?'':replacement;
   };
-  const symbols=getSymbols(game.id).map(symbol=>{
+  const symbols=(game.slug==='lucky-stars'?cosmicVisibleSymbols(game.id):getSymbols(game.id)).map(symbol=>{
     const assigned=chosenImages.get(symbol.id);
     const uploaded=url('symbol_'+symbol.id);
     const image=egyptDefaultArt(symbol,assigned||uploaded||'');
@@ -391,7 +402,7 @@ function firstGamePage(game,req){
     (game.slug==='golden-seven'?backgroundImage('egypt_bonus_background','slot-bonus-background'):game.slug==='lucky-stars'?backgroundImage('space_bonus_background','slot-bonus-background'):'')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
-    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
+    (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(game.slug==='lucky-stars'&&bonus?cosmicBonusMultiplier(req.user.id,game.id):(bonus?.multiplier||2))+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
     (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>'+
       '<aside class="egypt-bonus-games" id="egypt-bonus-games"'+(bonusVisible?'':' hidden')+' aria-label="Оставшиеся бонусные игры"><span>БОНУСНЫХ<br>ИГР</span><strong id="egypt-bonus-games-count">'+(bonusVisible?1+(egyptChain?.queue.length||0):0)+'</strong></aside>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
@@ -488,10 +499,16 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       if(generated.error)return generated;
       const preExpansionCells=generated.cells.slice();
       const expansion=expandSpaceWild(preExpansionCells,wildId,scatter.symbolId);
-      const symbols=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+      const symbols=cosmicVisibleSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
       const scored=scoreSpaceLines({cells:expansion.cells,symbols,bet:active.bet,
         payouts:getPayouts(game.id),lines:spacePaylines(game.id),wildId,scatterId:scatter.symbolId,rules:spaceRules(game.id)});
-      const accumulated=active.bonus_win+scored.total;
+      // Apply the current X to this spin, then increment it by one.
+      const currentMultiplier=cosmicBonusMultiplier(req.user.id,game.id);
+      const nextMultiplier=Math.min(1000000,currentMultiplier+1);
+      const bonusRoundWin=scored.total*currentMultiplier;
+      if(!Number.isSafeInteger(bonusRoundWin)||bonusRoundWin<0)
+        return {error:'Превышен размер бонусного выигрыша.'};
+      const accumulated=active.bonus_win+bonusRoundWin;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен размер бонусного выигрыша.'};
       const retriggerSpins=egyptFreeSpinsFor(generated.scatterCount);
@@ -517,20 +534,26 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
             return {error:'Превышен допустимый баланс.'};
           db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?').run(nextBalance,req.user.id);
           db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?').run(req.user.id,game.id);
+          db.prepare('DELETE FROM space_bonus_multipliers WHERE user_id=? AND game_id=?').run(req.user.id,game.id);
         }
       }
-      if(!completedBonus)db.prepare('UPDATE game_bonus_sessions SET remaining=?,bonus_win=? WHERE user_id=? AND game_id=?')
-        .run(remaining,accumulated,req.user.id,game.id);
+      if(!completedBonus){
+        db.prepare('UPDATE game_bonus_sessions SET remaining=?,bonus_win=? WHERE user_id=? AND game_id=?')
+          .run(remaining,accumulated,req.user.id,game.id);
+        db.prepare(`INSERT INTO space_bonus_multipliers(user_id,game_id,value) VALUES(?,?,?)
+          ON CONFLICT(user_id,game_id) DO UPDATE SET value=excluded.value`)
+          .run(req.user.id,game.id,nextMultiplier);
+      }
       const bigThreshold=settings?.big_win_multiplier_milli??5000;
       const megaThreshold=settings?.mega_win_multiplier_milli??15000;
-      const tier=scored.total*1000>=active.bet*megaThreshold?'mega'
-        :scored.total*1000>=active.bet*bigThreshold?'big':scored.total>0?'normal':'none';
+      const tier=bonusRoundWin*1000>=active.bet*megaThreshold?'mega'
+        :bonusRoundWin*1000>=active.bet*bigThreshold?'big':bonusRoundWin>0?'normal':'none';
       return {mode:'space-bonus',cells:expansion.cells,preExpansionCells,
         expandedReels:expansion.expandedReels,wins:scored.wins,
-        total:scored.total,baseWin:scored.total,bonusRoundWin:scored.total,
+        total:bonusRoundWin,baseWin:scored.total,bonusRoundWin,
         bonusWin:accumulated,remaining,completedBonus,
         scatterCount:generated.scatterCount,retriggerSpins,
-        bonusMultiplier:1,nextMultiplier:1,
+        bonusMultiplier:currentMultiplier,nextMultiplier,
         balance:nextBalance,bet:active.bet,winTier:tier};
     }
     if(active&&game.slug==='golden-seven'){
@@ -742,6 +765,9 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       }else{
         db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
           VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
+        if(game.slug==='lucky-stars')
+          db.prepare(`INSERT INTO space_bonus_multipliers(user_id,game_id,value) VALUES(?,?,1)
+            ON CONFLICT(user_id,game_id) DO UPDATE SET value=1`).run(req.user.id,game.id);
       }
     }
     return {...spin,mode:'base',total:payout,balance:updatedBalance,bet:wallet.bet,
