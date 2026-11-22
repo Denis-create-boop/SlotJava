@@ -303,13 +303,13 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<form method="post" class="game-title-form" action="/admin/games/'+id+'/title">'+csrf+
       '<label for="game_title">Название игры<input id="game_title" type="text" name="title" minlength="1" maxlength="80" value="'+h(game.title)+'" required></label>'+
       '<button class="primary" type="submit">Сохранить название</button></form></section>';
-    if(activeTab==='background')panel=panelStart('Изменение фона')+
-      '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
-      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div>'+spaceMoveBackground+'</section>';
     const spaceMoveBackground=game.slug==='lucky-stars'&&(assignedBackgrounds.has('background')||assets.has('background'))?
       '<form method="post" action="/admin/games/'+id+'/move-background-to-reels">'+csrf+
       '<p class="hint">Если рамка с пятью барабанами появилась на весь экран, перенеси её в фон игрового поля. Общий фон после переноса можно установить отдельно.</p>'+
       '<button class="primary" type="submit">Перенести общий фон в фон игрового поля</button></form>':'';
+    if(activeTab==='background')panel=panelStart('Изменение фона')+
+      '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)?'Настройте основной фон и отдельный фон бонусной игры. Бонусный фон автоматически появляется при бесплатных вращениях; выбирайте изображение из папки или загружайте PNG, JPG, WEBP или GIF.':'Изменяйте фон, логотип и прозрачную картинку демона, обхватывающего поле. Демон показывается только во время бонусной игры первой игры; используйте PNG с прозрачным центром.')+'</p><div class="asset-settings-grid">'+
+      rowsFor(game.slug==='slot-classic'?['background','logo','bonus_frame']:game.slug==='golden-seven'?['background','egypt_bonus_background','logo']:game.slug==='lucky-stars'?['background','space_bonus_background','logo']:['background','logo'])+'</div>'+spaceMoveBackground+'</section>';
     if(activeTab==='reels')panel=panelStart('Фон игрового поля')+
       '<p class="hint">Одна картинка заполняет всё игровое поле за пятью барабанами. Фон ячеек с символами настраивается отдельно в разделе «Фон барабанов».</p>'+
       '<div class="asset-settings-grid">'+rowsFor(['reels_background'])+'</div>'+spaceMoveBackground+'</section>';
