@@ -906,6 +906,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS space_bonus_pending (
   spins INTEGER NOT NULL CHECK(spins BETWEEN 10 AND 25),
   PRIMARY KEY(user_id,game_id,seq)
 )`);
+// Cosmic free-spin multiplier is kept separate from the legacy bonus session:
+// the older table constrains its multiplier to 2..100 for other games.
+db.exec(`CREATE TABLE IF NOT EXISTS space_bonus_multipliers (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  value INTEGER NOT NULL DEFAULT 1 CHECK(value BETWEEN 1 AND 1000000),
+  PRIMARY KEY(user_id,game_id)
+)`);
 // Historical Egypt configurations can contain more than one Scatter per reel.
 // Enforce exactly zero or one on every Egypt reel from now on.
 db.prepare(`UPDATE game_scatter_reels SET max_symbols=CASE WHEN max_symbols>0 THEN 1 ELSE 0 END,
