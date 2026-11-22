@@ -2027,3 +2027,79 @@ body>.egypt-line-award{
 .slot-theme-egypt .egypt-symbol-strip-item.is-selected img{
   filter:brightness(.9) saturate(.85);
 }
+
+
+/* Compact Egyptian spin payout: stays anchored on reel art without shifting
+   the page, and leaves more of the symbols visible during celebration. */
+.slot-theme-egypt .slot-reels.slot-reels-ribbon>.egypt-round-prize{
+  width:min(60%,235px)!important;
+  padding:6px 10px!important;
+  gap:1px!important;
+  border-radius:10px!important;
+}
+.slot-theme-egypt .egypt-round-prize>span{font-size:.68rem}
+.slot-theme-egypt .egypt-round-prize>strong{font-size:clamp(1.25rem,2vw,1.7rem)}
+.slot-theme-egypt .egypt-round-prize>small{font-size:.68rem}
+
+/* Admin-configured MEGA WIN: the entire screen is covered by a cinematic
+   golden burst. A regular BIG WIN still uses the smaller reel overlay. */
+body>.slot-big-win-overlay.is-egypt-mega{
+  position:fixed!important;
+  inset:0!important;
+  z-index:2147483020!important;
+  display:grid!important;
+  place-items:center;
+  padding:clamp(18px,5vw,75px);
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,240,169,.77) 0%,rgba(255,174,45,.56) 19%,rgba(129,44,11,.84) 57%,rgba(18,8,22,.97) 100%)!important;
+  overflow:hidden;
+  pointer-events:none;
+}
+body>.slot-big-win-overlay.is-egypt-mega[hidden]{display:none!important}
+body>.slot-big-win-overlay.is-egypt-mega::before,
+body>.slot-big-win-overlay.is-egypt-mega::after{
+  content:"";position:absolute;
+  width:155vmax;height:155vmax;
+  border-radius:50%;pointer-events:none;
+}
+body>.slot-big-win-overlay.is-egypt-mega::before{
+  background:repeating-conic-gradient(from 0deg,rgba(255,230,126,.54) 0deg,transparent 8deg,transparent 16deg);
+  animation:egypt-mega-burst 3.2s ease-out both;
+}
+body>.slot-big-win-overlay.is-egypt-mega::after{
+  width:48vmax;height:48vmax;
+  border:4px solid rgba(255,242,174,.8);
+  box-shadow:0 0 80px #ffe17bbd,inset 0 0 50px #ffcc6855;
+  animation:egypt-mega-ring 1.7s ease-out both;
+}
+body>.slot-big-win-overlay.is-egypt-mega strong{
+  position:relative;z-index:2;
+  font-size:clamp(2.7rem,9vw,8.5rem)!important;
+  line-height:1.08;
+  max-width:min(92vw,1180px);
+  color:#fff9d6!important;
+  -webkit-text-stroke:1px #9d4d16;
+  text-shadow:0 5px 2px #813a0b,0 10px 24px #000,
+    0 0 36px #ffc542,0 0 100px #ffdc70!important;
+  animation:egypt-mega-title 1.2s cubic-bezier(.16,.9,.2,1) both!important;
+}
+@keyframes egypt-mega-burst{
+  0%{opacity:0;transform:scale(.15) rotate(-18deg)}
+  35%{opacity:1;transform:scale(.8) rotate(8deg)}
+  100%{opacity:.55;transform:scale(1.3) rotate(20deg)}
+}
+@keyframes egypt-mega-ring{
+  0%{opacity:0;transform:scale(.2)}
+  45%{opacity:.8;transform:scale(1)}
+  100%{opacity:0;transform:scale(2.4)}
+}
+@keyframes egypt-mega-title{
+  0%{opacity:0;transform:scale(.25) rotate(-5deg)}
+  50%{opacity:1;transform:scale(1.13)}
+  100%{opacity:1;transform:scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  body>.slot-big-win-overlay.is-egypt-mega::before,
+  body>.slot-big-win-overlay.is-egypt-mega::after,
+  body>.slot-big-win-overlay.is-egypt-mega strong{animation:none!important}
+}
