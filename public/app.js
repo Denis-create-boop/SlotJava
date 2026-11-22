@@ -1461,7 +1461,7 @@
   function paintEgyptSelection(focusId=0){
     if(!isEgypt)return;
     egyptPlayingIds.clear();
-    for(const id of egyptActiveIds)egyptPlayingIds.add(id);
+    for(const id of egyptActiveIds)if(id!==wildId)egyptPlayingIds.add(id);
     setEgyptFocus(focusId);
     if(egyptSymbolStrip)egyptSymbolStrip.hidden=!bonusActive;
     if(egyptSymbolStripItems){
@@ -1497,7 +1497,7 @@
   }
   paintEgyptSelection();
   async function animateEgyptSelection(id){
-    if(!id||!egyptPicker||!egyptPickerPortrait)return;
+    if(!id||id===wildId||!egyptPicker||!egyptPickerPortrait)return;
     const pool=regularDefinitions.filter(item=>item.id!==wildId&&!egyptActiveIds.includes(item.id));
     if(!pool.length)return;
     egyptPicker.hidden=false;
@@ -1970,7 +1970,7 @@
           await delay(tier==='mega'?3700:2200);
           hideBigWin();
         }
-        egyptActiveIds=(result.selectedSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
+        egyptActiveIds=(result.selectedSymbolIds||egyptActiveIds).filter(id=>id!==wildId&&symbols.has(id));
         if(egyptActiveIds.length)egyptChosenId=egyptActiveIds[egyptActiveIds.length-1];
         updateBonus(!result.completedBonus,result.remaining||0,1,result.bonusWin||0);
         // updateBonus only updates the cumulative prize; the main win meter
@@ -1990,7 +1990,7 @@
             message.textContent+=' Все символы уже выбраны — продолжают играть вместе.';
             await delay(1100);
           }
-          egyptActiveIds=(result.activeSymbolIds||egyptActiveIds).filter(id=>symbols.has(id));
+          egyptActiveIds=(result.activeSymbolIds||egyptActiveIds).filter(id=>id!==wildId&&symbols.has(id));
           paintEgyptSelection();
         }
         if(result.completedBonus&&bonusFinish){
