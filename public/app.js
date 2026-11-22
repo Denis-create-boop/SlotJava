@@ -546,7 +546,7 @@
   }
 
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function animateColumn(col,index,finalIds){
+  function animateColumn(col,index,finalIds,options={}){
     if(reducedMotion){
       showStatic(col,finalIds);
       return Promise.resolve();
@@ -563,8 +563,8 @@
     track.style.transform='translate3d(0,'+(-extra*rowHeight)+'px,0)';
     void track.offsetHeight;
     return new Promise(resolve=>{
-      const delay=index*160;
-      const duration=1400+index*170;
+      const delay=options.delay??index*160;
+      const duration=options.duration??(1400+index*170);
       window.setTimeout(()=>{
         track.style.transition='transform '+duration+'ms cubic-bezier(.16,.66,.13,1)';
         track.style.transform='translate3d(0,0,0)';
@@ -576,63 +576,76 @@
     });
   }
 
-  // Egyptian near-miss anticipation: after TWO already stopped SCATTER reels,
-  // the still-spinning reels light up and spin a separate fast visual strip.
-  // Server-selected final symbols and bonus odds are never changed.
+  // Egypt SCATTER anticipation: use the server-settled result to determine
+  // when the second SCATTER is approaching its stop. This changes ONLY the
+  // visual schedule: winning odds and the final cells never change.
   async function animateEgyptScatterSuspense(cells){
-    let stoppedScatters=0;
-    const eligible=(root.dataset.egyptScatterEligible||'').split(',').map(value=>value==='1');
+    const eligible=(root.dataset.egyptScatterEligible||'').split(',').map(v=>v==='1');
+    const scatterReels=columns.map((_,reel)=>reel)
+      .filter(reel=>Array.from({length:rowCount},(_,row)=>cells[row*reelCount+reel]).includes(scatterId));
+    const secondScatter=scatterReels.length>=2?scatterReels[1]:-1;
+    const waitingReels=secondScatter>=0
+      ?columns.map((_,i)=>i).filter(i=>i>secondScatter&&eligible[i]):[];
+    const anticipation=waitingReels.length>0&&!reducedMotion;
     const overlays=new Map();
-    const startSuspense=(firstRemaining)=>{
-      for(let index=firstRemaining;index<reelCount;index++){
-        if(!eligible[index]||overlays.has(index))continue;
-        const column=columns[index],windowEl=column.querySelector('.reel-window');
-        if(!windowEl)continue;
+    const plans=columns.map((_,index)=>({
+      delay:index*220,
+      duration:1750+index*230+(anticipation&&index>secondScatter?900:0)
+    }));
+    const startSuspense=()=>{
+      for(const index of waitingReels){
+        if(overlays.has(index))continue;
+        const col=columns[index],view=col.querySelector('.reel-window');
+        if(!view)continue;
         const veil=document.createElement('div');
         veil.className='egypt-suspense-veil';
         veil.setAttribute('aria-hidden','true');
         const strip=document.createElement('div');
         strip.className='egypt-suspense-strip';
-        const preview=Array.from({length:rowCount},()=>{
-          const item=definitions[Math.floor(Math.random()*definitions.length)];
-          return item?.id??sample();
-        });
+        const preview=Array.from({length:rowCount},()=>sample());
         for(const id of preview.concat(preview))strip.append(makeTile(id));
         veil.append(strip);
-        windowEl.append(veil);
-        column.classList.add('egypt-suspense-reel');
+        view.append(veil);
+        col.classList.add('egypt-suspense-reel');
         overlays.set(index,veil);
       }
       if(overlays.size){
-        message.textContent='ДВА SCATTER! Оставшиеся барабаны могут запустить бонус!';
+        message.textContent='ДВА SCATTER! Сможет ли следующий барабан запустить бонус?';
         play('bonus_sound');
       }
     };
+    let triggerTimer=null;
+    if(anticipation){
+      // Turn on the glow BEFORE the second Scatter reel has fully stopped,
+      // while the remaining reels still have at least ~1.5s of spin left.
+      const triggerAt=Math.max(0,plans[secondScatter].delay+plans[secondScatter].duration-850);
+      triggerTimer=window.setTimeout(startSuspense,triggerAt);
+    }
+    const stopSuspense=async(index)=>{
+      const veil=overlays.get(index);
+      if(!veil)return;
+      // Reduce speed and brightness before showing the determined symbols.
+      veil.classList.add('is-slowing');
+      columns[index].classList.add('egypt-suspense-ending');
+      await new Promise(resolve=>window.setTimeout(resolve,650));
+      veil.classList.add('is-fading');
+      await new Promise(resolve=>window.setTimeout(resolve,400));
+      veil.remove();
+      overlays.delete(index);
+      columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
+    };
     try{
-      const animations=columns.map((col,index)=>{
+      await Promise.all(columns.map(async(col,index)=>{
         const target=Array.from({length:rowCount},(_,row)=>cells[row*reelCount+index]);
-        return animateColumn(col,index,target).then(async()=>{
-          if(overlays.has(index)&&!reducedMotion){
-            // Give the lit reel a readable rapid-spin finale before revealing
-            // its already-determined result.
-            await new Promise(resolve=>window.setTimeout(resolve,720));
-          }
-          if(overlays.has(index)){
-            overlays.get(index).remove();
-            overlays.delete(index);
-            col.classList.remove('egypt-suspense-reel');
-          }
-          if(target.includes(scatterId))stoppedScatters++;
-          if(stoppedScatters===2&&eligible.some((canLand,reel)=>reel>index&&canLand))
-            startSuspense(index+1);
-        });
-      });
-      await Promise.all(animations);
+        await animateColumn(col,index,target,plans[index]);
+        if(overlays.has(index))await stopSuspense(index);
+      }));
     }finally{
-      overlays.forEach((veil,index)=>{
+      if(triggerTimer!==null)window.clearTimeout(triggerTimer);
+      for(const [index,veil] of overlays){
         veil.remove();
-        columns[index].classList.remove('egypt-suspense-reel');
-      });
+        columns[index].classList.remove('egypt-suspense-reel','egypt-suspense-ending');
+      }
     }
   }
 
