@@ -53,7 +53,7 @@ function scoreEgyptBonus({cells,selectedId,minReels=3,bet,payouts}){
 // settled board. This avoids one expanding symbol erasing another or a SCATTER.
 // Display expansions sequentially; the payout is the sum across selected
 // symbols and all ten lines, irrespective of adjacent reel positions.
-function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={}}){
+function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={},linePercentById={}}){
   if(!Array.isArray(cells)||cells.length!==24)throw Error('Egypt requires a 6x4 board.');
   const distinct=[...new Set(selectedIds)];
   const symbolWins=[];
@@ -63,9 +63,11 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={}}){
     const landedReels=Array.from({length:6},(_,reel)=>reel).filter(reel=>
       Array.from({length:4},(_,row)=>cells[row*6+reel]).includes(symbolId));
     const price=payouts.prices.find(row=>row.symbol_id===symbolId)?.percent_hundredths||0;
+    const configuredLinePrice=linePercentById[symbolId];
+    const linePrice=configuredLinePrice===null||configuredLinePrice===undefined?price:configuredLinePrice;
     const milli=payouts.multipliers.find(row=>row.symbol_id===symbolId&&row.reel_count===landedReels.length)?.multiplier_milli??1000;
-    const perLine=landedReels.length>=minimum&&price>0&&milli>0
-      ?Math.round(bet*price*milli/10000000):0;
+    const perLine=landedReels.length>=minimum&&linePrice>0&&milli>0
+      ?Math.round(bet*linePrice*milli/10000000):0;
     const qualified=landedReels.length>=minimum&&perLine>0;
     const prize=qualified?perLine*EGYPT_LINES.length:0;
     total+=prize;
@@ -73,7 +75,7 @@ function scoreEgyptSymbolSet({cells,selectedIds,bet,payouts,minReelsById={}}){
     symbolWins.push({symbolId,landedReels,expandedReels:qualified?landedReels:[],
       matchedReels:landedReels.length,minReels:minimum,
       lineWins:qualified?EGYPT_LINES.map((rows,i)=>({line:i+1,rows,reels:landedReels})):[],
-      perLine,prize});
+      perLine,prize,linePercentHundredths:linePrice});
   }
   return {total,symbolWins};
 }
