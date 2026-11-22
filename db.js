@@ -577,6 +577,38 @@ db.transaction(()=>{
   }
 })();
 
+// One-time repair of four missing Egyptian portrait assignments verified in
+// the browser's data-symbol-def table. Earlier image-library deletion/migration
+// can leave these built-in paths hidden, so the old recovery intentionally
+// skipped them. Restore ONLY these four requested defaults once, without
+// replacing any existing admin assignments or uploaded art. Future deletions
+// remain respected after this one-time repair.
+db.transaction(()=>{
+  const flag='egypt_restore_four_missing_portraits_2026_v1';
+  if(db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag))return;
+  const egypt=db.prepare("SELECT id FROM games WHERE slug='golden-seven'").get();
+  if(!egypt)return;
+  const portraits=[['Фараон','pharaoh'],['Анубис','anubis'],
+    ['Клеопатра','cleopatra'],['Анкх','ankh']];
+  const symbolByName=db.prepare('SELECT id FROM game_symbols WHERE game_id=? AND name=?');
+  const linked=db.prepare('SELECT library_image_id FROM game_symbol_images WHERE symbol_id=?');
+  const uploaded=db.prepare('SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?');
+  const imageByPath=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?');
+  const register=db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)');
+  const unhide=db.prepare('DELETE FROM game_hidden_builtin_images WHERE game_id=? AND builtin_path=?');
+  const attach=db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)');
+  for(const [name,key] of portraits){
+    const symbol=symbolByName.get(egypt.id,name);
+    if(!symbol||linked.get(symbol.id)||uploaded.get(egypt.id,'symbol_'+symbol.id))continue;
+    const art='/static/images/egypt/premium-'+key+'.svg';
+    unhide.run(egypt.id,art);
+    register.run(egypt.id,name,art);
+    const image=imageByPath.get(egypt.id,art);
+    if(image)attach.run(symbol.id,image.id);
+  }
+  db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+})();
+
 function getScatterSettings(gameId){
   const symbol=db.prepare('SELECT symbol_id FROM game_scatter_symbols WHERE game_id=?').get(gameId);
   if(!symbol)return null;
