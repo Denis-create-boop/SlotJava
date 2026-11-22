@@ -46,3 +46,26 @@ test('scatter on a wild reel prevents visual replacement',()=>{
   assert.deepEqual(result.expandedReels,[]);
   assert.equal(result.cells[7],10);
 });
+
+test('Sun — WILD — Sun pays using the Sun price, not a Wild price',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=9;cells[2]=1;
+  const result=scoreSpaceLines({
+    cells,
+    symbols:[{id:1,name:'Sun'},{id:2,name:'Meteor'},{id:9,name:'WILD'}],
+    bet:100,
+    payouts:{
+      prices:[{symbol_id:1,percent_hundredths:10000},
+        {symbol_id:2,percent_hundredths:0},
+        {symbol_id:9,percent_hundredths:999999}],
+      multipliers:[{symbol_id:1,reel_count:3,multiplier_milli:1000},
+        {symbol_id:9,reel_count:3,multiplier_milli:100000}]
+    },
+    lines:[[0,0,0,0,0]],
+    wildId:9,scatterId:10
+  });
+  assert.equal(result.total,300);
+  assert.equal(result.wins.length,1);
+  assert.equal(result.wins[0].name,'Sun');
+  assert.equal(result.wins[0].count,3);
+});
