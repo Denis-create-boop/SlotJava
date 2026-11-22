@@ -1108,92 +1108,108 @@
   async function animateEgyptExpansion(result){
     const wins=Array.isArray(result.symbolWins)?result.symbolWins:[];
     if(!wins.length)return;
+    const resetBoard=()=>{
+      clearEgyptLines();
+      columns.forEach((col,index)=>{
+        const cells=Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index]);
+        showStatic(col,cells);
+        col.classList.remove('egypt-expanding-reel','egypt-expanded-reel');
+      });
+    };
+    const activeIds=Array.isArray(result.selectedSymbolIds)?result.selectedSymbolIds:[];
+    let shown=0;
     for(const item of wins){
-      if(item.prize<=0||!item.expandedReels?.length)continue;
-      // Expand one awarded symbol at a time so several active symbols can
-      // each receive their ten lines without visually overwriting each other.
+      shown++;
+      resetBoard();
       paintEgyptSelection(item.symbolId);
-      message.textContent=(symbols.get(item.symbolId)?.name||'Символ')+
-        ': '+item.matchedReels+' барабанов, 10 линий — '+item.prize+' очков!';
+      const name=symbols.get(item.symbolId)?.name||'Символ';
+      // Always introduce every selected symbol—even when its result is zero—
+      // so a second or third symbol is never silently skipped.
+      message.textContent='Бонусный символ '+shown+' из '+activeIds.length+': '+name+
+        '. Выпало на '+item.matchedReels+' барабанах.';
+      await delay(reducedMotion?120:550);
+      if(item.prize<=0||!item.expandedReels?.length){
+        message.textContent=name+': нет выигрышных линий в этом вращении.';
+        await delay(reducedMotion?150:700);
+        continue;
+      }
       for(const reel of item.expandedReels){
         const col=columns[reel];
         if(!col)continue;
         col.classList.remove('egypt-expanding-reel');
-        // The expanding symbol covers ALL four cells, including SCATTER.
-        // This is visual only: the server already counted any SCATTER retrigger.
+        // Full-height expansion replaces SCATTER visually as well.
         showStatic(col,Array(rowCount).fill(item.symbolId));
         void col.offsetWidth;
         col.classList.add('egypt-expanding-reel');
         play('win_sound');
-        await delay(250);
+        await delay(reducedMotion?80:240);
       }
       await paintEgyptLines(item);
-      await delay(500);
-      clearEgyptLines();
-      columns.forEach((col,index)=>showStatic(col,
-        Array.from({length:rowCount},(_,row)=>result.cells[row*reelCount+index])));
+      message.textContent=name+': '+item.lineWins.length+' линий × '+item.perLine+
+        ' очков = +'+item.prize+' очков.';
+      await delay(reducedMotion?150:900);
+      resetBoard();
+      await delay(reducedMotion?80:350);
     }
+    resetBoard();
     paintEgyptSelection();
   }
+
   async function paintEgyptLines(result){
     clearEgyptLines();
-    if(!egyptLinesOverlay||!result.lineWins?.length||!result.expandedReels?.length)return;
-    const field=root.querySelector('.reel-columns');
-    if(!field)return;
-    // A fixed top-layer SVG uses viewport coordinates and cannot be hidden
-    // behind a cabinet background, reel stacking context, or clipping.
-    if(egyptLinesOverlay.parentElement!==document.body)
-      document.body.append(egyptLinesOverlay);
-    const winRects=columns.map(col=>col.querySelector('.reel-window').getBoundingClientRect());
-    const ns='http://www.w3.org/2000/svg';
-    const viewportWidth=document.documentElement.clientWidth;
-    const viewportHeight=document.documentElement.clientHeight;
-    egyptLinesOverlay.setAttribute('viewBox','0 0 '+viewportWidth+' '+viewportHeight);
+    if(!result.lineWins?.length||!result.expandedReels?.length)return;
+    // Use a dedicated canvas in document.body. It is explicitly positioned
+    // above all reels and game backgrounds, avoiding SVG viewBox/CSS clipping.
+    const canvas=document.createElement('canvas');
+    canvas.className='egypt-lines-canvas';
+    canvas.setAttribute('aria-hidden','true');
+    document.body.append(canvas);
+    const ctx=canvas.getContext('2d');
+    if(!ctx){canvas.remove();return;}
+    const ratio=window.devicePixelRatio||1;
+    const width=window.innerWidth,height=window.innerHeight;
+    canvas.width=Math.round(width*ratio);
+    canvas.height=Math.round(height*ratio);
+    ctx.scale(ratio,ratio);
+    const coords=columns.map(col=>col.querySelector('.reel-window').getBoundingClientRect());
     for(const reel of result.expandedReels){
       if(Number.isInteger(reel)&&reel>=0&&reel<columns.length)
         columns[reel].classList.add('egypt-expanded-reel');
     }
-    const center=(row,col)=>{
-      const rect=winRects[col];
-      return [rect.left+rect.width/2,rect.top+(row+.5)*rect.height/rowCount];
+    const position=(col,row)=>{
+      const box=coords[col];
+      return [box.left+box.width/2,box.top+(row+.5)*box.height/rowCount];
     };
-    const makeLine=(pts,width,color)=>{
-      const poly=document.createElementNS(ns,'polyline');
-      poly.setAttribute('points',pts);
-      poly.setAttribute('stroke',color);
-      poly.setAttribute('stroke-width',String(width));
-      poly.setAttribute('stroke-linejoin','round');
-      poly.setAttribute('stroke-linecap','round');
-      poly.setAttribute('fill','none');
-      poly.setAttribute('vector-effect','non-scaling-stroke');
-      return poly;
-    };
-    // Ten separate line reveals, one at a time. A strong dark outline makes
-    // each golden path legible on the light Egyptian reel illustrations.
-    for(const win of result.lineWins){
-      const rows=egyptPaths[win.line-1];
-      if(!rows)continue;
-      const points=rows.map((row,col)=>center(row,col).join(',')).join(' ');
-      egyptLinesOverlay.replaceChildren(
-        makeLine(points,12,'#24111c'),
-        makeLine(points,7,win.line%2?'#ffe25b':'#78f2ff')
-      );
-      egyptLinesOverlay.hidden=false;
-      egyptLinesOverlay.classList.add('is-presenting');
-      const count=document.createElementNS(ns,'text');
-      const [labelX,labelY]=center(rows[0],0);
-      count.setAttribute('x',String(labelX+12));
-      count.setAttribute('y',String(Math.max(24,labelY-18)));
-      count.setAttribute('class','egypt-payline-count');
-      count.textContent='ЛИНИЯ '+win.line+' / 10';
-      egyptLinesOverlay.append(count);
-      message.textContent='Бонус: линия '+win.line+' из 10 · +'+result.perLine+
-        ' очков за линию';
-      await delay(reducedMotion?120:460);
-      egyptLinesOverlay.hidden=true;
-      await delay(reducedMotion?0:90);
+    const label=document.createElement('div');
+    label.className='egypt-line-award';
+    document.body.append(label);
+    try{
+      for(const win of result.lineWins){
+        const rows=egyptPaths[win.line-1];
+        if(!rows)continue;
+        ctx.clearRect(0,0,width,height);
+        ctx.beginPath();
+        rows.forEach((row,col)=>{
+          const [x,y]=position(col,row);
+          if(col===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        });
+        ctx.lineCap='round';ctx.lineJoin='round';
+        ctx.strokeStyle='#28100b';ctx.lineWidth=13;ctx.stroke();
+        ctx.strokeStyle=win.line%2?'#ffe667':'#6df5ff';
+        ctx.lineWidth=7;ctx.shadowColor='#ffce56';ctx.shadowBlur=15;ctx.stroke();
+        ctx.shadowBlur=0;
+        label.textContent='ЛИНИЯ '+win.line+' / 10  ·  +'+result.perLine+' очков';
+        label.style.left=Math.max(8,Math.min(width-260,coords[0].left+8))+'px';
+        label.style.top=Math.max(10,coords[0].top-52)+'px';
+        message.textContent=(symbols.get(result.symbolId)?.name||'Символ')+
+          ': линия '+win.line+' из 10 · +'+result.perLine+' очков';
+        await delay(reducedMotion?140:420);
+      }
+    }finally{
+      label.remove();
+      canvas.remove();
+      clearEgyptLines();
     }
-    clearEgyptLines();
   }
   // Autoplay always uses the existing server-validated spin endpoint.
   // Counts paid spins only; bonus/free spins do not consume the selected quota.
