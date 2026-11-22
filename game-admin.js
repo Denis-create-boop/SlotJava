@@ -542,7 +542,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const entries=[];
       for(let count=2;count<=6;count++){
         const raw=req.body?.['r_'+count];
-        if(typeof raw!=='string'||!/^(?:0|[1-9]\\d{0,4})(?:\\.\\d{1,5})?$/.test(raw)||Number(raw)>10000)
+        if(typeof raw!=='string'||!/^(?:0|[1-9]\d{0,4})(?:\.\d{1,5})?$/.test(raw)||Number(raw)>10000)
           return show(req,res,'Цена за 2–6 символов должна быть от 0 до 10000% с точностью до 0.00001%.',true,'symbols');
         entries.push([count,Math.round(Number(raw)*1000000)]);
       }
