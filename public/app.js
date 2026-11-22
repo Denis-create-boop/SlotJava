@@ -217,9 +217,7 @@
   // Load and decode images before revealing the game field. The overlay is
   // server-rendered, so it appears immediately, before this script starts.
   const loadingScreen=document.getElementById('slot-loading-screen');
-  const loadingInfo=document.getElementById('slot-loading-info');
   const loadingFill=document.getElementById('slot-loading-fill');
-  const loadingCount=document.getElementById('slot-loading-count');
   async function preloadGameImages(){
     if(!loadingScreen)return;
     const paths=new Set();
@@ -252,8 +250,6 @@
     const update=()=>{
       const percent=Math.round(done/total*100);
       if(loadingFill)loadingFill.style.width=percent+'%';
-      if(loadingCount)loadingCount.textContent=percent+'%';
-      if(loadingInfo)loadingInfo.textContent='Изображений загружено: '+done+' из '+total;
     };
     update();
     const tasks=urls.map(url=>new Promise(resolve=>{
@@ -286,7 +282,6 @@
     ]);
     if(timedOut||failed){
       console.warn('[SlotJava] Image preload incomplete', {failed,done,total,timedOut});
-      if(loadingInfo)loadingInfo.textContent='Некоторые изображения недоступны. Игра откроется.';
       await new Promise(resolve=>window.setTimeout(resolve,900));
     }
     loadingScreen.classList.add('is-ready');
