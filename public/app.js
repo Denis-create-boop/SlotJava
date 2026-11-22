@@ -1440,6 +1440,7 @@
     if(autoTrigger)autoTrigger.classList.toggle('is-auto-running',autoRunning);
     if(autoTriggerLabel)autoTriggerLabel.textContent=autoRunning?'СТОП':'АВТО';
     autoCount.disabled=autoRunning;
+    updateBetSteps();
     if(autoRunning)autoStatus.textContent='Осталось платных вращений: '+autoRemaining+(bonusActive?' · бонусные вращения бесплатно':'');
   }
   function stopAutoplay(reason='Автоигра остановлена.'){
