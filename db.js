@@ -405,7 +405,8 @@ db.transaction(()=>{
       const src='/static/images/'+item.folder+'/'+file;
       insertArt.run(game.id,name,src);
       const art=selectArt.get(game.id,src);
-      if(art&&!existingUpload.get(game.id,key))assignBackground.run(game.id,key,art.id);
+      // Seed only on initial game creation; do not resurrect a deliberately removed background.
+      if(empty&&art&&!existingUpload.get(game.id,key))assignBackground.run(game.id,key,art.id);
     }
     // Images in each game's own folder; symbols may be reassigned by admin.
     for(const [idx,entry] of item.symbols.entries()){
@@ -431,6 +432,54 @@ db.transaction(()=>{
     }
   }
 })();
+// One-time repair for legacy Cosmic Odyssey layouts which used the large
+// 5x3 reel-frame picture as the page wallpaper, leaving the reel field at its
+// default. Keep the existing picture ID: custom uploads and renamed library
+// assets must not be lost. Never overwrite a separately customized reel field.
+{
+  const flag='space_reel_wallpaper_repair_v1';
+  if(!db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?').get(flag)){
+    const game=db.prepare("SELECT id FROM games WHERE slug='lucky-stars'").get();
+    if(game){
+      const library=db.prepare(`SELECT b.library_image_id,l.builtin_path,l.file_name
+        FROM game_background_images b
+        JOIN game_image_library l ON l.id=b.library_image_id
+        WHERE b.game_id=? AND b.asset_key=?`);
+      const upload=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?');
+      const wallpaper=library.get(game.id,'background');
+      const wallpaperUpload=upload.get(game.id,'background');
+      const reel=library.get(game.id,'reels_background');
+      const reelUpload=upload.get(game.id,'reels_background');
+      const defaultReel=!reelUpload&&(!reel||reel.builtin_path==='/static/images/space/field.svg');
+      const customWallpaper=!!wallpaperUpload||!!(wallpaper&&wallpaper.builtin_path!=='/static/images/space/background.svg');
+      const samePicture=!!(wallpaper&&reel&&wallpaper.library_image_id===reel.library_image_id);
+      if((defaultReel&&customWallpaper)||samePicture){
+        db.transaction(()=>{
+          if(defaultReel){
+            db.prepare("DELETE FROM game_background_images WHERE game_id=? AND asset_key='reels_background'").run(game.id);
+            if(wallpaperUpload){
+              db.prepare("UPDATE game_assets SET asset_key='reels_background' WHERE game_id=? AND asset_key='background'")
+                .run(game.id);
+            }else if(wallpaper){
+              db.prepare('INSERT INTO game_background_images(game_id,asset_key,library_image_id) VALUES(?,?,?)')
+                .run(game.id,'reels_background',wallpaper.library_image_id);
+            }
+          }
+          // The default scene is a separate image, so the decorative reel frame
+          // no longer covers the viewport. A later user choice remains editable.
+          db.prepare("DELETE FROM game_background_images WHERE game_id=? AND asset_key='background'").run(game.id);
+          const defaultArt=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?')
+            .get(game.id,'/static/images/space/background.svg');
+          if(defaultArt&&!upload.get(game.id,'background'))
+            db.prepare("INSERT INTO game_background_images(game_id,asset_key,library_image_id) VALUES(?,'background',?)")
+              .run(game.id,defaultArt.id);
+        })();
+      }
+    }
+    db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+  }
+}
+
 // Scatter is a special symbol only for the original 5x4 game. The symbol and
 // its artwork are created once after other games are seeded, so Egypt still
 // gets exactly one more regular symbol than the original game had.
