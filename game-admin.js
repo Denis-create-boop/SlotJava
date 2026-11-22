@@ -11,6 +11,7 @@ fs.mkdirSync(uploadsDir,{recursive:true,mode:0o700});
 const assetTypes={
   background:{label:'Фон игрового окна',kind:'image'},
   egypt_bonus_background:{label:'Фон бонусной игры «Египет»',kind:'image'},
+  space_expanding_wild:{label:'Космос: один высокий WILD на три ячейки',kind:'image'},
   field_background:{label:'Общий фон поля с барабанами',kind:'image'},
   cells_background:{label:'Общий фон всех ячеек с символами',kind:'image'},
   logo:{label:'Логотип игры',kind:'image'},
@@ -109,6 +110,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   }
   function assetTab(key){
     if(key==='background'||key==='logo'||key==='bonus_frame'||key==='egypt_bonus_background')return 'background';
+    if(key==='space_expanding_wild')return 'symbols';
     if(key==='reels_background'||/^reel_[1-5]$/.test(key))return 'reels';
     if(key==='field_background'||key==='cells_background'||/^cell_(?:[1-9]|1\d|20)$/.test(key))return 'cells';
     if(key==='bet_panel'||key==='win_panel')return 'panels';
@@ -398,7 +400,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
       '<button class="primary" type="submit">Добавить символ</button></form>'+
-      '<div class="symbol-admin-list">'+symbolItems+'</div></section>';
+      '<div class="symbol-admin-list">'+symbolItems+'</div>'+
+      (game.slug==='lucky-stars'?'<h3>Расширяющийся WILD: одна картинка на 3 ячейки</h3><p class="hint">Загрузите отдельную вертикальную картинку. Если не выбрано, используется обычный WILD.</p><div class="asset-settings-grid">'+rowsFor(['space_expanding_wild'])+'</div>':'')+'</section>';
     const notice=message?'<p class="'+(error?'error':'success-note')+'" role="status">'+h(message)+'</p>':'';
     sendPage(res,'Настройки: '+game.title,
       '<div class="game-admin-page"><a class="back-link" href="/admin">← К списку игр</a>'+
