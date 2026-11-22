@@ -42,6 +42,9 @@
   const bonusMultiplier=document.getElementById('slot-bonus-multiplier');
   const bonusRemaining=document.getElementById('slot-bonus-remaining');
   const bonusTotal=document.getElementById('slot-bonus-total');
+  const egyptGamesBadge=document.getElementById('egypt-bonus-games');
+  const egyptGamesCount=document.getElementById('egypt-bonus-games-count');
+  const winCaption=document.getElementById('slot-win-caption');
   const bonusPlus=document.getElementById('slot-bonus-plus');
   const bonusFinish=document.getElementById('slot-bonus-finish');
   const bonusFinishTotal=document.getElementById('slot-bonus-finish-total');
@@ -55,6 +58,9 @@
     root.classList.toggle('is-bonus-active',active);
     if(bonusTop)bonusTop.hidden=!active;
     if(bonusStats)bonusStats.hidden=!active;
+    if(egyptGamesBadge)egyptGamesBadge.hidden=!active;
+    if(isEgypt&&winCaption)winCaption.textContent=active?'Выигрыш бонуса':'Выигрыш';
+    if(isEgypt&&active)winDisplay.textContent=String(total);
     if(bonusMultiplier)bonusMultiplier.textContent='×'+multiplier;
     if(bonusRemaining)bonusRemaining.textContent=String(remaining);
     if(bonusTotal)bonusTotal.textContent=String(total);
@@ -1001,6 +1007,10 @@
   let egyptChosenId=Number(root.dataset.egyptSelected)||0;
   if(egyptChosenId&&!egyptActiveIds.includes(egyptChosenId))egyptActiveIds.push(egyptChosenId);
   function setEgyptCounters(state){
+    if(egyptGamesCount){
+      const pending=Number.isSafeInteger(state.pendingBonuses)?state.pendingBonuses:0;
+      egyptGamesCount.textContent=String(Math.max(0,(bonusActive?1:0)+pending));
+    }
     const fields=[
       [egyptCounterPlayed,state.played],
       [egyptCounterPlayedTotal,state.playedTotal],
