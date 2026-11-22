@@ -224,7 +224,12 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       const options=libraryImages.map(image=>'<option value="'+image.id+'"'+(image.id===selected?' selected':'')+'>'+h(image.name)+'</option>').join('');
       const chosen=libraryImages.find(image=>image.id===selected);
       const preview=chosen?'<img class="asset-preview" src="'+h(libraryUrl(id,chosen))+'" alt="'+h(chosen.name)+'">':'';
-      return '<details class="symbol-admin-card"><summary class="symbol-admin-summary"><span>'+h(symbol.name)+' <small>ID '+symbol.id+'</small></span><span class="symbol-expand-hint">Настроить <span aria-hidden="true">▾</span></span></summary>'+
+      const visibleName=game.slug==='lucky-stars'&&chosen&&!isWild&&!isScatter?chosen.name:symbol.name;
+      return '<details class="symbol-admin-card"><summary class="symbol-admin-summary"><span>'+h(visibleName)+' <small>ID '+symbol.id+'</small></span><span class="symbol-expand-hint">Настроить <span aria-hidden="true">▾</span></span></summary>'+
+        (visibleName!==symbol.name?'<p class="hint">В игре пока сохранено название «'+h(symbol.name)+'». Для синхронизации нажми кнопку выше или сохрани название ниже.</p>':'')+
+        '<form method="post" class="symbol-name-form" action="/admin/games/'+id+'/symbols/'+symbol.id+'/name">'+csrf+
+        '<label>Название символа в игре<input type="text" name="name" minlength="1" maxlength="60" value="'+h(symbol.name)+'" required></label>'+
+        '<button type="submit">Сохранить название</button></form>'+
         '<div class="symbol-library-picker">'+preview+
         '<form method="post" action="/admin/games/'+id+'/symbols/'+symbol.id+'/image">'+csrf+
         '<label>Картинка из папки игры<select name="image_id" required><option value="">Выберите изображение</option>'+options+'</select></label>'+
@@ -441,7 +446,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<p class="hint">'+(game.slug==='golden-seven'?'Установите множитель ставки для 2–6 символов на линии и относительный вес их выпадения. Линии можно создавать и редактировать отдельно в разделе «Линии выигрыша».':'Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.')+'</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
       '<label>Название нового символа<input name="name" minlength="1" maxlength="60" required placeholder="Например: Золотая звезда"></label>'+
-      '<button class="primary" type="submit">Добавить символ</button></form>'+
+      '<button class="primary" type="submit">Добавить символ</button></form>'+ 
+      (game.slug==='lucky-stars'?'<form method="post" action="/admin/games/'+id+'/symbols/sync-image-names">'+csrf+
+        '<p class="hint">Синхронизировать текущие названия символов с названиями выбранных картинок. Цены и коэффициенты останутся без изменений. WILD и SCATTER не переименовываются.</p>'+
+        '<button type="submit">Применить названия выбранных картинок ко всем символам</button></form>':'')+
       (game.slug==='lucky-stars'?'<p><a class="primary" href="/admin/games/'+id+'?tab=lines">Редактировать 10 линий выигрыша →</a></p>':'')+
       '<div class="symbol-admin-list">'+symbolItems+'</div>'+
       (game.slug==='lucky-stars'?'<h3>Расширяющийся WILD: одна картинка на 3 ячейки</h3><p class="hint">Для выбора из папки используйте кнопку «На весь барабан WILD» в разделе изображений. Можно также загрузить отдельный вертикальный файл ниже.</p><div class="asset-settings-grid">'+rowsFor(['space_expanding_wild'])+'</div>':'')+'</section>';
@@ -587,6 +595,34 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     db.prepare('INSERT INTO game_symbols(game_id,name,position) VALUES(?,?,?)').run(id,name,position);
     res.redirect(sectionUrl(id,'symbols'));
   });
+  // Existing symbol IDs, paytables and history survive all renames.
+  app.post('/admin/games/:id/symbols/:symbolId/name',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),symbolId=Number(req.params.symbolId);
+    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
+    const name=typeof req.body?.name==='string'?req.body.name.trim():'';
+    if(!name||name.length>60)return show(req,res,'Название символа: от 1 до 60 символов.',true,'symbols');
+    const protectedSymbol=db.prepare('SELECT 1 FROM game_wild_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId)
+      ||db.prepare('SELECT 1 FROM game_scatter_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId);
+    if(protectedSymbol)return res.sendStatus(403);
+    db.prepare('UPDATE game_symbols SET name=? WHERE game_id=? AND id=?').run(name,id,symbolId);
+    res.redirect(sectionUrl(id,'symbols')+'&renamed=1');
+  });
+  app.post('/admin/games/:id/symbols/sync-image-names',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(game?.slug!=='lucky-stars')return res.sendStatus(404);
+    const linked=db.prepare(`SELECT s.id,l.name FROM game_symbols s
+      JOIN game_symbol_images si ON si.symbol_id=s.id
+      JOIN game_image_library l ON l.id=si.library_image_id AND l.game_id=s.game_id
+      WHERE s.game_id=?
+      AND NOT EXISTS (SELECT 1 FROM game_wild_symbols w WHERE w.game_id=s.game_id AND w.symbol_id=s.id)
+      AND NOT EXISTS (SELECT 1 FROM game_scatter_symbols sc WHERE sc.game_id=s.game_id AND sc.symbol_id=s.id)`).all(id);
+    const update=db.prepare('UPDATE game_symbols SET name=? WHERE id=? AND game_id=?');
+    db.transaction(()=>{for(const symbol of linked){
+      const name=symbol.name?.trim();
+      if(name&&name.length<=60)update.run(name,symbol.id,id);
+    }})();
+    res.redirect(sectionUrl(id,'symbols')+'&synced=1');
+  });
   app.post('/admin/games/:id/symbols/:symbolId/egypt-weight',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId),game=id?gameById(id):null;
     if(!game||game.slug!=='golden-seven'||!assertOwnSymbol(id,symbolId))return res.sendStatus(404);
@@ -678,12 +714,20 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
   });
   app.post('/admin/games/:id/symbols/:symbolId/image',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),symbolId=Number(req.params.symbolId),imageId=Number(req.body.image_id);
-    if(!id||!gameById(id)||!assertOwnSymbol(id,symbolId)||!Number.isSafeInteger(imageId)||!ownedLibraryImage(id,imageId))
+    const game=id?gameById(id):null;
+    const selectedImage=game&&Number.isSafeInteger(imageId)?ownedLibraryImage(id,imageId):null;
+    if(!game||!assertOwnSymbol(id,symbolId)||!Number.isSafeInteger(imageId)||!selectedImage)
       return res.sendStatus(404);
     const previous=db.prepare('SELECT file_name FROM game_assets WHERE game_id=? AND asset_key=?').get(id,'symbol_'+symbolId);
     db.transaction(()=>{
       db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?) ON CONFLICT(symbol_id) DO UPDATE SET library_image_id=excluded.library_image_id').run(symbolId,imageId);
       db.prepare('DELETE FROM game_assets WHERE game_id=? AND asset_key=?').run(id,'symbol_'+symbolId);
+      if(game.slug==='lucky-stars'&&selectedImage.name?.trim()&&selectedImage.name.trim().length<=60){
+        const wild=db.prepare('SELECT 1 FROM game_wild_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId);
+        const scatter=db.prepare('SELECT 1 FROM game_scatter_symbols WHERE game_id=? AND symbol_id=?').get(id,symbolId);
+        if(!wild&&!scatter)db.prepare('UPDATE game_symbols SET name=? WHERE id=? AND game_id=?')
+          .run(selectedImage.name.trim(),symbolId,id);
+      }
     })();
     if(previous)try{fs.unlinkSync(path.join(uploadsDir,previous.file_name));}catch(e){console.warn('Old symbol art cleanup:',e.code);}
     res.redirect(sectionUrl(id,'symbols'));
