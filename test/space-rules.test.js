@@ -69,3 +69,36 @@ test('Sun — WILD — Sun pays using the Sun price, not a Wild price',()=>{
   assert.equal(result.wins[0].name,'Sun');
   assert.equal(result.wins[0].count,3);
 });
+
+test('Cosmic direct paytable: two matching reels can pay stake x2.5',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=9;cells[2]=2;
+  const result=scoreSpaceLines({cells,symbols,bet:100,payouts,lines:[[0,0,0,0,0]],
+    wildId:9,scatterId:10,rules:{
+      minimums:[{symbol_id:1,min_reels:2}],
+      multipliers:[{symbol_id:1,matches:2,multiplier_milli:2500}]
+    }});
+  assert.equal(result.total,250);
+  assert.equal(result.wins[0].count,2);
+});
+test('Cosmic 3-reel minimum blocks two, then pays direct x4 for three',()=>{
+  const cells=Array(15).fill(2);
+  cells[0]=1;cells[1]=9;
+  const rules={minimums:[{symbol_id:1,min_reels:3}],multipliers:[
+    {symbol_id:1,matches:2,multiplier_milli:9000},
+    {symbol_id:1,matches:3,multiplier_milli:4000}
+  ]};
+  const line=[[0,0,0,0,0]];
+  const input={cells,symbols,bet:100,payouts,lines:line,wildId:9,scatterId:10,rules};
+  assert.equal(scoreSpaceLines(input).total,0);
+  cells[2]=1;
+  assert.equal(scoreSpaceLines(input).total,400);
+});
+test('Cosmic five matching reels pays one direct x10, not multiplied per copy',()=>{
+  const cells=Array(15).fill(2);for(let col=0;col<5;col++)cells[col]=col===2?9:1;
+  const result=scoreSpaceLines({cells,symbols,bet:75,payouts,lines:[[0,0,0,0,0]],
+    wildId:9,scatterId:10,rules:{minimums:[{symbol_id:1,min_reels:2}],
+      multipliers:[{symbol_id:1,matches:5,multiplier_milli:10000}]}});
+  assert.equal(result.total,750);
+  assert.equal(result.wins.length,1);
+});
