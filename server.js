@@ -8,7 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
-const { EGYPT_LINES,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries } = require('./egypt-bonus');
+const { EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -200,6 +200,11 @@ function scoreBoard(cells,symbols,payouts,bet=10,rows=4,egyptMinimums=null){
   }
   return {total,wins};
 }
+function egyptSymbolWeights(gameId){
+  return Object.fromEntries(db.prepare(`SELECT w.symbol_id,w.weight
+    FROM egypt_symbol_weights w JOIN game_symbols s ON s.id=w.symbol_id
+    WHERE s.game_id=?`).all(gameId).map(row=>[row.symbol_id,row.weight]));
+}
 function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   const scatter=getScatterSettings(gameId);
   const symbols=getSymbols(gameId).filter(symbol=>symbol.id!==scatter?.symbolId);
@@ -220,7 +225,12 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
     :scoreBoard(board,symbols,payouts,bet,rows,egyptMinimums);
   if(!symbols.length)return {error:'Добавьте хотя бы один символ в админке.'};
   const reelCount=layout.reels,rows=layout.rows;
-  const randomBoard=()=>Array.from({length:rows*reelCount},()=>symbols[crypto.randomInt(symbols.length)].id);
+  const weighted=egyptPrices?egyptSymbolWeights(gameId):null;
+  const availableSymbols=weighted?symbols.filter(symbol=>(weighted[symbol.id]??100)>0):symbols;
+  if(!availableSymbols.length)return {error:'У всех символов Египта вес 0. Укажите хотя бы один положительный вес в админке.'};
+  const choose=weighted?egyptWeightedPicker(availableSymbols,weighted,n=>crypto.randomInt(n))
+    :()=>symbols[crypto.randomInt(symbols.length)].id;
+  const randomBoard=()=>Array.from({length:rows*reelCount},choose);
   const wantWin=crypto.randomInt(100)<winFrequency;
   let cells=randomBoard(),evaluation=evaluate(cells);
   for(let trial=0;trial<180&&Boolean(evaluation.total)!==wantWin;trial++){
@@ -229,13 +239,14 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
   if(wantWin&&evaluation.total===0&&symbols.length>=2){
     const reelRules=new Map(payouts.multipliers.map(p=>[p.symbol_id+':'+p.reel_count,p.multiplier_milli]));
     const candidates=egyptPrices
-      ?symbols.filter(symbol=>Array.from({length:5},(_,i)=>i+2)
+      ?availableSymbols.filter(symbol=>Array.from({length:5},(_,i)=>i+2)
           .some(count=>(egyptPrices[symbol.id+':'+count]??0)>0))
           .map(symbol=>({symbol_id:symbol.id}))
       :payouts.prices.filter(p=>p.percent_hundredths>0&&symbols.some(s=>s.id===p.symbol_id));
     for(let trial=0;trial<Math.min(candidates.length*30,240)&&evaluation.total===0;trial++){
       const rule=candidates[crypto.randomInt(candidates.length)];
-      const others=symbols.filter(item=>item.id!==rule.symbol_id);
+      const others=availableSymbols.filter(item=>item.id!==rule.symbol_id);
+      if(!others.length)continue;
       const minReels=egyptMinimums?.get(rule.symbol_id)===2?2:3;
       const available=egyptPrices?Array.from({length:reelCount-minReels+1},(_,i)=>i+minReels)
         .filter(count=>(egyptPrices[rule.symbol_id+':'+count]??0)>0):null;
@@ -244,7 +255,10 @@ function generateSpin(gameId,winFrequency,bet,layout={reels:5,rows:4}){
         ?available[crypto.randomInt(available.length)]
         :minReels+crypto.randomInt(reelCount-minReels+1);
       if(!egyptPrices&&(reelRules.get(rule.symbol_id+':'+activeReels)??1000)<=0)continue;
-      const arranged=Array.from({length:rows*reelCount},()=>others[crypto.randomInt(others.length)].id);
+      const otherChoose=egyptPrices
+        ?egyptWeightedPicker(others,weighted,n=>crypto.randomInt(n))
+        :()=>others[crypto.randomInt(others.length)].id;
+      const arranged=Array.from({length:rows*reelCount},otherChoose);
       const line=egyptPrices?crypto.randomInt(10):null;
       const egyptPath=line===null?null:EGYPT_LINES[line];
       for(let col=0;col<activeReels;col++)
@@ -429,6 +443,10 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     if(active&&game.slug==='golden-seven'){
       const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
       if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
+      const weights=egyptSymbolWeights(game.id);
+      const enabled=regular.filter(symbol=>(weights[symbol.id]??100)>0);
+      if(!enabled.length)return {error:'У всех символов Египта вес 0. Укажите хотя бы один положительный вес в админке.'};
+      const choose=egyptWeightedPicker(enabled,weights,n=>crypto.randomInt(n));
       let chain=getEgyptBonusChain(req.user.id,game.id);
       if(!chain){
         // Migrate in-progress bonuses from older releases without forfeiting
@@ -450,8 +468,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       }
       // Generate one settled 6x4 board including up to one SCATTER per reel.
       // Every selected symbol is scored on this unexpanded board independently.
-      const initialBoard=Array.from({length:layout.rows*layout.reels},()=>
-        regular[crypto.randomInt(regular.length)].id);
+      const initialBoard=Array.from({length:layout.rows*layout.reels},choose);
       const scatterPlacement=scatterOnBoard(initialBoard,scatter.symbolId,scatter.rules,
         layout.rows,layout.reels,n=>crypto.randomInt(n));
       const minRows=db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
