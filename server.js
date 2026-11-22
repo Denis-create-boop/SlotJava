@@ -320,7 +320,8 @@ function firstGamePage(game,req){
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
     (scatter?'<div class="slot-bonus-top" id="slot-bonus-top"'+(bonusVisible?'':' hidden')+'><div class="slot-devil-hug" aria-label="Бонусный множитель"><strong id="slot-bonus-multiplier">×'+(bonus?.multiplier||2)+'</strong></div><em id="slot-bonus-plus" aria-live="polite"></em></div>':'')+
-    (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>':'')+
+    (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>'+
+      '<aside class="egypt-bonus-games" id="egypt-bonus-games"'+(bonusVisible?'':' hidden')+' aria-label="Оставшиеся бонусные игры"><span>БОНУСНЫХ<br>ИГР</span><strong id="egypt-bonus-games-count">'+(bonusVisible?1+(egyptChain?.queue.length||0):0)+'</strong></aside>':'')+
     '<div class="slot-reels slot-reels-ribbon">'+
     backgroundImage('reels_background','slot-reels-background')+
     (game.slug==='slot-classic'&&scatter&&url('bonus_frame')?'<img class="slot-bonus-field-frame" src="'+h(url('bonus_frame'))+'" alt="" aria-hidden="true">':'')+
@@ -341,14 +342,11 @@ function firstGamePage(game,req){
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
     '':'')+
 
-    (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений осталось: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
-      (game.slug==='golden-seven'?'<span>Сыграно: <strong id="egypt-bonus-played">'+(egyptChain?.played_current||0)+'</strong> / <strong id="egypt-bonus-series-total">'+(egyptChain?.current_total||bonus?.remaining||0)+'</strong></span>'+
-      '<span>Серия № <strong id="egypt-bonus-series">'+(egyptChain?.series_number||1)+'</strong></span>'+
-      '<span>Сыграно всего: <strong id="egypt-bonus-played-total">'+(egyptChain?.played_total||0)+'</strong></span>'+
-      '<span>Осталось всего: <strong id="egypt-bonus-remaining-total">'+((bonus?.remaining||0)+(egyptChain?.queue||[]).reduce((sum,item)=>sum+item.free_spins,0))+'</strong></span>'+
-      '<span>Ретриггеров: <strong id="egypt-bonus-retriggers">'+(egyptChain?.retrigger_count||0)+'</strong></span>'+
-      '<span>В очереди: <strong id="egypt-bonus-queue">'+(egyptChain?.queue.length||0)+'</strong></span>':'')+
-      '<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
+    (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'>'+
+      '<span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
+      (game.slug==='golden-seven'?'':'<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span>')+
+      (game.slug==='golden-seven'?'<span class="egypt-bonus-winnings">Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span>':'')+
+      '</div>':'')+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
