@@ -407,8 +407,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const winTier=evaluated.total>0&&evaluated.total*1000>=active.bet*mega?'mega'
         :evaluated.total>0&&evaluated.total*1000>=active.bet*big?'big'
         :evaluated.total>0?'normal':'none';
-      return {mode:'egypt-bonus',cells:board.cells,selectedSymbolId:chosen.id,
-        expandedReels:board.expandedReels,lineWins:evaluated.lineWins,
+      return {mode:'egypt-bonus',cells:board.cells,preExpansionCells:board.initialCells,
+        selectedSymbolId:chosen.id,expandedReels:board.expandedReels,lineWins:evaluated.lineWins,
         minReels:minimum,matchedReels:evaluated.matchedReels,
         perLine:evaluated.perLine,total:evaluated.total,
         baseWin:evaluated.total,bonusRoundWin:evaluated.total,
