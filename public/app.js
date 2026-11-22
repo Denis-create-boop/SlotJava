@@ -163,11 +163,29 @@
   const columns=Array.from(root.querySelectorAll('.reel-column'));
   const reelCount=columns.length;
   const rowCount=Number(root.dataset.rows)||4;
-  const definitions=Array.from(document.querySelectorAll('[data-symbol-def]')).map(node=>({
-    id:Number(node.dataset.symbolId),
-    name:node.dataset.name||'Символ',
-    image:node.dataset.image||''
-  })).filter(item=>Number.isSafeInteger(item.id));
+  const isEgypt=root.classList.contains('slot-theme-egypt');
+  const egyptStarterArt=new Set([
+    'Фараон','Клеопатра','Анубис','Анкх','10','J','Q','K','A','Скарабей','SCATTER'
+  ]);
+  const definitions=Array.from(document.querySelectorAll('[data-symbol-def]')).map(node=>{
+    const name=node.dataset.name||'Символ';
+    const defaultImage=node.dataset.defaultImage||'';
+    let image=node.dataset.image||'';
+    // Only repair missing/legacy starter art explicitly allowed by the server.
+    // Keep administrator-selected images and deliberately deleted art intact.
+    const legacy=image.startsWith('/static/images/egypt/symbols.svg#');
+    if(isEgypt&&defaultImage&&(!image||legacy)){
+      image=defaultImage;
+      if(!node.dataset.image)console.warn('[SlotJava] Egyptian image link missing, using starter artwork:',name);
+    }
+    return {id:Number(node.dataset.symbolId),name,image,defaultImage};
+  }).filter(item=>Number.isSafeInteger(item.id));
+  if(isEgypt){
+    console.info('[SlotJava] Egypt artwork check v3; symbols:',definitions.map(({id,name,image})=>({id,name,image})));
+    if(definitions.some(item=>egyptStarterArt.has(item.name)&&!item.image)){
+      console.warn('[SlotJava] Egyptian image links missing in server-rendered definitions.');
+    }
+  }
   const symbols=new Map(definitions.map(item=>[item.id,item]));
   const regularDefinitions=definitions.filter(item=>item.id!==scatterId);
   const sound=name=>root.querySelector('[data-sound="'+name+'"]');
