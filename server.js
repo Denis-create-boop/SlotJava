@@ -6,9 +6,9 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
-const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession } = require('./db');
+const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
-const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor } = require('./egypt-bonus');
+const { egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,chooseNewEgyptSymbol } = require('./egypt-bonus');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -120,9 +120,9 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-suspense-portrait-v2"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=egypt-retrigger-chain-v1"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-suspense-portrait-v2" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-retrigger-chain-v1" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -303,12 +303,14 @@ function firstGamePage(game,req){
   const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
   const bonusVisible=!!bonus;
-  const selectedEgypt=game.slug==='golden-seven'?(bonus?.selected_symbol_id||0):0;
+  const egyptChain=game.slug==='golden-seven'&&bonus?getEgyptBonusChain(req.user.id,game.id):null;
+  const egyptSelectedIds=egyptChain?.symbols?.length?egyptChain.symbols:(bonus?.selected_symbol_id?[bonus.selected_symbol_id]:[]);
+  const selectedEgypt=game.slug==='golden-seven'?(egyptSelectedIds[egyptSelectedIds.length-1]||0):0;
   const egyptScatterOdds=game.slug==='golden-seven'&&scatter
     ?Array.from({length:reelCount},(_,i)=>scatter.rules.some(rule=>
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
-  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'">'+
+  return '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'">'+
     backgroundImage('background','slot-full-background')+
     '<a class="back-link game-catalog-link" href="/"><span aria-hidden="true">←</span> К каталогу</a>'+
     '<div class="slot-machine">'+
@@ -324,10 +326,16 @@ function firstGamePage(game,req){
     '<div class="reel-columns">'+reels+'</div>'+
     (game.slug==='golden-seven'?'<svg class="egypt-payline-overlay" id="egypt-payline-overlay" viewBox="0 0 600 400" preserveAspectRatio="none" aria-label="Десять линий выплат" hidden></svg>':'')+
     '</div>'+
+    (game.slug==='golden-seven'?'<div class="egypt-symbol-strip" id="egypt-symbol-strip"'+(bonusVisible?'':' hidden')+'><strong>СИМВОЛЫ БОНУСА</strong><div class="egypt-symbol-strip-items" id="egypt-symbol-strip-items"></div></div>':'')+
     (game.slug==='golden-seven'?'<div class="egypt-bonus-picker" id="egypt-bonus-picker" hidden><div class="egypt-bonus-picker-title">СИМВОЛ БОНУСНОЙ ИГРЫ</div><div class="egypt-bonus-picker-portrait" id="egypt-bonus-picker-portrait"></div><strong id="egypt-bonus-picker-name"></strong><small>Выбор символа для 10 линий</small></div>'+
     '<div class="egypt-selected-label" id="egypt-selected-label"'+(bonusVisible?'':' hidden')+'><div class="egypt-selected-portrait" id="egypt-selected-portrait" aria-hidden="true"></div><div class="egypt-selected-info"><small>ВЫБРАННЫЙ СИМВОЛ БОНУСА</small><strong id="egypt-selected-name"></strong><span>10 призовых линий</span></div></div>':'')+
 
-    (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span><span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
+    (scatter?'<div class="slot-bonus-stats" id="slot-bonus-stats"'+(bonusVisible?'':' hidden')+'><span>Бесплатных вращений осталось: <strong id="slot-bonus-remaining">'+(bonus?.remaining||0)+'</strong></span>'+
+      (game.slug==='golden-seven'?'<span>Сыграно: <strong id="egypt-bonus-played">'+(egyptChain?.played_current||0)+'</strong> / <strong id="egypt-bonus-series-total">'+(egyptChain?.current_total||bonus?.remaining||0)+'</strong></span>'+
+      '<span>Серия № <strong id="egypt-bonus-series">'+(egyptChain?.series_number||1)+'</strong></span>'+
+      '<span>Ретриггеров: <strong id="egypt-bonus-retriggers">'+(egyptChain?.retrigger_count||0)+'</strong></span>'+
+      '<span>В очереди: <strong id="egypt-bonus-queue">'+(egyptChain?.queue.length||0)+'</strong></span>':'')+
+      '<span>Выигрыш бонуса: <strong id="slot-bonus-total">'+(bonus?.bonus_win||0)+'</strong></span></div>':'')+
     '<div class="slot-bottom-bar"><button type="button" id="slot-settings-trigger" class="slot-settings-trigger" aria-label="Настройки игры" title="Настройки">⚙</button><div class="slot-meters">'+
     '<div class="slot-meter">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Баланс</span><strong id="slot-balance">'+wallet.balance+'</strong></div>'+
     '<button type="button" class="slot-meter slot-bet-button" id="slot-bet-trigger">'+backgroundImage('bet_panel','slot-meter-background')+'<span>Ставка <span aria-hidden="true">▾</span></span><strong id="slot-bet">'+wallet.bet+'</strong></button>'+
@@ -387,50 +395,113 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const scatter=['slot-classic','golden-seven'].includes(game.slug)?getScatterSettings(game.id):null;
     const active=scatter?getBonusSession(req.user.id,game.id):null;
     if(active&&game.slug==='golden-seven'){
-      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter?.symbolId);
+      const regular=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
       if(!regular.length)return {error:'В Египте нет обычных символов для бонуса.'};
-      let chosen=regular.find(symbol=>symbol.id===active.selected_symbol_id);
-      if(!chosen){
-        chosen=regular[crypto.randomInt(regular.length)];
+      let chain=getEgyptBonusChain(req.user.id,game.id);
+      if(!chain){
+        // Migrate in-progress bonuses from older releases without forfeiting
+        // their accumulated winnings or selected symbol.
+        const initial=regular.some(s=>s.id===active.selected_symbol_id)
+          ?active.selected_symbol_id:regular[crypto.randomInt(regular.length)].id;
         db.prepare('UPDATE game_bonus_sessions SET selected_symbol_id=? WHERE user_id=? AND game_id=?')
-          .run(chosen.id,req.user.id,game.id);
+          .run(initial,req.user.id,game.id);
+        db.prepare(`INSERT INTO egypt_bonus_chains(user_id,game_id,symbols_json,current_total)
+          VALUES(?,?,?,?)`).run(req.user.id,game.id,JSON.stringify([initial]),active.remaining);
+        chain=getEgyptBonusChain(req.user.id,game.id);
       }
-      const minimum=db.prepare('SELECT min_reels FROM egypt_symbol_bonus_rules WHERE symbol_id=?').get(chosen.id)?.min_reels||3;
-      const board=egyptBonusBoard({symbols:regular,selectedId:chosen.id,
-        reels:layout.reels,rows:layout.rows,minReels:minimum,randomInt:n=>crypto.randomInt(n)});
-      const evaluated=scoreEgyptBonus({cells:board.cells,selectedId:chosen.id,
-        minReels:minimum,bet:active.bet,payouts:getPayouts(game.id)});
-      if(evaluated.total===0){
-        // Zero-payout lines must not expand the symbol or show paylines.
-        board.cells=board.initialCells.slice();
-        board.expandedReels=[];
-        evaluated.lineWins=[];
+      const selected=chain.symbols.filter(id=>regular.some(symbol=>symbol.id===id));
+      if(!selected.length){
+        const chosen=regular[crypto.randomInt(regular.length)].id;
+        selected.push(chosen);
+        db.prepare('UPDATE egypt_bonus_chains SET symbols_json=? WHERE user_id=? AND game_id=?')
+          .run(JSON.stringify(selected),req.user.id,game.id);
       }
-      const total=active.bonus_win+evaluated.total;
-      if(!Number.isSafeInteger(total)||total<0)return {error:'Превышен допустимый бонусный выигрыш.'};
+      // Generate one settled 6x4 board including up to one SCATTER per reel.
+      // Every selected symbol is scored on this unexpanded board independently.
+      const initialBoard=Array.from({length:layout.rows*layout.reels},()=>
+        regular[crypto.randomInt(regular.length)].id);
+      const scatterPlacement=scatterOnBoard(initialBoard,scatter.symbolId,scatter.rules,
+        layout.rows,layout.reels,n=>crypto.randomInt(n));
+      const minRows=db.prepare(`SELECT symbol_id,min_reels FROM egypt_symbol_bonus_rules
+        WHERE symbol_id IN (SELECT id FROM game_symbols WHERE game_id=?)`).all(game.id);
+      const minimum=Object.fromEntries(minRows.map(row=>[row.symbol_id,row.min_reels]));
+      const round=scoreEgyptSymbolSet({cells:scatterPlacement.cells,
+        selectedIds:selected,bet:active.bet,payouts:getPayouts(game.id),minReelsById:minimum});
+      const accumulated=active.bonus_win+round.total;
+      if(!Number.isSafeInteger(accumulated)||accumulated<0)
+        return {error:'Превышен допустимый выигрыш бонуса.'};
+      const retriggerSpins=egyptFreeSpinsFor(scatterPlacement.count);
+      if(retriggerSpins){
+        const nextOrder=db.prepare(`SELECT COALESCE(MAX(queue_order),0)+1 AS n
+          FROM egypt_bonus_pending WHERE user_id=? AND game_id=?`)
+          .get(req.user.id,game.id).n;
+        db.prepare(`INSERT INTO egypt_bonus_pending(user_id,game_id,queue_order,free_spins,scatter_count)
+          VALUES(?,?,?,?,?)`).run(req.user.id,game.id,nextOrder,retriggerSpins,scatterPlacement.count);
+        db.prepare(`UPDATE egypt_bonus_chains SET retrigger_count=retrigger_count+1
+          WHERE user_id=? AND game_id=?`).run(req.user.id,game.id);
+      }
+      const playedCurrent=chain.played_current+1;
+      const playedTotal=chain.played_total+1;
       const remaining=active.remaining-1;
-      let balanceAfter=wallet.balance;
-      if(remaining===0){
-        balanceAfter+=total;
-        if(!Number.isSafeInteger(balanceAfter))return {error:'Превышен допустимый баланс.'};
-        db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?').run(balanceAfter,req.user.id);
-        db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?').run(req.user.id,game.id);
-      }else{
-        db.prepare('UPDATE game_bonus_sessions SET remaining=?,bonus_win=? WHERE user_id=? AND game_id=?')
-          .run(remaining,total,req.user.id,game.id);
+      let selectedNow=selected.slice(),transition=null,finished=false;
+      let currentTotal=chain.current_total,seriesNumber=chain.series_number;
+      let playedSeries=playedCurrent,nextRemaining=remaining,balanceAfter=wallet.balance;
+      const queue=db.prepare(`SELECT queue_order,free_spins,scatter_count FROM egypt_bonus_pending
+        WHERE user_id=? AND game_id=? ORDER BY queue_order`).all(req.user.id,game.id);
+      if(remaining===0&&queue.length){
+        // First series ends silently; all winnings stay pending. Next series
+        // starts with one extra never-used symbol, if any are left to choose.
+        const next=queue[0];
+        db.prepare(`DELETE FROM egypt_bonus_pending
+          WHERE user_id=? AND game_id=? AND queue_order=?`)
+          .run(req.user.id,game.id,next.queue_order);
+        const added=chooseNewEgyptSymbol(regular,selected,n=>crypto.randomInt(n));
+        if(added!==null)selectedNow.push(added);
+        nextRemaining=next.free_spins;
+        currentTotal=next.free_spins;
+        playedSeries=0;
+        seriesNumber++;
+        transition={newSymbolId:added,freeSpins:next.free_spins,
+          seriesNumber,scatterCount:next.scatter_count};
+      }else if(remaining===0){
+        // Only the FINAL bonus in the full retrigger chain credits the wallet.
+        balanceAfter+=accumulated;
+        if(!Number.isSafeInteger(balanceAfter)||balanceAfter<0)
+          return {error:'Превышен допустимый баланс.'};
+        db.prepare('UPDATE user_balances SET balance=? WHERE user_id=?')
+          .run(balanceAfter,req.user.id);
+        db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?')
+          .run(req.user.id,game.id);
+        finished=true;
       }
+      if(!finished){
+        db.prepare(`UPDATE game_bonus_sessions SET remaining=?,bonus_win=?,selected_symbol_id=?
+          WHERE user_id=? AND game_id=?`)
+          .run(nextRemaining,accumulated,selectedNow[selectedNow.length-1],req.user.id,game.id);
+        db.prepare(`UPDATE egypt_bonus_chains SET symbols_json=?,played_current=?,
+          played_total=?,current_total=?,series_number=?
+          WHERE user_id=? AND game_id=?`)
+          .run(JSON.stringify(selectedNow),playedSeries,playedTotal,
+            currentTotal,seriesNumber,req.user.id,game.id);
+      }
+      const queued=db.prepare(`SELECT free_spins,scatter_count FROM egypt_bonus_pending
+        WHERE user_id=? AND game_id=? ORDER BY queue_order`).all(req.user.id,game.id);
       const big=settings?.big_win_multiplier_milli??5000;
       const mega=settings?.mega_win_multiplier_milli??15000;
-      const winTier=evaluated.total>0&&evaluated.total*1000>=active.bet*mega?'mega'
-        :evaluated.total>0&&evaluated.total*1000>=active.bet*big?'big'
-        :evaluated.total>0?'normal':'none';
-      return {mode:'egypt-bonus',cells:board.cells,preExpansionCells:board.initialCells,
-        selectedSymbolId:chosen.id,expandedReels:board.expandedReels,landedReels:board.landedReels,lineWins:evaluated.lineWins,
-        minReels:minimum,matchedReels:evaluated.matchedReels,
-        perLine:evaluated.perLine,total:evaluated.total,
-        baseWin:evaluated.total,bonusRoundWin:evaluated.total,
-        bonusWin:total,remaining,completedBonus:remaining===0,
-        balance:balanceAfter,bet:active.bet,winTier,wins:[]};
+      const winTier=round.total>0&&round.total*1000>=active.bet*mega?'mega'
+        :round.total>0&&round.total*1000>=active.bet*big?'big'
+        :round.total>0?'normal':'none';
+      return {mode:'egypt-bonus',cells:scatterPlacement.cells,
+        selectedSymbolIds:selected,activeSymbolIds:selectedNow,
+        symbolWins:round.symbolWins,
+        scatterCount:scatterPlacement.count,scatterPositions:scatterPlacement.positions,
+        retriggerSpins,transition,
+        total:round.total,baseWin:round.total,bonusRoundWin:round.total,
+        bonusWin:accumulated,remaining:nextRemaining,
+        played:playedSeries,playedTotal,currentTotal,seriesNumber,
+        retriggerCount:chain.retrigger_count+(retriggerSpins?1:0),
+        pendingBonuses:queued.length,
+        completedBonus:finished,balance:balanceAfter,bet:active.bet,winTier,wins:[]};
     }
     if(active){
       // Free spins are transacted atomically and have a separate pending
@@ -514,6 +585,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         selectedEgypt=options[crypto.randomInt(options.length)].id;
         db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet,selected_symbol_id)
           VALUES(?,?,?,2,0,?,?)`).run(req.user.id,game.id,freeSpins,wallet.bet,selectedEgypt);
+        db.prepare(`INSERT INTO egypt_bonus_chains(user_id,game_id,symbols_json,current_total)
+          VALUES(?,?,?,?)`).run(req.user.id,game.id,JSON.stringify([selectedEgypt]),freeSpins);
       }else{
         db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
           VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
