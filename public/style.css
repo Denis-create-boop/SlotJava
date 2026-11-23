@@ -2575,3 +2575,52 @@ body:has(.slot-game.slot-theme-space)>header{
 @media(prefers-reduced-motion:reduce){
   .slot-theme-classic .ribbon-tile.classic-sticky-wild{animation:none}
 }
+
+/* A winning Classic WILD lunges out toward the player (base + free spins).
+   It is deliberately scoped to paid Wilds, not every visible/locked Wild. */
+.slot-theme-classic .ribbon-tile.is-classic-winning-wild{
+  isolation:isolate;
+  z-index:15;
+  overflow:visible;
+  perspective:750px;
+}
+.slot-theme-classic .ribbon-tile.is-classic-winning-wild img,
+.slot-theme-classic .ribbon-tile.is-classic-winning-wild .ribbon-symbol-fallback{
+  position:relative;
+  z-index:2;
+  transform-origin:center center;
+  animation:classic-wild-approach 1.65s cubic-bezier(.2,.66,.25,1)
+    var(--win-delay,0s) infinite!important;
+  filter:drop-shadow(0 0 10px #ff8919) drop-shadow(0 0 21px #d42b12);
+  will-change:transform,filter;
+}
+.slot-theme-classic .ribbon-tile.is-classic-winning-wild::before{
+  content:"";
+  position:absolute;
+  inset:-17%;
+  border-radius:23px;
+  background:radial-gradient(ellipse,#ffae3788 0%,#f1432f55 42%,transparent 72%);
+  animation:classic-wild-aura 1.65s ease-in-out var(--win-delay,0s) infinite!important;
+  pointer-events:none;
+}
+@keyframes classic-wild-approach{
+  0%,100%{transform:perspective(750px) translateZ(0) scale(1);filter:brightness(1.03) drop-shadow(0 0 8px #d93c14)}
+  32%{transform:perspective(750px) translateZ(90px) scale(1.38);filter:brightness(1.2) drop-shadow(0 0 14px #ffbd52)}
+  54%{transform:perspective(750px) translateZ(185px) scale(1.78);filter:brightness(1.34) drop-shadow(0 0 26px #ff8e24)}
+  76%{transform:perspective(750px) translateZ(75px) scale(1.28);filter:brightness(1.14) drop-shadow(0 0 14px #d93013)}
+}
+@keyframes classic-wild-aura{
+  0%,100%{opacity:.25;transform:scale(.65)}
+  52%{opacity:1;transform:scale(1.35)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-classic .ribbon-tile.is-classic-winning-wild img,
+  .slot-theme-classic .ribbon-tile.is-classic-winning-wild .ribbon-symbol-fallback,
+  .slot-theme-classic .ribbon-tile.is-classic-winning-wild::before{
+    animation:none!important;
+  }
+  .slot-theme-classic .ribbon-tile.is-classic-winning-wild img,
+  .slot-theme-classic .ribbon-tile.is-classic-winning-wild .ribbon-symbol-fallback{
+    transform:scale(1.08);
+  }
+}
