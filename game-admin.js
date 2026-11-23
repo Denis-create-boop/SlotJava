@@ -493,6 +493,11 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         awardEditor+
         (game.slug==='golden-seven'?'<h3>Линии бонусной игры ('+egyptLineEntries.length+')</h3>'+egyptLinePreview+
           '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому каждая из настроенных линий учитывает все такие барабаны, даже несоседние.</p>':'')+
+        (game.slug==='slot-classic'?'<form method="post" action="/admin/games/'+id+'/classic-bonus-scatter-chance" class="win-setting-form">'+csrf+
+          '<h3>Шанс SCATTER в бонусной игре (общий)</h3>'+
+          '<p class="hint">Отдельная вероятность появления SCATTER во время бесплатных вращений и респинов. Один процент применяется ко всем барабанам; для платных вращений остаются индивидуальные настройки ниже.</p>'+
+          '<label>Шанс SCATTER на каждом барабане в бонусе, %<input type="number" name="chance_percent" min="0" max="100" step="1" value="'+(db.prepare('SELECT chance_percent FROM classic_bonus_scatter_settings WHERE game_id=?').get(id)?.chance_percent??12)+'" required></label>'+
+          '<button class="primary" type="submit">Сохранить шанс SCATTER бонуса</button></form>':'')+
         (game.slug==='slot-classic'?'<form method="post" action="/admin/games/'+id+'/classic-wild-chance" class="win-setting-form">'+csrf+
           '<h3>WILD в бонусной игре — липкий символ</h3>'+
           '<p class="hint">Задайте шанс выпадения нового WILD в каждой свободной ячейке при вращении и респинах бонуски. 0% — новые WILD не появляются, 100% — каждая свободная ячейка превращается в WILD. Выпавший WILD фиксируется до конца всех бесплатных вращений и не крутится повторно. Уже закреплённые WILD не исчезают. В обычной игре эта настройка не действует.</p>'+
@@ -634,6 +639,17 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     if(!game||!getScatterSettings(id)||!Number.isSafeInteger(count))return res.sendStatus(404);
     db.prepare('DELETE FROM game_scatter_bonus_awards WHERE game_id=? AND scatter_count=?').run(id,count);
     res.redirect(sectionUrl(id,'scatter')+'&saved=1');
+  });
+  app.post('/admin/games/:id/classic-bonus-scatter-chance',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(game?.slug!=='slot-classic')return res.sendStatus(404);
+    const raw=req.body?.chance_percent;
+    if(typeof raw!=='string'||!/^(?:100|[1-9]?\d)$/.test(raw))
+      return show(req,res,'Введите общий шанс SCATTER в бонусе от 0 до 100%.',true,'scatter');
+    db.prepare(`INSERT INTO classic_bonus_scatter_settings(game_id,chance_percent) VALUES(?,?)
+      ON CONFLICT(game_id) DO UPDATE SET chance_percent=excluded.chance_percent`)
+      .run(id,Number(raw));
+    res.redirect(sectionUrl(id,'scatter')+'&scatter_bonus_saved=1');
   });
   app.post('/admin/games/:id/classic-wild-chance',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
