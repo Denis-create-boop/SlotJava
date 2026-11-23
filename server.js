@@ -722,11 +722,19 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const wildChance=classicWild
         ?db.prepare('SELECT chance_percent FROM classic_bonus_wild_settings WHERE game_id=?')
           .get(game.id)?.chance_percent??8:null;
+      // The first game's bonus uses one independent SCATTER chance for all
+      // reels, while preserving each reel's configured count/weight rules.
+      const bonusScatterChance=game.slug==='slot-classic'
+        ?db.prepare('SELECT chance_percent FROM classic_bonus_scatter_settings WHERE game_id=?')
+          .get(game.id)?.chance_percent??12:null;
+      const bonusScatterRules=bonusScatterChance===null?scatter.rules:scatter.rules.map(rule=>({
+        ...rule,chance_percent:bonusScatterChance
+      }));
       const round=playBonusRound({
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
         randomInt:n=>crypto.randomInt(n),scoreBoard:(cells,symbols,payouts,bet,rows)=>scoreBoard(cells,symbols,payouts,bet,rows,null,wildSymbol(game.id)),
-        scatterId:scatter.symbolId,scatterRules:scatter.rules,wildId:classicWild,
+        scatterId:scatter.symbolId,scatterRules:bonusScatterRules,wildId:classicWild,
         stickyWildPositions,wildChancePercent:wildChance
       });
       if(classicWild){
