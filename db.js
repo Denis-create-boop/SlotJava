@@ -832,6 +832,34 @@ CREATE TABLE IF NOT EXISTS classic_bonus_wild_locks(
 db.prepare(`INSERT OR IGNORE INTO classic_bonus_wild_settings(game_id,chance_percent)
   SELECT id,8 FROM games WHERE slug='slot-classic'`).run();
 
+// Configurable Scatter → free-spin award rules, per game. Lower thresholds
+// do not trigger; counts exceeding the highest threshold use its award.
+// Defaults are inserted once. Deleting a rule never resurrects it.
+db.exec(`CREATE TABLE IF NOT EXISTS game_scatter_bonus_awards(
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  scatter_count INTEGER NOT NULL CHECK(scatter_count BETWEEN 1 AND 100),
+  free_spins INTEGER NOT NULL CHECK(free_spins BETWEEN 0 AND 25),
+  PRIMARY KEY(game_id,scatter_count)
+)`);
+{
+  const defaults={
+    'slot-classic':[[3,10],[4,15],[5,20]],
+    'golden-seven':[[3,10],[4,15],[5,20],[6,25]],
+    'lucky-stars':[[3,10],[4,15],[5,20]]
+  };
+  const done=db.prepare('SELECT 1 FROM demo_setup_flags WHERE name=?');
+  const init=db.prepare('INSERT INTO game_scatter_bonus_awards(game_id,scatter_count,free_spins) VALUES(?,?,?)');
+  db.transaction(()=>{
+    for(const [slug,rules] of Object.entries(defaults)){
+      const flag='scatter_bonus_awards_initialized_'+slug;
+      if(done.get(flag))continue;
+      const game=db.prepare('SELECT id FROM games WHERE slug=?').get(slug);
+      if(!game)continue;
+      for(const [count,spins] of rules)init.run(game.id,count,spins);
+      db.prepare('INSERT INTO demo_setup_flags(name) VALUES(?)').run(flag);
+    }
+  })();
+}
 // Egyptian Wild: provide a visible replaceable image-library item and
 // attach it to the protected Wild symbol. Replacing this item in the image
 // library immediately changes the reel symbol too. Existing choices are
