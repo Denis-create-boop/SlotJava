@@ -2556,3 +2556,22 @@ body:has(.slot-game.slot-theme-space)>header{
   .slot-theme-space .reel-column.space-scatter-anticipation-reel,
   .slot-theme-space .space-scatter-suspense-glow{animation:none}
 }
+
+/* Road to Hell: Wild locks to its exact cell for the whole bonus series. */
+.slot-theme-classic .ribbon-tile.classic-sticky-wild,
+.slot-theme-classic .ribbon-tile.bonus-locked.classic-sticky-wild{
+  position:relative;
+  z-index:3;
+  outline:2px solid #ff8a34;
+  outline-offset:-3px;
+  background:radial-gradient(ellipse at center,#7d250d77,transparent 76%);
+  box-shadow:inset 0 0 17px #ff720f88,0 0 14px #f8511999;
+  animation:classic-sticky-wild-glow 1.7s ease-in-out infinite alternate;
+}
+@keyframes classic-sticky-wild-glow{
+  from{filter:brightness(1.02)}
+  to{filter:brightness(1.27)}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot-theme-classic .ribbon-tile.classic-sticky-wild{animation:none}
+}
