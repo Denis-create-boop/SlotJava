@@ -990,7 +990,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS space_bonus_pending (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   seq INTEGER NOT NULL,
-  spins INTEGER NOT NULL CHECK(spins BETWEEN 10 AND 25),
+  spins INTEGER NOT NULL CHECK(spins BETWEEN 1 AND 25),
   PRIMARY KEY(user_id,game_id,seq)
 )`);
 // Cosmic free-spin multiplier is kept separate from the legacy bonus session:
@@ -1027,12 +1027,51 @@ CREATE TABLE IF NOT EXISTS egypt_bonus_pending (
   user_id INTEGER NOT NULL,
   game_id INTEGER NOT NULL,
   queue_order INTEGER NOT NULL,
-  free_spins INTEGER NOT NULL CHECK(free_spins BETWEEN 10 AND 25),
-  scatter_count INTEGER NOT NULL CHECK(scatter_count BETWEEN 3 AND 6),
+  free_spins INTEGER NOT NULL CHECK(free_spins BETWEEN 1 AND 25),
+  scatter_count INTEGER NOT NULL CHECK(scatter_count BETWEEN 1 AND 100),
   PRIMARY KEY(user_id,game_id,queue_order),
   FOREIGN KEY(user_id,game_id) REFERENCES egypt_bonus_chains(user_id,game_id) ON DELETE CASCADE
 );
 `);
+// Existing installations have a 10..25 queue restriction. New editable
+// Scatter rules may award 1..9 free spins and may use custom Scatter counts.
+// Rebuild only these two child tables; preserve every pending bonus entry.
+{
+  const spaceSql=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='space_bonus_pending'").get()?.sql||'';
+  const egyptSql=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='egypt_bonus_pending'").get()?.sql||'';
+  if(/BETWEEN 10 AND 25/i.test(spaceSql)||/BETWEEN 10 AND 25|BETWEEN 3 AND 6/i.test(egyptSql)){
+    db.transaction(()=>{
+      if(/BETWEEN 10 AND 25/i.test(spaceSql)){
+        db.exec(`ALTER TABLE space_bonus_pending RENAME TO space_bonus_pending_old_rules;
+          CREATE TABLE space_bonus_pending (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+            seq INTEGER NOT NULL,
+            spins INTEGER NOT NULL CHECK(spins BETWEEN 1 AND 25),
+            PRIMARY KEY(user_id,game_id,seq)
+          );
+          INSERT INTO space_bonus_pending(user_id,game_id,seq,spins)
+            SELECT user_id,game_id,seq,spins FROM space_bonus_pending_old_rules;
+          DROP TABLE space_bonus_pending_old_rules;`);
+      }
+      if(/BETWEEN 10 AND 25|BETWEEN 3 AND 6/i.test(egyptSql)){
+        db.exec(`ALTER TABLE egypt_bonus_pending RENAME TO egypt_bonus_pending_old_rules;
+          CREATE TABLE egypt_bonus_pending (
+            user_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            queue_order INTEGER NOT NULL,
+            free_spins INTEGER NOT NULL CHECK(free_spins BETWEEN 1 AND 25),
+            scatter_count INTEGER NOT NULL CHECK(scatter_count BETWEEN 1 AND 100),
+            PRIMARY KEY(user_id,game_id,queue_order),
+            FOREIGN KEY(user_id,game_id) REFERENCES egypt_bonus_chains(user_id,game_id) ON DELETE CASCADE
+          );
+          INSERT INTO egypt_bonus_pending(user_id,game_id,queue_order,free_spins,scatter_count)
+            SELECT user_id,game_id,queue_order,free_spins,scatter_count FROM egypt_bonus_pending_old_rules;
+          DROP TABLE egypt_bonus_pending_old_rules;`);
+      }
+    })();
+  }
+}
 function getEgyptBonusChain(userId,gameId){
   const row=db.prepare('SELECT * FROM egypt_bonus_chains WHERE user_id=? AND game_id=?').get(userId,gameId);
   if(!row)return null;
