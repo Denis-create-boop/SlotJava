@@ -797,6 +797,41 @@ for(const game of db.prepare("SELECT id,slug FROM games WHERE slug IN ('slot-cla
   db.prepare('INSERT INTO game_wild_symbols(game_id,symbol_id) VALUES(?,?)').run(game.id,symbol.id);
 }
 
+// The Road to Hell Wild picture is a normal game-library image, assigned
+// directly to the protected WILD symbol. Admin can replace or reassign it.
+{
+  const classic=db.prepare("SELECT id FROM games WHERE slug='slot-classic'").get();
+  if(classic){
+    const wild=db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(classic.id);
+    if(wild){
+      const src='/static/images/symbols/wild-hell.svg';
+      db.prepare('INSERT OR IGNORE INTO game_image_library(game_id,name,builtin_path) VALUES(?,?,?)')
+        .run(classic.id,'WILD — Дорога в АД (замените картинку)',src);
+      const picture=db.prepare('SELECT id FROM game_image_library WHERE game_id=? AND builtin_path=?')
+        .get(classic.id,src);
+      const linked=db.prepare('SELECT 1 FROM game_symbol_images WHERE symbol_id=?').get(wild.symbol_id);
+      const direct=db.prepare("SELECT 1 FROM game_assets WHERE game_id=? AND asset_key=?")
+        .get(classic.id,'symbol_'+wild.symbol_id);
+      if(picture&&!linked&&!direct)
+        db.prepare('INSERT INTO game_symbol_images(symbol_id,library_image_id) VALUES(?,?)')
+          .run(wild.symbol_id,picture.id);
+    }
+  }
+}
+// Persist each sticky WILD for the WHOLE first-game bonus series.
+db.exec(`CREATE TABLE IF NOT EXISTS classic_bonus_wild_settings(
+  game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+  chance_percent INTEGER NOT NULL DEFAULT 8 CHECK(chance_percent BETWEEN 0 AND 100)
+);
+CREATE TABLE IF NOT EXISTS classic_bonus_wild_locks(
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK(position BETWEEN 0 AND 19),
+  PRIMARY KEY(user_id,game_id,position)
+)`);
+db.prepare(`INSERT OR IGNORE INTO classic_bonus_wild_settings(game_id,chance_percent)
+  SELECT id,8 FROM games WHERE slug='slot-classic'`).run();
+
 // Egyptian Wild: provide a visible replaceable image-library item and
 // attach it to the protected Wild symbol. Replacing this item in the image
 // library immediately changes the reel symbol too. Existing choices are
