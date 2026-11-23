@@ -860,6 +860,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS game_scatter_bonus_awards(
     }
   })();
 }
+// Independent bonus-only Scatter odds for the first game, shared by every reel.
+db.exec(`CREATE TABLE IF NOT EXISTS classic_bonus_scatter_settings(
+  game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+  chance_percent INTEGER NOT NULL DEFAULT 12 CHECK(chance_percent BETWEEN 0 AND 100)
+)`);
+db.prepare(`INSERT OR IGNORE INTO classic_bonus_scatter_settings(game_id,chance_percent)
+  SELECT id,12 FROM games WHERE slug='slot-classic'`).run();
+
 // Egyptian Wild: provide a visible replaceable image-library item and
 // attach it to the protected Wild symbol. Replacing this item in the image
 // library immediately changes the reel symbol too. Existing choices are
