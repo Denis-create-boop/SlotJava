@@ -817,8 +817,18 @@
     track.replaceChildren(buildStrip(ids));
   }
 
+  const initialClassicSticky=(root.dataset.classicStickyWilds||'').split(',')
+    .filter(Boolean).map(Number).filter(pos=>Number.isSafeInteger(pos)&&pos>=0&&pos<reelCount*rowCount);
   if(definitions.length){
-    columns.forEach(col=>showStatic(col,Array.from({length:rowCount},sample)));
+    columns.forEach((col,index)=>showStatic(col,Array.from({length:rowCount},(_,row)=>{
+      const pos=row*reelCount+index;
+      return wildId&&initialClassicSticky.includes(pos)?wildId:sample();
+    })));
+    // These cells have already been frozen in the ongoing bonus.
+    for(const pos of initialClassicSticky){
+      const col=pos%reelCount,row=Math.floor(pos/reelCount);
+      columns[col]?.querySelector('.reel-track')?.children[row]?.classList.add('bonus-locked','classic-sticky-wild');
+    }
   }else{
     message.textContent='В игре пока нет символов. Добавьте их через админку.';
     button.disabled=true;
@@ -1221,8 +1231,8 @@
       },stagger*80);
     });
   }
-  async function animateBonusSteps(steps){
-    let locked=new Set();
+  async function animateBonusSteps(steps,stickyBefore=[]){
+    let locked=new Set(stickyBefore);
     for(let i=0;i<steps.length;i++){
       const step=steps[i];
       if(!Array.isArray(step.cells)||step.cells.length!==reelCount*rowCount)
@@ -1244,6 +1254,10 @@
       }
       await Promise.all(animations);
       applyBonusLocks(step.frozenCells);
+      for(const pos of step.stickyWildPositions||[]){
+        const col=pos%reelCount,row=Math.floor(pos/reelCount);
+        columns[col]?.querySelector('.reel-track')?.children[row]?.classList.add('classic-sticky-wild');
+      }
       locked=new Set(step.frozenCells);
       if(step.scatterCount>0){
         const increase=Number(step.scatterIncrease)||0;
@@ -1827,7 +1841,7 @@
       if(autoRunning&&result.mode==='base')autoRemaining=Math.max(0,autoRemaining-1);
       if(autoRunning)paintAutoplay();
       if(result.mode==='bonus'&&Array.isArray(result.steps)){
-        await animateBonusSteps(result.steps);
+        await animateBonusSteps(result.steps,result.stickyWildPositionsBefore||[]);
         button.disabled=true;
         button.classList.remove('is-spin-stoppable');
       }else if(isEgypt&&(result.mode==='base'||result.mode==='egypt-bonus')){
@@ -1891,7 +1905,7 @@
           :(Array.isArray(result.wins)?result.wins:[]));
       }
       if(result.mode==='bonus'&&result.steps?.length)
-        applyBonusLocks(result.steps[result.steps.length-1].frozenCells);
+        applyBonusLocks(result.completedBonus?[]:result.stickyWildPositions||[]);
       balance.textContent=String(result.balance);
       betDisplay.textContent=String(result.bet);
       winDisplay.textContent=result.mode!=='base'&&result.total===0?'—':String(result.total);
@@ -2007,6 +2021,8 @@
             :'Осталось бесплатных вращений: '+result.remaining+'.';
         }
       }else if(result.mode==='bonus'){
+        if(result.completedBonus)root.querySelectorAll('.classic-sticky-wild')
+          .forEach(tile=>tile.classList.remove('classic-sticky-wild'));
         // The tier is based on the final multiplied award, supplied by the server.
         // Announce a large bonus win first, and only then reveal its calculation.
         if(result.baseWin>0){
