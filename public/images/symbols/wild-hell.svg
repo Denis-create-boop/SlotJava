@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="WILD Дорога в АД">
+<defs><radialGradient id="hell"><stop stop-color="#8c130a"/><stop offset=".75" stop-color="#310706"/><stop offset="1" stop-color="#0a080b"/></radialGradient><linearGradient id="lava" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a7"/><stop offset=".48" stop-color="#ff9c20"/><stop offset="1" stop-color="#aa2208"/></linearGradient></defs>
+<rect x="17" y="17" width="366" height="366" rx="30" fill="url(#hell)" stroke="#ed8d2f" stroke-width="13"/>
+<path d="M74 169Q29 89 93 45Q80 126 142 121Q166 67 200 39Q234 67 258 121Q320 126 307 45Q371 89 326 169" fill="#781314" stroke="#ef7c24" stroke-width="8"/>
+<path d="M155 155Q200 119 245 155L255 222L218 252L200 231L182 252L145 222Z" fill="#d1bd9e" stroke="#58170c" stroke-width="8"/>
+<path d="M155 176l30 14-27 12m87-26-30 14 27 12" fill="#ff5c11" stroke="#4a130d" stroke-width="5"/>
+<path d="M170 229l30 22 30-22" stroke="#f8b24c" stroke-width="7" fill="none"/>
+<text x="200" y="328" font-family="Georgia,serif" font-weight="900" font-size="88" text-anchor="middle" fill="url(#lava)" stroke="#5f140b" stroke-width="3">WILD</text></svg>
