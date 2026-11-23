@@ -8,6 +8,7 @@ const { installGameAdmin } = require('./game-admin');
 const { gameLayout, playableGame } = require('./game-layout');
 const { db, verifyPassword, validUsername, validPassword, getUserByName, createUser, countActiveAdmins, listGames, gameById, getGameSettings, getGameAssets, getSymbols, getPayouts, getWallet, getLibraryImages, getSymbolImageLinks, getGameBackgroundImages, getScatterSettings, getBonusSession, getEgyptBonusChain } = require('./db');
 const { scatterOnBoard,freeSpinsFor,playBonusRound } = require('./slot-bonus');
+const {scatterAwardForCount}=require('./scatter-awards');
 const { SPACE_LINES,scoreSpaceLines,resolveSpaceWildBonus } = require('./space-rules');
 const { EGYPT_LINES,egyptWeightedPicker,egyptBonusBoard,scoreEgyptBonus,egyptFreeSpinsFor,scoreEgyptSymbolSet,scoreEgyptBaseLines,nextEgyptBonusSeries,excludeEgyptWildOnSelectedReels } = require('./egypt-bonus');
 
@@ -121,9 +122,9 @@ function layout(title,body,user,csrf,balanceLabel) {
       '<form method="post" action="/logout" class="inline">'+csrfInput(csrf)+'<button type="submit">Выход</button></form>'
     : '<a href="/login">Войти</a><a href="/register">Регистрация</a>';
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=space-scatter-suspense-20261122"></head>'+
+    '<title>'+h(title)+' · SlotJava</title><link rel="stylesheet" href="/static/style.css?v=classic-wild-custom-awards-20261123"></head>'+
     '<body><header><a class="brand" href="/">🎰 SlotJava</a><nav>'+menu+'</nav></header><main>'+body+'</main>'+
-    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=egypt-wild-suspense-20261122" defer></script></body></html>';
+    '<footer>SlotJava · браузерная версия в разработке · сборка egypt-art-3</footer><script src="/static/app.js?v=classic-wild-custom-awards-20261123" defer></script></body></html>';
 }
 function sendPage(res,title,body,req,status=200) {
   let balanceLabel=null;
@@ -214,11 +215,8 @@ function egyptSymbolWeights(gameId){
 function wildSymbol(gameId){return db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(gameId)?.symbol_id||0;}
 function scatterBonusAward(gameId,scatterCount){
   if(!Number.isInteger(scatterCount)||scatterCount<1)return 0;
-  // Greatest configured threshold <= the actual Scatter count. The highest
-  // threshold is deliberately re-used when even more Scatters have landed.
-  return db.prepare(`SELECT free_spins FROM game_scatter_bonus_awards
-    WHERE game_id=? AND scatter_count<=?
-    ORDER BY scatter_count DESC LIMIT 1`).get(gameId,scatterCount)?.free_spins??0;
+  const rows=db.prepare('SELECT scatter_count,free_spins FROM game_scatter_bonus_awards WHERE game_id=?').all(gameId);
+  return scatterAwardForCount(rows,scatterCount);
 }
 
 function spacePaylines(gameId){return db.prepare('SELECT rows_json FROM space_paylines WHERE game_id=? ORDER BY position,id').all(gameId).map(row=>JSON.parse(row.rows_json));}
