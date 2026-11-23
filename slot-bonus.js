@@ -58,13 +58,38 @@ function winningCells(board,wins,reels,rows,wildId=0){
 // A bonus round spends exactly ONE free spin, regardless of respin count.
 // Lock winning CELLS, not entire columns. Every other cell on every reel
 // rolls again, even if another cell on that same reel is already locked.
-function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16,scatterId=0,scatterRules=[],wildId=0}){
+function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard,maxRespins=16,scatterId=0,scatterRules=[],wildId=0,stickyWildPositions=[],wildChancePercent=null}){
   if(!symbols.length)throw Error('Нет игровых символов');
-  const frozenCells=new Set(),steps=[];
+  if(typeof randomInt!=='function')throw Error('Missing random number generator.');
+  const stickyEnabled=wildId>0&&wildChancePercent!==null;
+  const chance=stickyEnabled?Math.max(0,Math.min(100,Number(wildChancePercent)||0)):0;
+  const rollPool=stickyEnabled?symbols.filter(s=>s.id!==wildId):symbols;
+  if(!rollPool.length)throw Error('Нет обычных символов для бонусной игры.');
+  const roll=()=>rollPool[randomInt(rollPool.length)].id;
+  const sticky=new Set(stickyEnabled?(stickyWildPositions||[]).filter(pos=>
+    Number.isInteger(pos)&&pos>=0&&pos<reels*rows):[]);
+  // Sticky Wild stays fixed through respins and all free spins. Ordinary
+  // winning-cell locks from the current round do NOT carry to the next one.
+  const frozenCells=new Set(sticky),steps=[];
   const applyScatter=board=>scatterId
     ?scatterOnBoard(board,scatterId,scatterRules,rows,reels,randomInt,frozenCells)
-    :{cells:board,count:0,positions:[]};
-  let landed=applyScatter(randomBoard(symbols,reels,rows,randomInt));
+    :{cells:board.slice(),count:0,positions:[]};
+  const applyWildChance=landed=>{
+    if(!stickyEnabled)return landed;
+    const cells=landed.cells.slice(),newSticky=[];
+    for(let pos=0;pos<cells.length;pos++){
+      if(sticky.has(pos)){cells[pos]=wildId;continue;}
+      if(frozenCells.has(pos)||cells[pos]===scatterId)continue;
+      if(randomInt(100)<chance){
+        cells[pos]=wildId;
+        sticky.add(pos);frozenCells.add(pos);newSticky.push(pos);
+      }
+    }
+    return {...landed,cells,newSticky};
+  };
+  const initial=Array.from({length:reels*rows},()=>roll());
+  for(const pos of sticky)initial[pos]=wildId;
+  let landed=applyWildChance(applyScatter(initial));
   let board=landed.cells;
   let scatterCount=0;
   let respins=0;
@@ -72,7 +97,7 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
     scatterCount+=landed.count;
     const evaluated=scoreBoard(board,symbols,payouts,bet,rows);
     const active=winningCells(board,evaluated.wins,reels,rows,wildId);
-    const newCells=[];
+    const newCells=Array.isArray(landed.newSticky)?landed.newSticky.slice():[];
     for(const pos of active){
       if(!frozenCells.has(pos)){frozenCells.add(pos);newCells.push(pos);}
     }
@@ -80,6 +105,8 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
       cells:board.slice(),
       frozenCells:[...frozenCells].sort((a,b)=>a-b),
       newCells:newCells.sort((a,b)=>a-b),
+      newStickyWilds:(landed.newSticky||[]).slice(),
+      stickyWildPositions:[...sticky].sort((a,b)=>a-b),
       scatterCount:landed.count,
       scatterPositions:landed.positions||[],
       wins:evaluated.wins
@@ -87,13 +114,14 @@ function playBonusRound({symbols,payouts,bet,reels=5,rows=4,randomInt,scoreBoard
     if(!newCells.length||frozenCells.size===reels*rows||respins>=maxRespins)break;
     const next=board.slice();
     for(let pos=0;pos<next.length;pos++){
-      if(!frozenCells.has(pos))next[pos]=symbols[randomInt(symbols.length)].id;
+      if(!frozenCells.has(pos))next[pos]=roll();
     }
-    landed=applyScatter(next);
+    landed=applyWildChance(applyScatter(next));
     board=landed.cells;
     respins++;
   }
   const result=scoreBoard(board,symbols,payouts,bet,rows);
-  return {steps,board,total:result.total,wins:result.wins,respins,scatterCount};
+  return {steps,board,total:result.total,wins:result.wins,respins,scatterCount,
+    stickyWildPositions:[...sticky].sort((a,b)=>a-b)};
 }
 module.exports={scatterOnBoard,freeSpinsFor,playBonusRound,winningCells};
