@@ -173,6 +173,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     const linked=new Map(getSymbolImageLinks(id).map(item=>[item.symbol_id,item.image_id]));
     const egyptWildId=game.slug==='golden-seven'
       ?db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(id)?.symbol_id||0:0;
+    const classicWildId=game.slug==='slot-classic'
+      ?db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(id)?.symbol_id||0:0;
     const libraryCards=libraryImages.map(image=>{
       const src=libraryUrl(id,image);
       const linkedCount=Array.from(linked.values()).filter(imageId=>imageId===image.id).length+
@@ -190,6 +192,10 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         quickAssign(['background','Фон игры'])+quickAssign(['reels_background','Фон игрового поля'])+quickAssign(['cells_background','Фон барабанов'])+
         (game.slug==='lucky-stars'?quickAssign(['space_bonus_background','Фон космической бонуски']):'')+
         (game.slug==='lucky-stars'?quickAssign(['space_expanding_wild','На весь барабан WILD']):'')+
+        (classicWildId?'<form method="post" action="/admin/games/'+id+'/symbols/'+classicWildId+'/image">'+csrf+
+          '<input type="hidden" name="image_id" value="'+image.id+'">'+
+          '<button type="submit"'+(linked.get(classicWildId)===image.id?' disabled':'')+'>'+
+          (linked.get(classicWildId)===image.id?'WILD АД ✓':'Назначить WILD первой игры')+'</button></form>':'')+
         (egyptWildId?'<form method="post" action="/admin/games/'+id+'/symbols/'+egyptWildId+'/image">'+csrf+
           '<input type="hidden" name="image_id" value="'+image.id+'">'+
           '<button type="submit"'+(linked.get(egyptWildId)===image.id?' disabled':'')+'>'+
@@ -392,6 +398,7 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
       '<button class="primary" type="submit">Сохранить настройки</button></form></section>';
     if(activeTab==='library')panel=panelStart('Папка изображений игры')+
       '<p class="hint">Картинки сохраняются в библиотеке именно этой игры. После загрузки их можно выбирать для символов. PNG, JPG, WEBP, GIF до 5 МБ.</p>'+
+      (classicWildId?'<p class="hint"><strong>WILD — Дорога в АД:</strong> найдите в папке изображение «WILD — Дорога в АД» и замените картинку своей. Она автоматически появится у символа и на барабанах. Другую картинку можно назначить кнопкой «Назначить WILD первой игры».</p>':'')+
       (egyptWildId?'<p class="hint"><strong>WILD Египта:</strong> в папке есть картинка-заглушка «WILD — Египет». Откройте её и нажмите «Заменить картинку», чтобы загрузить собственную — она сразу появится на барабанах и у символа WILD. Если добавите другую картинку в папку, нажмите на её карточке «Назначить WILD Египта».</p>':'')+
       '<form class="library-upload" method="post" action="/admin/games/'+id+'/library?tab=library" enctype="multipart/form-data">'+csrf+
       '<label>Название картинки<input name="name" maxlength="80" required placeholder="Например: Череп"></label>'+
@@ -469,10 +476,16 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<p class="hint">'+(game.slug==='lucky-stars'?'Космос: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20. В бонусе WILD расширяется до одной высокой картинки на весь барабан (3 ячейки); каждый выигрыш считается по редактируемым линиям. SCATTER никогда не заменяется WILD. Повторные SCATTER запускают дополнительные серии.' :game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20, 6 — 25. Перед бонусом случайно выбирается символ, который расширяется на барабан при выпадении. Нет множителя первой игры.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
         (game.slug==='golden-seven'?'<h3>Линии бонусной игры ('+egyptLineEntries.length+')</h3>'+egyptLinePreview+
           '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому каждая из настроенных линий учитывает все такие барабаны, даже несоседние.</p>':'')+
+        (game.slug==='slot-classic'?'<form method="post" action="/admin/games/'+id+'/classic-wild-chance" class="win-setting-form">'+csrf+
+          '<h3>WILD в бонусной игре — липкий символ</h3>'+
+          '<p class="hint">Задайте шанс выпадения нового WILD в каждой свободной ячейке при вращении и респинах бонуски. 0% — новые WILD не появляются, 100% — каждая свободная ячейка превращается в WILD. Выпавший WILD фиксируется до конца всех бесплатных вращений и не крутится повторно. Уже закреплённые WILD не исчезают. В обычной игре эта настройка не действует.</p>'+
+          '<label>Вероятность появления WILD в свободной ячейке, %<input type="number" name="chance_percent" min="0" max="100" step="1" value="'+(db.prepare('SELECT chance_percent FROM classic_bonus_wild_settings WHERE game_id=?').get(id)?.chance_percent??8)+'" required></label>'+
+          '<button class="primary" type="submit">Сохранить вероятность WILD</button></form>':'')+
         '<form method="post" action="/admin/games/'+id+'/scatter" class="scatter-settings-form">'+csrf+
         '<div class="scatter-rule-grid">'+inputs+'</div><button class="primary" type="submit">Сохранить настройки Scatter</button></form></section>';
     }
     if(activeTab==='symbols')panel=panelStart('Символы и коэффициенты')+
+      (classicWildId?'<p class="hint"><strong>WILD — Дорога в АД</strong>: изображение назначается в папке картинок или ниже в карточке WILD. У WILD нет собственной цены: он заменяет обычные символы при расчёте выигрышной комбинации.</p>':'')+
       (egyptWildId?'<p class="hint"><strong>WILD Египта</strong> находится в этом списке символов. Его картинка выбирается из папки изображений и показывается на барабанах. Своей цены у WILD нет — он подменяет обычный символ и оплачивается по его таблице. <a href="/admin/games/'+id+'?tab=library">Открыть папку изображений для загрузки WILD →</a></p>':'')+
       '<p class="hint">'+(game.slug==='lucky-stars'?'Для каждого символа выберите начало выплат — от 2 или от 3 барабанов — и установите отдельный множитель ставки за 2, 3, 4 и 5 подряд совпавших символов на линии.':game.slug==='golden-seven'?'Установите множитель ставки для 2–6 символов на линии и относительный вес их выпадения. Линии можно создавать и редактировать отдельно в разделе «Линии выигрыша».':'Для каждого символа установите цену одной копии в процентах от ставки и множитель по длине непрерывной цепочки барабанов. Выплата начинается с трёх последовательных барабанов слева направо.')+'</p>'+
       '<form method="post" action="/admin/games/'+id+'/symbols?tab=symbols" class="new-symbol-form">'+csrf+
@@ -568,6 +581,17 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     })();
     if(!deleted)return show(req,res,'Нельзя удалить последнюю линию или линия не найдена.',true,'lines');
     res.redirect(sectionUrl(id,'lines')+'&saved=1');
+  });
+  app.post('/admin/games/:id/classic-wild-chance',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(game?.slug!=='slot-classic')return res.sendStatus(404);
+    const raw=req.body?.chance_percent;
+    if(typeof raw!=='string'||!/^(?:100|[1-9]?\d)$/.test(raw))
+      return show(req,res,'Введите процент выпадения Wild от 0 до 100.',true,'scatter');
+    db.prepare(`INSERT INTO classic_bonus_wild_settings(game_id,chance_percent) VALUES(?,?)
+      ON CONFLICT(game_id) DO UPDATE SET chance_percent=excluded.chance_percent`)
+      .run(id,Number(raw));
+    res.redirect(sectionUrl(id,'scatter')+'&wild_saved=1');
   });
   app.post('/admin/games/:id/scatter',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
