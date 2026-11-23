@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="385" viewBox="0 0 1200 385" role="img" aria-labelledby="title desc">
+<title id="title">SLOT ENGINE — animated project banner</title>
+<desc id="desc">Neon arcade slot illustration with rotating reels, drifting light particles and a moving light sweep.</desc>
+<defs>
+  <linearGradient id="background" x2="1" y2="1"><stop stop-color="#0b0919"/><stop offset=".55" stop-color="#17112b"/><stop offset="1" stop-color="#090b19"/></linearGradient>
+  <linearGradient id="stroke" x2="1"><stop stop-color="#b05eff"/><stop offset=".48" stop-color="#ffbf65"/><stop offset="1" stop-color="#fe5c93"/></linearGradient>
+  <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff6c6"/><stop offset=".46" stop-color="#f9bc5b"/><stop offset="1" stop-color="#e16a53"/></linearGradient>
+  <radialGradient id="reelBg"><stop stop-color="#363047"/><stop offset="1" stop-color="#171327"/></radialGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+  <clipPath id="clip"><rect x="770" y="91" width="354" height="220" rx="20"/></clipPath>
+  <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M34 0H0V34" fill="none" stroke="#b88dd2" stroke-opacity=".10"/></pattern>
+  <g id="star"><path d="M0-18L5-5 18 0 5 5 0 18-5 5-18 0-5-5Z" fill="#ffdca1"/></g>
+</defs>
+<rect width="1200" height="385" rx="23" fill="url(#background)"/>
+<rect width="1200" height="385" rx="23" fill="url(#grid)"/>
+<path d="M0 290Q285 200 545 280T1200 225" fill="none" stroke="#d85cde" stroke-opacity=".15" stroke-width="85" filter="url(#glow)"/>
+<rect x="7" y="7" width="1186" height="371" rx="19" fill="none" stroke="url(#stroke)" stroke-opacity=".65" stroke-width="2"/>
+<g opacity=".8">
+  <circle cx="78" cy="72" r="2" fill="#a7a8ff"><animate attributeName="opacity" values=".15;1;.15" dur="3.1s" repeatCount="indefinite"/></circle>
+  <circle cx="215" cy="42" r="3" fill="#ffe0a8"><animate attributeName="opacity" values=".15;1;.15" dur="2.2s" repeatCount="indefinite"/></circle>
+  <circle cx="446" cy="79" r="2" fill="#da9fff"><animate attributeName="opacity" values=".25;1;.25" dur="3.8s" repeatCount="indefinite"/></circle>
+  <circle cx="612" cy="48" r="3" fill="#f6aaff"><animate attributeName="opacity" values="1;.15;1" dur="2.9s" repeatCount="indefinite"/></circle>
+  <circle cx="1122" cy="60" r="2" fill="#ffcda6"><animate attributeName="opacity" values=".2;1;.2" dur="3.4s" repeatCount="indefinite"/></circle>
+</g>
+<text x="76" y="122" font-family="Arial,Helvetica,sans-serif" font-size="20" letter-spacing="6" fill="#d1a2ff">INTERACTIVE WEB PROJECT</text>
+<text x="72" y="212" font-family="Arial Black,Arial,Helvetica,sans-serif" font-weight="900" font-size="83" letter-spacing="2" fill="url(#gold)">SLOT ENGINE</text>
+<text x="77" y="254" font-family="Arial,Helvetica,sans-serif" font-size="22" letter-spacing="1" fill="#e9deff">Игровые механики · Бонусы · Визуальный редактор</text>
+<g font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700">
+<rect x="77" y="290" width="139" height="37" rx="18.5" fill="#272039" stroke="#745a96"/>
+<text x="146" y="314" text-anchor="middle" fill="#f7e6ff">NODE.JS</text>
+<rect x="230" y="290" width="162" height="37" rx="18.5" fill="#272039" stroke="#745a96"/>
+<text x="311" y="314" text-anchor="middle" fill="#f7e6ff">JAVASCRIPT</text>
+<rect x="406" y="290" width="133" height="37" rx="18.5" fill="#272039" stroke="#745a96"/>
+<text x="472" y="314" text-anchor="middle" fill="#f7e6ff">SQLITE</text>
+</g>
+<rect x="760" y="80" width="374" height="238" rx="26" fill="#0c081b" stroke="#ac79eb" stroke-width="5"/>
+<rect x="770" y="91" width="354" height="220" rx="20" fill="url(#reelBg)"/>
+<g clip-path="url(#clip)">
+  <g stroke="#eeb9ff" stroke-opacity=".33" stroke-width="2">
+    <path d="M888 91V311M1006 91V311M770 201H1124"/>
+  </g>
+  <g font-family="Arial Black,Arial,sans-serif" font-size="53" font-weight="900" text-anchor="middle" fill="#ffd18a">
+    <g>
+      <text x="830" y="171">7</text><text x="830" y="281">✦</text><text x="830" y="391">7</text>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -110;0 0" keyTimes="0;.48;1" dur="4.5s" repeatCount="indefinite"/>
+    </g>
+    <g fill="#ff83bb">
+      <text x="947" y="171">★</text><text x="947" y="281">7</text><text x="947" y="391">★</text>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -110;0 0" keyTimes="0;.5;1" dur="3.7s" repeatCount="indefinite"/>
+    </g>
+    <g fill="#c69bff">
+      <text x="1065" y="171">✦</text><text x="1065" y="281">★</text><text x="1065" y="391">✦</text>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -110;0 0" keyTimes="0;.44;1" dur="4.2s" repeatCount="indefinite"/>
+    </g>
+  </g>
+  <path d="M740 102L800 102 1080 322 1020 322Z" fill="#fff6cb" opacity=".07">
+    <animateTransform attributeName="transform" type="translate" values="-500 0;650 0" dur="5s" repeatCount="indefinite"/>
+  </path>
+</g>
+<g fill="#ffc969">
+  <circle cx="789" cy="66" r="4"/><circle cx="833" cy="66" r="4"/><circle cx="877" cy="66" r="4"/><circle cx="921" cy="66" r="4"/><circle cx="965" cy="66" r="4"/><circle cx="1009" cy="66" r="4"/><circle cx="1053" cy="66" r="4"/><circle cx="1097" cy="66" r="4"/>
+  <animate attributeName="opacity" values=".5;1;.5" dur="1.9s" repeatCount="indefinite"/>
+</g>
+<use href="#star" x="1155" y="191" opacity=".75"><animateTransform attributeName="transform" type="rotate" values="0 1155 191;360 1155 191" dur="9s" repeatCount="indefinite"/></use>
+</svg>
