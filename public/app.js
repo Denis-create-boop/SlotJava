@@ -231,6 +231,7 @@
   const rowCount=Number(root.dataset.rows)||4;
   const isEgypt=root.classList.contains('slot-theme-egypt');
   const isSpace=root.classList.contains('slot-theme-space');
+  const isClassic=root.classList.contains('slot-theme-classic');
   const wildId=Number(root.dataset.wildId)||0;
   // All symbols selected in the current Egyptian bonus are visibly framed
   // on their reel tiles (not just in the legend above the game).
@@ -1115,7 +1116,7 @@
 
   function clearWinningGlow(){
     root.querySelectorAll('.ribbon-tile.is-winning').forEach(tile=>{
-      tile.classList.remove('is-winning','is-winning-wild');
+      tile.classList.remove('is-winning','is-winning-wild','is-classic-winning-wild');
       tile.querySelectorAll('.slot-symbol-prize').forEach(label=>label.remove());
       tile.removeAttribute('data-winning-prize');
     });
@@ -1147,13 +1148,18 @@
     for(const win of wins){
       if(!symbols.has(win.symbolId)||!Number.isInteger(win.reels)||win.reels<(isEgypt?2:3))continue;
       const chainLength=Math.min(columns.length,win.reels);
+      const classic=isClassic&&win.prize>0;
       let prizeTile=null;
       for(let col=0;col<chainLength;col++){
         const matching=Array.from(columns[col].querySelectorAll('.ribbon-tile'))
           .filter(tile=>Number(tile.dataset.symbolId)===win.symbolId);
-        for(const tile of matching){
+        const paidWilds=classic&&wildId
+          ?Array.from(columns[col].querySelectorAll('.ribbon-tile'))
+            .filter(tile=>Number(tile.dataset.symbolId)===wildId):[];
+        for(const tile of [...matching,...paidWilds]){
           tile.style.setProperty('--win-delay',(col*.18)+'s');
           tile.classList.add('is-winning');
+          if(paidWilds.includes(tile))tile.classList.add('is-classic-winning-wild');
         }
         // Show one prize label per matching symbol type, on its final reel.
         // The label is a sibling of the animated image and does not spin.
