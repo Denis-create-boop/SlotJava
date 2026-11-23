@@ -392,6 +392,9 @@ function firstGamePage(game,req){
   const wallet=getWallet(req.user.id,game.id);
   const scatter=getScatterSettings(game.id);
   const bonus=scatter?getBonusSession(req.user.id,game.id):null;
+  const classicSticky=game.slug==='slot-classic'&&bonus
+    ?db.prepare('SELECT position FROM classic_bonus_wild_locks WHERE user_id=? AND game_id=? ORDER BY position')
+      .all(req.user.id,game.id).map(row=>row.position):[];
   const bonusVisible=!!bonus;
   const cosmicQueuedSpins=game.slug==='lucky-stars'&&bonus
     ?db.prepare('SELECT COALESCE(SUM(spins),0) AS total FROM space_bonus_pending WHERE user_id=? AND game_id=?')
@@ -406,7 +409,7 @@ function firstGamePage(game,req){
       rule.reel_index===i+1&&rule.chance_percent>0&&rule.max_symbols>0)?'1':'0').join(',')
     :'';
   return spacePageImage+
-    '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-wild-id="'+wildSymbol(game.id)+'" data-space-expanding-wild="'+h(url('space_expanding_wild')||'')+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
+    '<div class="slot-game slot-theme-'+theme+'" data-game-id="'+game.id+'" data-reels="'+reelCount+'" data-rows="'+rowCount+'" data-scatter-id="'+(scatter?.symbolId||0)+'" data-wild-id="'+wildSymbol(game.id)+'" data-space-expanding-wild="'+h(url('space_expanding_wild')||'')+'" data-bonus-active="'+(bonusVisible?'1':'0')+'" data-classic-sticky-wilds="'+h(classicSticky.join(','))+'" data-egypt-selected="'+selectedEgypt+'" data-egypt-symbols="'+h(egyptSelectedIds.join(','))+'" data-egypt-scatter-eligible="'+egyptScatterOdds+'" data-egypt-line-count="'+egyptLinesCount+'" aria-busy="true">'+
     '<div class="slot-loading-screen" id="slot-loading-screen" role="status" aria-live="polite">'+
       '<div class="slot-loading-panel"><span class="slot-loading-glyph" aria-hidden="true">✦</span>'+
       '<strong>ЗАГРУЗКА</strong>'+
