@@ -212,6 +212,15 @@ function egyptSymbolWeights(gameId){
     WHERE s.game_id=?`).all(gameId).map(row=>[row.symbol_id,row.weight]));
 }
 function wildSymbol(gameId){return db.prepare('SELECT symbol_id FROM game_wild_symbols WHERE game_id=?').get(gameId)?.symbol_id||0;}
+function scatterBonusAward(gameId,scatterCount){
+  if(!Number.isInteger(scatterCount)||scatterCount<1)return 0;
+  // Greatest configured threshold <= the actual Scatter count. The highest
+  // threshold is deliberately re-used when even more Scatters have landed.
+  return db.prepare(`SELECT free_spins FROM game_scatter_bonus_awards
+    WHERE game_id=? AND scatter_count<=?
+    ORDER BY scatter_count DESC LIMIT 1`).get(gameId,scatterCount)?.free_spins??0;
+}
+
 function spacePaylines(gameId){return db.prepare('SELECT rows_json FROM space_paylines WHERE game_id=? ORDER BY position,id').all(gameId).map(row=>JSON.parse(row.rows_json));}
 function spaceRules(gameId){
   const minimums=db.prepare(`SELECT r.symbol_id,r.min_reels FROM space_symbol_rules r
@@ -526,7 +535,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const accumulated=active.bonus_win+bonusRoundWin;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен размер бонусного выигрыша.'};
-      const retriggerSpins=egyptFreeSpinsFor(generated.scatterCount);
+      const retriggerSpins=scatterBonusAward(game.id,generated.scatterCount);
       if(retriggerSpins){
         const seq=db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM space_bonus_pending WHERE user_id=? AND game_id=?')
           .get(req.user.id,game.id).seq;
@@ -625,7 +634,7 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       const accumulated=active.bonus_win+round.total;
       if(!Number.isSafeInteger(accumulated)||accumulated<0)
         return {error:'Превышен допустимый выигрыш бонуса.'};
-      const retriggerSpins=egyptFreeSpinsFor(scatterPlacement.count);
+      const retriggerSpins=scatterBonusAward(game.id,scatterPlacement.count);
       if(retriggerSpins){
         const nextOrder=db.prepare(`SELECT COALESCE(MAX(queue_order),0)+1 AS n
           FROM egypt_bonus_pending WHERE user_id=? AND game_id=?`)
@@ -773,8 +782,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
     const winTier=payout>0&&payout*1000>=wallet.bet*megaThreshold?'mega'
       :payout>0&&payout*1000>=wallet.bet*bigThreshold?'big'
       :payout>0?'normal':'none';
-    const egyptTrigger=game.slug==='golden-seven'&&spin.scatterCount>=3;
-    const freeSpins=scatter?(['golden-seven','lucky-stars'].includes(game.slug)?egyptFreeSpinsFor(spin.scatterCount):freeSpinsFor(spin.scatterCount)):0;
+    const freeSpins=scatter?scatterBonusAward(game.id,spin.scatterCount):0;
+    const egyptTrigger=game.slug==='golden-seven'&&freeSpins>0;
     let selectedEgypt=0;
     if(freeSpins){
       if(game.slug==='golden-seven'){
