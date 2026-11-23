@@ -714,12 +714,24 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       // Free spins are transacted atomically and have a separate pending
       // balance. No credits can be applied before the final free spin.
       const symbols=getSymbols(game.id).filter(symbol=>symbol.id!==scatter.symbolId);
+      const classicWild=game.slug==='slot-classic'?wildSymbol(game.id):0;
+      const stickyWildPositions=classicWild
+        ?db.prepare('SELECT position FROM classic_bonus_wild_locks WHERE user_id=? AND game_id=? ORDER BY position')
+          .all(req.user.id,game.id).map(row=>row.position):[];
+      const wildChance=classicWild
+        ?db.prepare('SELECT chance_percent FROM classic_bonus_wild_settings WHERE game_id=?')
+          .get(game.id)?.chance_percent??8:null;
       const round=playBonusRound({
         symbols,payouts:getPayouts(game.id),bet:active.bet,
         reels:layout.reels,rows:layout.rows,
         randomInt:n=>crypto.randomInt(n),scoreBoard:(cells,symbols,payouts,bet,rows)=>scoreBoard(cells,symbols,payouts,bet,rows,null,wildSymbol(game.id)),
-        scatterId:scatter.symbolId,scatterRules:scatter.rules,wildId:wildSymbol(game.id)
+        scatterId:scatter.symbolId,scatterRules:scatter.rules,wildId:classicWild,
+        stickyWildPositions,wildChancePercent:wildChance
       });
+      if(classicWild){
+        const keep=db.prepare('INSERT OR IGNORE INTO classic_bonus_wild_locks(user_id,game_id,position) VALUES(?,?,?)');
+        for(const pos of round.stickyWildPositions)keep.run(req.user.id,game.id,pos);
+      }
       // Scatter raises the multiplier immediately during this free spin,
       // before its award is calculated. The ordinary win +1 applies AFTER.
       let roundMultiplier=active.multiplier;
@@ -746,6 +758,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
           .run(nextBalance,req.user.id);
         db.prepare('DELETE FROM game_bonus_sessions WHERE user_id=? AND game_id=?')
           .run(req.user.id,game.id);
+        if(classicWild)db.prepare('DELETE FROM classic_bonus_wild_locks WHERE user_id=? AND game_id=?')
+          .run(req.user.id,game.id);
         completed=true;
       }else{
         db.prepare(`UPDATE game_bonus_sessions SET remaining=?,multiplier=?,bonus_win=?
@@ -759,6 +773,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
         :award>0?'normal':'none';
       return {
         mode:'bonus',cells:round.board,steps,
+        stickyWildPositionsBefore:stickyWildPositions,
+        stickyWildPositions:round.stickyWildPositions,
         total:award,baseWin:round.total,
         wins:round.wins.map(win=>({...win,prize:win.prize*roundMultiplier})),
         balance:nextBalance,bet:active.bet,winTier,
@@ -799,6 +815,8 @@ app.post('/games/:slug/spin',guarded,spinLimiter,postGuard,(req,res)=>{
       }else{
         db.prepare(`INSERT INTO game_bonus_sessions(user_id,game_id,remaining,multiplier,bonus_win,bet)
           VALUES(?,?,?,2,0,?)`).run(req.user.id,game.id,freeSpins,wallet.bet);
+        if(game.slug==='slot-classic')db.prepare('DELETE FROM classic_bonus_wild_locks WHERE user_id=? AND game_id=?')
+          .run(req.user.id,game.id);
         if(game.slug==='lucky-stars')
           db.prepare(`INSERT INTO space_bonus_multipliers(user_id,game_id,value) VALUES(?,?,1)
             ON CONFLICT(user_id,game_id) DO UPDATE SET value=1`).run(req.user.id,game.id);
