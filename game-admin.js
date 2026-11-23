@@ -451,6 +451,22 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<script src="/static/admin-lines.js?v=2" defer></script>';
     }
     if(activeTab==='scatter'&&scatter){
+      const scatterAwards=db.prepare('SELECT scatter_count,free_spins FROM game_scatter_bonus_awards WHERE game_id=? ORDER BY scatter_count').all(id);
+      const awardEntries=scatterAwards.map(item=>
+        '<div class="scatter-rule"><form method="post" action="/admin/games/'+id+'/scatter-awards/'+item.scatter_count+'/save">'+csrf+
+        '<label>Количество SCATTER<input type="number" value="'+item.scatter_count+'" name="scatter_count" min="1" max="100" step="1" required></label>'+
+        '<label>Бесплатных вращений<input type="number" value="'+item.free_spins+'" name="free_spins" min="0" max="25" step="1" required></label>'+
+        '<button class="primary" type="submit">Сохранить правило</button></form>'+
+        '<form method="post" action="/admin/games/'+id+'/scatter-awards/'+item.scatter_count+'/delete">'+csrf+
+        '<button class="danger-action" type="submit">Удалить правило</button></form></div>').join('');
+      const awardEditor='<h3>Награды за количество SCATTER</h3>'+
+        '<p class="hint">Каждое правило задаёт количество бесплатных вращений. Можно добавлять, менять и удалять правила. Если SCATTER больше, чем последний заданный порог, используется награда последнего правила. Если меньше первого — бонус не запускается. Допустимо от 0 до 25 вращений за правило.</p>'+
+        '<div class="scatter-rule-grid">'+awardEntries+'</div>'+
+        '<form method="post" action="/admin/games/'+id+'/scatter-awards/add" class="win-setting-form">'+csrf+
+        '<h3>Добавить правило</h3>'+
+        '<label>Количество SCATTER<input type="number" name="scatter_count" min="1" max="100" step="1" required></label>'+
+        '<label>Бесплатных вращений<input type="number" name="free_spins" min="0" max="25" step="1" required></label>'+
+        '<button class="primary" type="submit">Добавить</button></form>';
       const ruleByReel=new Map(scatter.rules.map(rule=>[rule.reel_index,rule]));
       const inputs=Array.from({length:layout.reels},(_,i)=>{
         const reel=i+1,rule=ruleByReel.get(reel)||{chance_percent:0,max_symbols:0};
@@ -473,7 +489,8 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
         '<p class="hint">'+(['golden-seven','lucky-stars'].includes(game.slug)
           ?'Задайте шанс SCATTER отдельно для каждого барабана. На одном барабане может быть только один SCATTER.'
           :'Сначала срабатывает общий шанс барабана, затем выбирается количество Scatter по указанным весам. Например, веса 30, 20 и 70 для одного, двух и трёх Scatter означают пропорции 25%, 16,7% и 58,3% среди появлений. Сумма весов может быть любой. Веса количества выше указанного максимума игнорируются.')+'</p>'+
-        '<p class="hint">'+(game.slug==='lucky-stars'?'Космос: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20. В бонусе WILD расширяется до одной высокой картинки на весь барабан (3 ячейки); каждый выигрыш считается по редактируемым линиям. SCATTER никогда не заменяется WILD. Повторные SCATTER запускают дополнительные серии.' :game.slug==='golden-seven'?'Египет: 3 SCATTER — 10 вращений, 4 — 15, 5 — 20, 6 — 25. Перед бонусом случайно выбирается символ, который расширяется на барабан при выпадении. Нет множителя первой игры.':'3 Scatter — 10 бесплатных вращений; 4 — 15; 5 и более — 20. Бонусный множитель начинается с ×2 и увеличивается на +1 после выигрышного бесплатного вращения. Выигрыш накапливается отдельно и зачисляется только после завершения бонуса.')+'</p>'+
+        '<p class="hint">'+(game.slug==='lucky-stars'?'В космосе WILD расширяется на полный барабан при выигрыше; повторные SCATTER могут добавлять вращения по правилам ниже.':game.slug==='golden-seven'?'В Египте выбранный бонусный символ расширяется; повторные SCATTER начисляют вращения по правилам ниже.':'В первой игре WILD закрепляется в ячейке до конца бонусной серии, а количество вращений определяется правилами ниже.')+'</p>'+
+        awardEditor+
         (game.slug==='golden-seven'?'<h3>Линии бонусной игры ('+egyptLineEntries.length+')</h3>'+egyptLinePreview+
           '<p class="hint">Выбранный символ расширяется на каждый барабан, где выпал, поэтому каждая из настроенных линий учитывает все такие барабаны, даже несоседние.</p>':'')+
         (game.slug==='slot-classic'?'<form method="post" action="/admin/games/'+id+'/classic-wild-chance" class="win-setting-form">'+csrf+
@@ -581,6 +598,42 @@ function installGameAdmin(app,{db,gameById,getGameSettings,getGameAssets,getSymb
     })();
     if(!deleted)return show(req,res,'Нельзя удалить последнюю линию или линия не найдена.',true,'lines');
     res.redirect(sectionUrl(id,'lines')+'&saved=1');
+  });
+  const scatterAwardValues=req=>{
+    const count=Number(req.body?.scatter_count),spins=Number(req.body?.free_spins);
+    if(!Number.isSafeInteger(count)||count<1||count>100||
+       !Number.isSafeInteger(spins)||spins<0||spins>25)return null;
+    return [count,spins];
+  };
+  app.post('/admin/games/:id/scatter-awards/add',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null;
+    if(!game||!getScatterSettings(id))return res.sendStatus(404);
+    const vals=scatterAwardValues(req);
+    if(!vals)return show(req,res,'Укажите целое количество SCATTER от 1 до 100 и вращения от 0 до 25.',true,'scatter');
+    const exists=db.prepare('SELECT 1 FROM game_scatter_bonus_awards WHERE game_id=? AND scatter_count=?').get(id,vals[0]);
+    if(exists)return show(req,res,'Правило для этого числа SCATTER уже существует.',true,'scatter');
+    db.prepare('INSERT INTO game_scatter_bonus_awards(game_id,scatter_count,free_spins) VALUES(?,?,?)')
+      .run(id,...vals);
+    res.redirect(sectionUrl(id,'scatter')+'&saved=1');
+  });
+  app.post('/admin/games/:id/scatter-awards/:count/save',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null,count=Number(req.params.count);
+    if(!game||!getScatterSettings(id)||!Number.isSafeInteger(count))return res.sendStatus(404);
+    const vals=scatterAwardValues(req);
+    if(!vals)return show(req,res,'Укажите допустимые целые числа SCATTER и вращений.',true,'scatter');
+    const present=db.prepare('SELECT 1 FROM game_scatter_bonus_awards WHERE game_id=? AND scatter_count=?').get(id,count);
+    if(!present)return res.sendStatus(404);
+    const duplicate=vals[0]!==count&&db.prepare('SELECT 1 FROM game_scatter_bonus_awards WHERE game_id=? AND scatter_count=?').get(id,vals[0]);
+    if(duplicate)return show(req,res,'Правило с таким количеством SCATTER уже есть.',true,'scatter');
+    db.prepare('UPDATE game_scatter_bonus_awards SET scatter_count=?,free_spins=? WHERE game_id=? AND scatter_count=?')
+      .run(vals[0],vals[1],id,count);
+    res.redirect(sectionUrl(id,'scatter')+'&saved=1');
+  });
+  app.post('/admin/games/:id/scatter-awards/:count/delete',adminOnly,postGuard,(req,res)=>{
+    const id=gameId(req),game=id?gameById(id):null,count=Number(req.params.count);
+    if(!game||!getScatterSettings(id)||!Number.isSafeInteger(count))return res.sendStatus(404);
+    db.prepare('DELETE FROM game_scatter_bonus_awards WHERE game_id=? AND scatter_count=?').run(id,count);
+    res.redirect(sectionUrl(id,'scatter')+'&saved=1');
   });
   app.post('/admin/games/:id/classic-wild-chance',adminOnly,postGuard,(req,res)=>{
     const id=gameId(req),game=id?gameById(id):null;
